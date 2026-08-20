@@ -6,7 +6,7 @@ import { parseQrPayload } from '@qr-attendance/validation';
 
 export interface QrScannerProps {
   isActive: boolean;
-  onScan: (decodedText: string) => void;
+  onScan: (decodedText: string) => Promise<void> | void;
   disabled?: boolean;
 }
 
@@ -21,34 +21,43 @@ export const QrScanner: React.FC<QrScannerProps> = ({
   const [showManualInput, setShowManualInput] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
+
+  const isProcessingRef = useRef(false);
   const lastScannedTimeRef = useRef<number>(0);
   const lastScannedPayloadRef = useRef<string>('');
   const elementId = 'qr-camera-viewport';
 
-  const handleDecoded = useCallback(
-    (decodedText: string) => {
-      const now = Date.now();
-      // Debounce same QR code scanned within 2 seconds
-      if (
-        decodedText === lastScannedPayloadRef.current &&
-        now - lastScannedTimeRef.current < 2000
-      ) {
-        return;
-      }
+  const handleDecoded = useCallback((decodedText: string) => {
+    if (isProcessingRef.current) return;
 
-      lastScannedPayloadRef.current = decodedText;
-      lastScannedTimeRef.current = now;
+    const now = Date.now();
+    // Debounce identical QR code payload for 5 seconds to prevent re-scan loops
+    if (
+      decodedText === lastScannedPayloadRef.current &&
+      now - lastScannedTimeRef.current < 5000
+    ) {
+      return;
+    }
 
-      // Validate QR payload format
-      const parsed = parseQrPayload(decodedText);
-      if (parsed.success) {
-        onScan(decodedText);
-      } else {
-        onScan(decodedText);
-      }
-    },
-    [onScan]
-  );
+    lastScannedPayloadRef.current = decodedText;
+    lastScannedTimeRef.current = now;
+
+    // Validate QR payload format
+    const parsed = parseQrPayload(decodedText);
+    if (!parsed.success) {
+      return;
+    }
+
+    isProcessingRef.current = true;
+    Promise.resolve(onScanRef.current(decodedText))
+      .finally(() => {
+        setTimeout(() => {
+          isProcessingRef.current = false;
+        }, 1200);
+      });
+  }, []);
 
   // Helper to accurately pick the Main 1x back sensor (skipping 0.5x ultra-wide)
   const getMain1xCameraId = (cameras: CameraDevice[]): string => {
@@ -194,12 +203,12 @@ export const QrScanner: React.FC<QrScannerProps> = ({
           .catch(() => {});
       }
     };
-  }, [isActive, handleDecoded]);
+  }, [isActive]); // Strictly depends on isActive only to prevent camera reload cycles
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
-    onScan(manualInput.trim());
+    onScanRef.current(manualInput.trim());
     setManualInput('');
   };
 

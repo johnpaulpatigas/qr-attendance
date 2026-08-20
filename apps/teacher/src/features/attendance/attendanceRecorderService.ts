@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
-import type { RecordAttendancePayload, RecordAttendanceResponse } from '@qr-attendance/types';
+import type { RecordAttendancePayload, RecordAttendanceResponse, SessionType, AttendanceStatus } from '@qr-attendance/types';
 import { parseQrPayload } from '@qr-attendance/validation';
 
 interface StudentQueryResult {
@@ -10,6 +10,38 @@ interface StudentQueryResult {
   middle_name: string | null;
   suffix: string | null;
   section_id: string;
+}
+
+/**
+ * Calculates standard attendance status based on school session schedule
+ */
+export function calculateAttendanceStatus(
+  sessionType: SessionType,
+  scanTime: Date = new Date()
+): AttendanceStatus {
+  const hours = scanTime.getHours();
+  const minutes = scanTime.getMinutes();
+  const timeInMinutes = hours * 60 + minutes;
+
+  // Morning / Whole Day Session: Cutoff is 7:45 AM (465 minutes)
+  if (sessionType === 'morning' || sessionType === 'whole_day') {
+    // If scanned between 7:46 AM and 12:00 PM -> late
+    if (timeInMinutes > 465 && timeInMinutes < 720) {
+      return 'late';
+    }
+    return 'present';
+  }
+
+  // Afternoon Session: Cutoff is 1:15 PM (795 minutes)
+  if (sessionType === 'afternoon') {
+    // If scanned between 1:16 PM and 5:00 PM -> late
+    if (timeInMinutes > 795 && timeInMinutes < 1020) {
+      return 'late';
+    }
+    return 'present';
+  }
+
+  return 'present';
 }
 
 export async function submitAttendanceScan(
@@ -70,12 +102,12 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 3. Check for existing attendance today
+    // 3. Check for existing attendance in this session or on this date/type
     const { data: existingAttendance } = await client
       .from('attendance')
-      .select('id, status, recorded_at')
-      .eq('attendance_session_id', payload.session_id)
+      .select('*')
       .eq('student_id', student.id)
+      .eq('attendance_session_id', payload.session_id)
       .maybeSingle();
 
     if (existingAttendance) {
@@ -89,6 +121,7 @@ export async function submitAttendanceScan(
         status: 'already_recorded',
         message: `${student.first_name} ${student.last_name} was already marked ${existing.status.toUpperCase()} at ${timeStr}.`,
         student,
+        attendance: existing,
       };
     }
 
@@ -117,10 +150,9 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 5. Determine status (e.g. late if past 7:45 AM or explicitly specified)
+    // 5. Determine status based on explicit payload or session time schedule
     const scanTime = new Date();
-    const isLate = payload.status === 'late' || (scanTime.getHours() === 7 && scanTime.getMinutes() > 45) || scanTime.getHours() > 7;
-    const finalStatus = payload.status || (isLate ? 'late' : 'present');
+    const finalStatus: AttendanceStatus = payload.status || calculateAttendanceStatus(payload.session_type, scanTime);
 
     // 6. Insert attendance record into Supabase with valid recorded_by
     const { data: inserted, error: insertError } = await (client.from('attendance') as any)
@@ -158,7 +190,7 @@ export async function submitAttendanceScan(
         teacher_id: teacherId,
         event_type: 'scanned',
         timestamp: scanTime.toISOString(),
-        metadata: { source: 'web_qr_scanner' },
+        metadata: { source: 'web_qr_scanner', session_type: payload.session_type },
       });
     }
 
@@ -177,6 +209,7 @@ export async function submitAttendanceScan(
         middle_name: student.middle_name,
         suffix: student.suffix,
       },
+      attendance: inserted,
     };
   } catch (err: any) {
     return {

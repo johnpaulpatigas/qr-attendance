@@ -162,31 +162,33 @@ export const AttendancePage: React.FC = () => {
       : 'Student';
 
     if (response.status === 'recorded') {
+      const recordedStatus = response.attendance?.status || 'present';
       playScanTone('success');
       setFeedback({
         type: 'success',
-        title: '✓ Attendance Recorded',
+        title: recordedStatus === 'late' ? '✓ Marked Late' : '✓ Attendance Recorded',
         message: response.message,
         studentName: studentFullName,
       });
 
-      // Update counters and recent list
+      // Update counters and recent list accurately
       setSummary((prev) => ({
         ...prev,
-        present_count: prev.present_count + 1,
+        present_count: recordedStatus === 'present' ? prev.present_count + 1 : prev.present_count,
+        late_count: recordedStatus === 'late' ? prev.late_count + 1 : prev.late_count,
         unrecorded_count: Math.max(0, prev.unrecorded_count - 1),
       }));
 
       if (response.student) {
         const newRecord: AttendanceRecordWithStudent = {
-          id: crypto.randomUUID(),
+          id: response.attendance?.id || crypto.randomUUID(),
           student_id: response.student.id,
           class_id: selectedClassId,
           attendance_session_id: activeSession.id,
           attendance_date: attendanceDate,
           attendance_type: sessionType,
-          status: 'present',
-          recorded_at: new Date().toISOString(),
+          status: recordedStatus,
+          recorded_at: response.attendance?.recorded_at || new Date().toISOString(),
           recorded_by: user?.id || '',
           source: 'qr_scan',
           notes: null,
@@ -194,7 +196,7 @@ export const AttendancePage: React.FC = () => {
           updated_at: new Date().toISOString(),
           student: response.student,
         };
-        setRecentRecords((prev) => [newRecord, ...prev.slice(0, 9)]);
+        setRecentRecords((prev) => [newRecord, ...prev.filter(r => r.student_id !== response.student?.id).slice(0, 9)]);
       }
     } else if (response.status === 'already_recorded') {
       playScanTone('duplicate');
