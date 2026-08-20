@@ -1,8 +1,33 @@
-import React from 'react';
-import { CheckCircle2, Clock, MapPin, User } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@qr-attendance/ui';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState } from '@qr-attendance/ui';
+import { useAuth } from '../features/auth/AuthContext';
+import { fetchTodayAttendance, type TodayStudentStatus } from '../features/attendance/parentAttendanceService';
 
 export const TodayAttendancePage: React.FC = () => {
+  const { activeChild } = useAuth();
+  const [status, setStatus] = useState<TodayStudentStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!activeChild) return;
+    setLoading(true);
+    fetchTodayAttendance(activeChild.student_id).then((res) => {
+      setStatus(res);
+      setLoading(false);
+    });
+  }, [activeChild]);
+
+  if (!activeChild) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 text-center text-slate-500">
+        No linked student selected.
+      </div>
+    );
+  }
+
+  const childName = `${activeChild.first_name} ${activeChild.last_name}`;
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Active Child Summary Header */}
@@ -10,82 +35,157 @@ export const TodayAttendancePage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Today's Attendance</h2>
           <p className="text-sm text-slate-500">
-            Real-time status for <strong className="text-slate-800">Juan Dela Cruz</strong> (LRN: 108234981234)
+            Real-time status for <strong className="text-slate-800">{childName}</strong> (LRN: {activeChild.lrn})
           </p>
         </div>
-        <Badge variant="success" size="md" className="self-start sm:self-auto">
-          Present Today
-        </Badge>
+        {status && (
+          <Badge
+            variant={
+              status.overallStatus === 'present'
+                ? 'success'
+                : status.overallStatus === 'late'
+                ? 'warning'
+                : status.overallStatus === 'absent'
+                ? 'danger'
+                : 'outline'
+            }
+            size="md"
+            className="self-start sm:self-auto capitalize"
+          >
+            {status.overallStatus === 'unrecorded' ? 'Pending Scan' : `${status.overallStatus} Today`}
+          </Badge>
+        )}
       </div>
 
-      {/* Main Status Hero Card */}
-      <Card className="border-emerald-200 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md">
-              <CheckCircle2 className="h-7 w-7" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                Morning Session &bull; Recorded via QR Scan
-              </span>
-              <h3 className="text-xl font-bold text-slate-900">Marked PRESENT at 7:42 AM</h3>
-              <p className="text-sm text-slate-600">
-                Scanned by <span className="font-medium text-slate-900">Teacher Cruz</span> at Grade 12 — STEM A
-              </p>
-            </div>
+      {loading ? (
+        <LoadingState message="Fetching today's attendance record..." />
+      ) : status && status.hasScannedToday ? (
+        <div className="space-y-6">
+          {/* Main Status Hero Card */}
+          <Card
+            className={`border shadow-sm ${
+              status.overallStatus === 'present'
+                ? 'border-emerald-200 bg-gradient-to-br from-emerald-500/10 to-teal-500/5'
+                : status.overallStatus === 'late'
+                ? 'border-amber-200 bg-gradient-to-br from-amber-500/10 to-orange-500/5'
+                : 'border-rose-200 bg-gradient-to-br from-rose-500/10 to-red-500/5'
+            }`}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ${
+                    status.overallStatus === 'present'
+                      ? 'bg-emerald-600'
+                      : status.overallStatus === 'late'
+                      ? 'bg-amber-600'
+                      : 'bg-rose-600'
+                  }`}
+                >
+                  {status.overallStatus === 'present' ? (
+                    <CheckCircle2 className="h-7 w-7" />
+                  ) : status.overallStatus === 'late' ? (
+                    <Clock className="h-7 w-7" />
+                  ) : (
+                    <XCircle className="h-7 w-7" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Morning Session &bull; Recorded via QR Scan
+                  </span>
+                  <h3 className="text-xl font-bold text-slate-900">
+                    Marked {status.overallStatus.toUpperCase()} at{' '}
+                    {status.lastRecordedAt
+                      ? new Date(status.lastRecordedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '7:42 AM'}
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    Recorded by <span className="font-semibold text-slate-900">{status.recordedByTeacherName || 'Class Adviser'}</span> at Grade {activeChild.grade_level} — {activeChild.section_name}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Session Breakdown */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Morning Attendance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-slate-400" /> Time In
+                  </span>
+                  <span className="font-semibold text-emerald-700">
+                    {status.morningRecord
+                      ? new Date(status.morningRecord.recorded_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '7:42 AM'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <User className="h-4 w-4 text-slate-400" /> Recorded By
+                  </span>
+                  <span className="font-medium text-slate-900">
+                    {status.recordedByTeacherName || 'Teacher Cruz'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-slate-400" /> Section
+                  </span>
+                  <span className="font-medium text-slate-900">
+                    Grade {activeChild.grade_level} — {activeChild.section_name}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Afternoon Session</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-slate-400" /> Schedule
+                  </span>
+                  <span className="font-medium text-slate-500">1:00 PM</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <User className="h-4 w-4 text-slate-400" /> Status
+                  </span>
+                  <Badge variant="outline" size="sm">
+                    Pending Afternoon Scan
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Session Details */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Morning Attendance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-slate-400" /> Time In
-              </span>
-              <span className="font-semibold text-emerald-700">7:42 AM (On Time)</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500 flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-400" /> Recorded By
-              </span>
-              <span className="font-medium text-slate-900">Adviser / Teacher Cruz</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500 flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-slate-400" /> Classroom
-              </span>
-              <span className="font-medium text-slate-900">Room 302, Building B</span>
-            </div>
+        </div>
+      ) : (
+        <Card className="border-dashed border-slate-300">
+          <CardContent className="py-12 text-center space-y-3">
+            <AlertCircle className="h-10 w-10 text-slate-400 mx-auto" />
+            <h4 className="text-base font-semibold text-slate-800">
+              No Attendance Scanned Yet Today
+            </h4>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Attendance has not yet been taken for {childName} in Grade {activeChild.grade_level} {activeChild.section_name}. You will receive a notification as soon as the student is scanned.
+            </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Afternoon Session</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-slate-400" /> Time In
-              </span>
-              <span className="font-medium text-slate-400">Scheduled 1:00 PM</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500 flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-400" /> Status
-              </span>
-              <Badge variant="outline" size="sm">Pending Scan</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 };
