@@ -9,7 +9,7 @@ export interface StudentFilters {
 }
 
 // Initial mock dataset for development and instant testability
-const fallbackStudents: StudentWithSection[] = [
+export const fallbackStudents: StudentWithSection[] = [
   {
     id: 'e0123456-789a-bcde-f012-3456789abcde',
     lrn: '108234981234',
