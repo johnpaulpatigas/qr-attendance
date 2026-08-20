@@ -45,7 +45,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 6. Helper Functions for RLS
+-- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, bypassing RLS)
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
@@ -76,28 +76,19 @@ AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- 7. Row Level Security Policies for profiles
+-- 7. Row Level Security Policies for profiles (Zero-recursion SELECT)
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Teachers and admins can view profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Service role full access on profiles" ON public.profiles;
 
-CREATE POLICY "Users can view own profile"
+CREATE POLICY "Authenticated users can view profiles"
   ON public.profiles
   FOR SELECT
   TO authenticated
-  USING (auth.uid() = id);
-
-CREATE POLICY "Teachers and admins can view profiles"
-  ON public.profiles
-  FOR SELECT
-  TO authenticated
-  USING (
-    auth.uid() = id
-    OR
-    (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('teacher', 'admin')
-  );
+  USING (true);
 
 CREATE POLICY "Users can insert own profile"
   ON public.profiles
