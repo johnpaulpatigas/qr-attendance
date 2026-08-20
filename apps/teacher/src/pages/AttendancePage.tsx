@@ -154,6 +154,7 @@ export const AttendancePage: React.FC = () => {
       session_id: activeSession.id,
       attendance_date: attendanceDate,
       session_type: sessionType,
+      recorded_by: user?.id,
     });
 
     const studentFullName = response.student

@@ -92,12 +92,37 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 4. Determine status (e.g. late if past 7:45 AM or explicitly specified)
+    // 4. Resolve authenticated teacher ID for recorded_by
+    let teacherId = payload.recorded_by;
+    if (!teacherId) {
+      const { data: { user } } = await client.auth.getUser();
+      teacherId = user?.id;
+    }
+
+    // If teacherId is still not found, query session owner
+    if (!teacherId) {
+      const { data: sessionData } = await client
+        .from('attendance_sessions')
+        .select('teacher_id')
+        .eq('id', payload.session_id)
+        .maybeSingle();
+      teacherId = (sessionData as any)?.teacher_id;
+    }
+
+    if (!teacherId) {
+      return {
+        success: false,
+        status: 'unauthorized',
+        message: 'Unable to verify teacher credentials for recording attendance.',
+      };
+    }
+
+    // 5. Determine status (e.g. late if past 7:45 AM or explicitly specified)
     const scanTime = new Date();
     const isLate = payload.status === 'late' || (scanTime.getHours() === 7 && scanTime.getMinutes() > 45) || scanTime.getHours() > 7;
     const finalStatus = payload.status || (isLate ? 'late' : 'present');
 
-    // 5. Insert attendance record into Supabase
+    // 6. Insert attendance record into Supabase with valid recorded_by
     const { data: inserted, error: insertError } = await (client.from('attendance') as any)
       .insert({
         student_id: student.id,
@@ -106,6 +131,7 @@ export async function submitAttendanceScan(
         attendance_date: payload.attendance_date,
         attendance_type: payload.session_type,
         status: finalStatus,
+        recorded_by: teacherId,
         recorded_at: scanTime.toISOString(),
         source: 'qr_scan',
       })
@@ -124,12 +150,17 @@ export async function submitAttendanceScan(
       throw new Error(insertError.message);
     }
 
-    // 6. Log audit event
-    await (client.from('attendance_events') as any).insert({
-      attendance_id: inserted.id,
-      event_type: 'scan',
-      payload: { source: 'web_qr_scanner' },
-    });
+    // 7. Log audit event
+    if (inserted?.id) {
+      await (client.from('attendance_events') as any).insert({
+        attendance_id: inserted.id,
+        student_id: student.id,
+        teacher_id: teacherId,
+        event_type: 'scanned',
+        timestamp: scanTime.toISOString(),
+        metadata: { source: 'web_qr_scanner' },
+      });
+    }
 
     const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const studentName = `${student.first_name} ${student.last_name}`;
