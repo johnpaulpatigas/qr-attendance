@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
-import { QrCode, Lock, Mail } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { QrCode, Lock, Mail, KeyRound } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input } from '@qr-attendance/ui';
-import { loginSchema } from '@qr-attendance/validation';
+import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
+import { useAuth } from '../features/auth/AuthContext';
 
 export const LoginPage: React.FC = () => {
+  const [isResetMode, setIsResetMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { signInWithEmail, resetPassword } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
 
     const validation = loginSchema.safeParse({ email, password });
     if (!validation.success) {
@@ -20,10 +31,36 @@ export const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    // Authentication handled in Phase 2
-    setTimeout(() => {
-      setLoading(false);
-    }, 500);
+    const { error: authError } = await signInWithEmail(email, password);
+    setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+    } else {
+      navigate(from, { replace: true });
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    const validation = passwordResetSchema.safeParse({ email });
+    if (!validation.success) {
+      setError(validation.error.errors[0].message);
+      return;
+    }
+
+    setLoading(true);
+    const { error: resetErr } = await resetPassword(email);
+    setLoading(false);
+
+    if (resetErr) {
+      setError(resetErr.message);
+    } else {
+      setSuccessMessage('Password reset instructions sent to your email address.');
+    }
   };
 
   return (
@@ -41,38 +78,94 @@ export const LoginPage: React.FC = () => {
 
         <Card className="shadow-lg border-slate-200">
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your DepEd teacher credentials to continue</CardDescription>
+            <CardTitle>{isResetMode ? 'Reset Password' : 'Sign In'}</CardTitle>
+            <CardDescription>
+              {isResetMode
+                ? 'Enter your registered DepEd email to receive a recovery link'
+                : 'Enter your teacher credentials to continue'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-                  {error}
+            {isResetMode ? (
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                {error && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                    {error}
+                  </div>
+                )}
+                {successMessage && (
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                    {successMessage}
+                  </div>
+                )}
+                <Input
+                  label="DepEd Email"
+                  type="email"
+                  placeholder="teacher@deped.gov.ph"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  leftIcon={<Mail className="h-4 w-4" />}
+                  required
+                />
+                <Button type="submit" className="w-full" isLoading={loading} leftIcon={<KeyRound className="h-4 w-4" />}>
+                  Send Reset Link
+                </Button>
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetMode(false);
+                      setError(null);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Back to Sign In
+                  </button>
                 </div>
-              )}
-              <Input
-                label="DepEd Email"
-                type="email"
-                placeholder="teacher@deped.gov.ph"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                leftIcon={<Mail className="h-4 w-4" />}
-                required
-              />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                leftIcon={<Lock className="h-4 w-4" />}
-                required
-              />
-              <Button type="submit" className="w-full" isLoading={loading}>
-                Sign In
-              </Button>
-            </form>
+              </form>
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-4">
+                {error && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                    {error}
+                  </div>
+                )}
+                <Input
+                  label="DepEd Email"
+                  type="email"
+                  placeholder="teacher@deped.gov.ph"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  leftIcon={<Mail className="h-4 w-4" />}
+                  required
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  leftIcon={<Lock className="h-4 w-4" />}
+                  required
+                />
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetMode(true);
+                      setError(null);
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <Button type="submit" className="w-full" isLoading={loading}>
+                  Sign In
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>

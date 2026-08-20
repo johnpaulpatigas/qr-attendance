@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { TeacherLayout } from '../../components/layout/TeacherLayout';
+import { ProtectedRoute } from '../../features/auth/ProtectedRoute';
 import { DashboardPage } from '../../pages/DashboardPage';
 import { AttendancePage } from '../../pages/AttendancePage';
 import { StudentsPage } from '../../pages/StudentsPage';
@@ -15,7 +16,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <TeacherLayout />,
+    element: (
+      <ProtectedRoute>
+        <TeacherLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

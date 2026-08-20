@@ -11,9 +11,11 @@ import {
   Wifi,
 } from 'lucide-react';
 import { Button, Badge } from '@qr-attendance/ui';
+import { useAuth } from '../../features/auth/AuthContext';
 
 export const TeacherLayout: React.FC = () => {
   const location = useLocation();
+  const { profile, user, signOut } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -29,6 +31,14 @@ export const TeacherLayout: React.FC = () => {
     if (path !== '/' && location.pathname.startsWith(path)) return true;
     return false;
   };
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Teacher';
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
@@ -67,23 +77,32 @@ export const TeacherLayout: React.FC = () => {
           })}
         </nav>
 
-        {/* Footer info & Logout */}
+        {/* Teacher Info & Logout */}
         <div className="border-t border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between px-2 text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
               <Wifi className="h-3.5 w-3.5 text-emerald-500" />
               Online
             </span>
-            <Badge variant="info" size="sm">Teacher</Badge>
+            <Badge variant="info" size="sm">
+              {profile?.role === 'admin' ? 'Administrator' : 'Teacher'}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-3 px-2 py-1">
+            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+              {initials}
+            </div>
+            <div className="truncate">
+              <p className="text-xs font-semibold text-slate-900 truncate">{displayName}</p>
+              <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+            </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             className="w-full justify-start text-slate-600 hover:text-rose-600 hover:bg-rose-50"
             leftIcon={<LogOut className="h-4 w-4" />}
-            onClick={() => {
-              // Sign out logic
-            }}
+            onClick={() => signOut()}
           >
             Sign Out
           </Button>
@@ -92,7 +111,7 @@ export const TeacherLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar for mobile header */}
+        {/* Top bar */}
         <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-8">
           <div className="flex items-center gap-3 lg:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
@@ -107,10 +126,10 @@ export const TeacherLayout: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <Badge variant="success" size="sm" className="hidden sm:inline-flex">
-              Connected to Supabase
+              Authenticated
             </Badge>
             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
-              TP
+              {initials}
             </div>
           </div>
         </header>
