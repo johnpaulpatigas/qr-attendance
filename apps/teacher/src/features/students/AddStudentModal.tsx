@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Button, Input, Select } from '@qr-attendance/ui';
 import { createStudentSchema } from '@qr-attendance/validation';
-import type { StudentWithSection } from '@qr-attendance/types';
+import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
+import { getSupabaseClient } from '@qr-attendance/supabase';
 import { createStudent } from './studentService';
+import { fetchClassSections } from '../attendance/attendanceSessionService';
 
 export interface AddStudentModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   onClose,
   onStudentCreated,
 }) => {
+  const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
   const [lrn, setLrn] = useState('');
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -22,26 +25,55 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const [suffix, setSuffix] = useState('');
   const [sex, setSex] = useState<'MALE' | 'FEMALE'>('MALE');
   const [birthDate, setBirthDate] = useState('2008-01-01');
-  const [gradeLevel, setGradeLevel] = useState('12');
-  const [sectionId, setSectionId] = useState('sec-1');
+  const [gradeLevel, setGradeLevel] = useState('10');
+  const [sectionId, setSectionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchClassSections().then((secs) => {
+        setSections(secs);
+        if (secs.length > 0) {
+          setSectionId(secs[0].id);
+          setGradeLevel(String(secs[0].grade_level));
+        }
+      });
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    const client = getSupabaseClient();
+
+    if (!sectionId) {
+      setError('Please select or create a class section first.');
+      return;
+    }
+
+    // Resolve active school year
+    let syId = '';
+    const selectedSec = sections.find((s) => s.id === sectionId);
+    if (selectedSec?.school_year_id) {
+      syId = selectedSec.school_year_id;
+    } else {
+      const { data: sy } = await client.from('school_years').select('id').limit(1).maybeSingle();
+      syId = (sy as any)?.id || crypto.randomUUID();
+    }
+
     const inputData = {
       lrn,
-      last_name: lastName,
-      first_name: firstName,
-      middle_name: middleName ? middleName : null,
-      suffix: suffix ? suffix : null,
+      last_name: lastName.trim(),
+      first_name: firstName.trim(),
+      middle_name: middleName.trim() ? middleName.trim() : null,
+      suffix: suffix.trim() ? suffix.trim() : null,
       sex,
       birth_date: birthDate,
       grade_level: Number(gradeLevel),
-      section_id: 'e0123456-789a-bcde-f012-3456789abc01', // Standard section UUID
-      school_year_id: 'e0123456-789a-bcde-f012-3456789abc02', // Standard SY UUID
+      section_id: sectionId,
+      school_year_id: syId,
     };
 
     const validation = createStudentSchema.safeParse(inputData);
@@ -55,7 +87,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       const created = await createStudent(validation.data);
       onStudentCreated({
         ...created,
-        section_name: sectionId === 'sec-1' ? 'STEM A' : 'ABM B',
+        section_name: selectedSec?.section_name || 'Section',
       });
       onClose();
     } catch (err: unknown) {
@@ -145,20 +177,30 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
             value={gradeLevel}
             onChange={(e) => setGradeLevel(e.target.value)}
             options={[
-              { value: '12', label: 'Grade 12' },
-              { value: '11', label: 'Grade 11' },
-              { value: '10', label: 'Grade 10' },
+              { value: '7', label: 'Grade 7' },
+              { value: '8', label: 'Grade 8' },
               { value: '9', label: 'Grade 9' },
+              { value: '10', label: 'Grade 10' },
+              { value: '11', label: 'Grade 11' },
+              { value: '12', label: 'Grade 12' },
             ]}
           />
           <Select
             label="Class Section"
             value={sectionId}
-            onChange={(e) => setSectionId(e.target.value)}
-            options={[
-              { value: 'sec-1', label: 'STEM A' },
-              { value: 'sec-2', label: 'ABM B' },
-            ]}
+            onChange={(e) => {
+              setSectionId(e.target.value);
+              const found = sections.find((s) => s.id === e.target.value);
+              if (found) setGradeLevel(String(found.grade_level));
+            }}
+            options={
+              sections.length > 0
+                ? sections.map((s) => ({
+                    value: s.id,
+                    label: `Grade ${s.grade_level} — ${s.section_name}`,
+                  }))
+                : [{ value: '', label: 'No sections registered yet' }]
+            }
           />
         </div>
 
@@ -166,7 +208,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>
+          <Button type="submit" variant="primary" isLoading={isLoading} disabled={sections.length === 0}>
             Generate QR & Save
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   QrCode,
@@ -8,29 +8,208 @@ import {
   XCircle,
   HelpCircle,
   ArrowRight,
+  PlusCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@qr-attendance/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, LoadingState } from '@qr-attendance/ui';
+import { getSupabaseClient } from '@qr-attendance/supabase';
+import { useAuth } from '../features/auth/AuthContext';
+
+interface DashboardClass {
+  id: string;
+  grade_level: number;
+  section_name: string;
+  room_number: string | null;
+  student_count: number;
+}
+
+interface RecentScan {
+  id: string;
+  student_name: string;
+  lrn: string;
+  status: string;
+  recorded_at: string;
+}
 
 export const DashboardPage: React.FC = () => {
+  const { user, profile } = useAuth();
+  const [classes, setClasses] = useState<DashboardClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+
+  const [metrics, setMetrics] = useState({
+    totalEnrolled: 0,
+    present: 0,
+    late: 0,
+    absent: 0,
+    unrecorded: 0,
+    attendanceRate: 0,
+  });
+
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const client = getSupabaseClient();
+
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        // 1. Fetch Teacher's Class Sections
+        const { data: sectionData } = await client
+          .from('class_sections')
+          .select(`
+            id,
+            grade_level,
+            section_name,
+            room_number,
+            students (
+              id
+            )
+          `)
+          .order('grade_level', { ascending: true });
+
+        const mappedClasses: DashboardClass[] = (sectionData || []).map((s: any) => ({
+          id: s.id,
+          grade_level: s.grade_level,
+          section_name: s.section_name,
+          room_number: s.room_number,
+          student_count: Array.isArray(s.students) ? s.students.length : 0,
+        }));
+
+        setClasses(mappedClasses);
+
+        // 2. Fetch today's total enrolled students
+        let studentQuery = client.from('students').select('id, section_id');
+        if (selectedClassId !== 'all') {
+          studentQuery = studentQuery.eq('section_id', selectedClassId);
+        }
+        const { data: enrolledStudents } = await studentQuery;
+        const totalEnrolled = enrolledStudents?.length || 0;
+
+        // 3. Fetch today's attendance records
+        const todayStr = new Date().toISOString().slice(0, 10);
+        let attendanceQuery = client
+          .from('attendance')
+          .select(`
+            id,
+            student_id,
+            status,
+            recorded_at,
+            class_id,
+            students (
+              first_name,
+              last_name,
+              lrn
+            )
+          `)
+          .eq('attendance_date', todayStr)
+          .order('recorded_at', { ascending: false });
+
+        if (selectedClassId !== 'all') {
+          attendanceQuery = attendanceQuery.eq('class_id', selectedClassId);
+        }
+
+        const { data: attRecords } = await attendanceQuery;
+
+        let present = 0;
+        let late = 0;
+        let absent = 0;
+
+        if (attRecords && Array.isArray(attRecords)) {
+          attRecords.forEach((r: any) => {
+            if (r.status === 'present') present++;
+            else if (r.status === 'late') late++;
+            else if (r.status === 'absent') absent++;
+          });
+        }
+
+        const recordedCount = present + late + absent;
+        const unrecorded = Math.max(0, totalEnrolled - recordedCount);
+        const rate = totalEnrolled > 0 ? Math.round(((present + late) / totalEnrolled) * 100) : 0;
+
+        setMetrics({
+          totalEnrolled,
+          present,
+          late,
+          absent,
+          unrecorded,
+          attendanceRate: rate,
+        });
+
+        // 4. Map Recent Scans
+        if (attRecords && Array.isArray(attRecords)) {
+          const scans: RecentScan[] = attRecords.slice(0, 5).map((r: any) => ({
+            id: r.id,
+            student_name: r.students ? `${r.students.first_name} ${r.students.last_name}` : 'Student',
+            lrn: r.students?.lrn || '',
+            status: r.status,
+            recorded_at: r.recorded_at,
+          }));
+          setRecentScans(scans);
+        } else {
+          setRecentScans([]);
+        }
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [user, selectedClassId]);
+
+  if (loading) {
+    return (
+      <div className="py-12">
+        <LoadingState message="Loading live attendance statistics..." />
+      </div>
+    );
+  }
+
+  const selectedClass = classes.find((c) => c.id === selectedClassId);
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Hero */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
         <div>
-          <h2 className="text-2xl font-extrabold tracking-tight">Today's Attendance</h2>
+          <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
+            Welcome back, {profile?.full_name || 'Teacher'}
+          </span>
+          <h2 className="text-2xl font-extrabold tracking-tight mt-1">Today's Attendance Overview</h2>
           <p className="mt-1 text-sm text-blue-100">
-            Grade 12 — STEM A &bull; Morning Session
+            {selectedClass
+              ? `Grade ${selectedClass.grade_level} — ${selectedClass.section_name} • ${metrics.totalEnrolled} Enrolled`
+              : `${classes.length} Class Section${classes.length === 1 ? '' : 's'} • ${metrics.totalEnrolled} Total Enrolled`}
           </p>
         </div>
-        <Link to="/attendance">
-          <Button
-            size="lg"
-            className="w-full sm:w-auto bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md"
-            leftIcon={<QrCode className="h-5 w-5" />}
-          >
-            Start Scanning
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {classes.length > 0 && (
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="rounded-lg bg-blue-700/80 border border-blue-500 text-white text-xs font-semibold px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <option value="all">All Classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Grade {c.grade_level} — {c.section_name}
+                </option>
+              ))}
+            </select>
+          )}
+          <Link to="/attendance">
+            <Button
+              size="md"
+              className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md shrink-0"
+              leftIcon={<QrCode className="h-4 w-4" />}
+            >
+              Start Scanning
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Summary Stat Cards */}
@@ -45,8 +224,8 @@ export const DashboardPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">45</div>
-            <p className="mt-1 text-xs text-slate-500">Students in class</p>
+            <div className="text-2xl font-bold text-slate-900">{metrics.totalEnrolled}</div>
+            <p className="mt-1 text-xs text-slate-500">Enrolled learners</p>
           </CardContent>
         </Card>
 
@@ -60,8 +239,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">38</div>
-            <p className="mt-1 text-xs text-emerald-600">84.4% attendance</p>
+            <div className="text-2xl font-bold text-emerald-700">{metrics.present}</div>
+            <p className="mt-1 text-xs text-emerald-600">
+              {metrics.attendanceRate}% attendance
+            </p>
           </CardContent>
         </Card>
 
@@ -75,8 +256,8 @@ export const DashboardPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-700">3</div>
-            <p className="mt-1 text-xs text-amber-600">After 7:45 AM</p>
+            <div className="text-2xl font-bold text-amber-700">{metrics.late}</div>
+            <p className="mt-1 text-xs text-amber-600">Marked tardy</p>
           </CardContent>
         </Card>
 
@@ -90,8 +271,8 @@ export const DashboardPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-700">2</div>
-            <p className="mt-1 text-xs text-rose-600">Unexcused</p>
+            <div className="text-2xl font-bold text-rose-700">{metrics.absent}</div>
+            <p className="mt-1 text-xs text-rose-600">Recorded absent</p>
           </CardContent>
         </Card>
 
@@ -105,7 +286,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-700">2</div>
+            <div className="text-2xl font-bold text-slate-700">{metrics.unrecorded}</div>
             <p className="mt-1 text-xs text-slate-500">Pending scan</p>
           </CardContent>
         </Card>
@@ -114,21 +295,53 @@ export const DashboardPage: React.FC = () => {
       {/* Quick Actions & Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Assigned Classes</CardTitle>
+            <Link to="/classes">
+              <Button size="sm" variant="ghost" className="text-xs">
+                View All
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50 transition-colors">
-              <div>
-                <h4 className="font-semibold text-slate-900">Grade 12 — STEM A</h4>
-                <p className="text-xs text-slate-500">45 Students &bull; Advisory Class</p>
+            {classes.length === 0 ? (
+              <div className="text-center py-6 space-y-3">
+                <p className="text-sm text-slate-500">No class sections registered in the database yet.</p>
+                <div className="flex items-center justify-center gap-2">
+                  <Link to="/classes">
+                    <Button size="sm" variant="outline" leftIcon={<PlusCircle className="h-4 w-4" />}>
+                      Create Class
+                    </Button>
+                  </Link>
+                  <Link to="/students/import-sf1">
+                    <Button size="sm" variant="primary" leftIcon={<FileSpreadsheet className="h-4 w-4" />}>
+                      Import SF1
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <Link to="/attendance">
-                <Button size="sm" variant="outline" rightIcon={<ArrowRight className="h-4 w-4" />}>
-                  Open
-                </Button>
-              </Link>
-            </div>
+            ) : (
+              classes.map((cls) => (
+                <div
+                  key={cls.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50 transition-colors"
+                >
+                  <div>
+                    <h4 className="font-semibold text-slate-900">
+                      Grade {cls.grade_level} — {cls.section_name}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      {cls.student_count} Students {cls.room_number ? `• Room ${cls.room_number}` : ''}
+                    </p>
+                  </div>
+                  <Link to="/attendance">
+                    <Button size="sm" variant="outline" rightIcon={<ArrowRight className="h-4 w-4" />}>
+                      Take Attendance
+                    </Button>
+                  </Link>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -137,9 +350,46 @@ export const DashboardPage: React.FC = () => {
             <CardTitle>Recent Attendance Scans</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-slate-500 text-center py-6">
-              No scans recorded yet for the current session.
-            </div>
+            {recentScans.length === 0 ? (
+              <div className="text-sm text-slate-500 text-center py-8">
+                No scans recorded yet today. Open the Attendance page to start scanning student QR passes.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentScans.map((scan) => (
+                  <div
+                    key={scan.id}
+                    className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-0"
+                  >
+                    <div>
+                      <div className="font-medium text-sm text-slate-900">{scan.student_name}</div>
+                      <div className="text-xs text-slate-500">LRN: {scan.lrn}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          scan.status === 'present'
+                            ? 'success'
+                            : scan.status === 'late'
+                            ? 'warning'
+                            : 'danger'
+                        }
+                        size="sm"
+                        className="uppercase font-bold text-[10px]"
+                      >
+                        {scan.status}
+                      </Badge>
+                      <span className="text-xs text-slate-400">
+                        {new Date(scan.recorded_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

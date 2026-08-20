@@ -86,11 +86,11 @@ export const AttendancePage: React.FC = () => {
 
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [summary, setSummary] = useState<AttendanceSummary>({
-    total_students: 45,
+    total_students: 0,
     present_count: 0,
     late_count: 0,
     absent_count: 0,
-    unrecorded_count: 45,
+    unrecorded_count: 0,
   });
 
   const [recentRecords, setRecentRecords] = useState<AttendanceRecordWithStudent[]>([]);
@@ -120,7 +120,7 @@ export const AttendancePage: React.FC = () => {
   const initSession = useCallback(async () => {
     if (!selectedClassId) return;
 
-    const teacherId = user?.id || 't-1';
+    const teacherId = user?.id || '';
     const sess = await getOrCreateAttendanceSession(
       selectedClassId,
       attendanceDate,
@@ -186,7 +186,7 @@ export const AttendancePage: React.FC = () => {
           attendance_type: sessionType,
           status: 'present',
           recorded_at: new Date().toISOString(),
-          recorded_by: user?.id || 't-1',
+          recorded_by: user?.id || '',
           source: 'qr_scan',
           notes: null,
           created_at: new Date().toISOString(),
@@ -230,11 +230,12 @@ export const AttendancePage: React.FC = () => {
             size="sm"
             onClick={() => setIsManualModalOpen(true)}
             leftIcon={<Edit3 className="h-4 w-4" />}
+            disabled={studentsInClass.length === 0}
           >
             Manual Mark / Correction
           </Button>
-          <Badge variant="info" size="md">
-            Session: Active
+          <Badge variant={activeSession ? 'info' : 'outline'} size="md">
+            Session: {activeSession ? 'Active' : 'Initializing...'}
           </Badge>
         </div>
       </div>
@@ -247,10 +248,14 @@ export const AttendancePage: React.FC = () => {
               label="Select Class / Section"
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              options={sections.map((s) => ({
-                value: s.id,
-                label: `Grade ${s.grade_level} — ${s.section_name}`,
-              }))}
+              options={
+                sections.length > 0
+                  ? sections.map((s) => ({
+                      value: s.id,
+                      label: `Grade ${s.grade_level} — ${s.section_name}`,
+                    }))
+                  : [{ value: '', label: 'No sections registered yet' }]
+              }
             />
 
             <Select
@@ -283,6 +288,7 @@ export const AttendancePage: React.FC = () => {
                 variant={isScanning ? 'danger' : 'primary'}
                 leftIcon={isScanning ? <QrCode className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 onClick={() => setIsScanning(!isScanning)}
+                disabled={!selectedClassId}
               >
                 {isScanning ? 'Stop Camera' : 'Start Camera Scanner'}
               </Button>

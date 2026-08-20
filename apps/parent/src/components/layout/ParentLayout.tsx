@@ -20,7 +20,7 @@ export const ParentLayout: React.FC = () => {
     { name: "Today's Status", href: '/', icon: CalendarCheck },
     { name: 'History', href: '/history', icon: History },
     { name: 'Statistics', href: '/statistics', icon: BarChart2 },
-    { name: 'Notifications', href: '/notifications', icon: Bell, badge: 2 },
+    { name: 'Notifications', href: '/notifications', icon: Bell },
   ];
 
   const isActive = (path: string) => {
@@ -94,11 +94,6 @@ export const ParentLayout: React.FC = () => {
                   <Icon className={`h-5 w-5 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
                   {item.name}
                 </div>
-                {item.badge && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -139,13 +134,12 @@ export const ParentLayout: React.FC = () => {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <Badge variant="success" size="sm">FCM Push Enabled</Badge>
+            <Badge variant="success" size="sm">FCM Push Active</Badge>
           </div>
 
           <div className="flex items-center gap-3">
             <Link to="/notifications" className="relative p-1.5 text-slate-500 hover:text-slate-700">
               <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
             </Link>
             <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-800">
               {initials}
@@ -173,11 +167,6 @@ export const ParentLayout: React.FC = () => {
               >
                 <Icon className={`h-5 w-5 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
                 <span className="mt-0.5 text-[10px]">{item.name}</span>
-                {item.badge && (
-                  <span className="absolute top-0.5 right-3 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}

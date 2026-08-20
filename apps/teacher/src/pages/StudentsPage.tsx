@@ -19,14 +19,16 @@ import {
   LoadingState,
   EmptyState,
 } from '@qr-attendance/ui';
-import type { StudentWithSection } from '@qr-attendance/types';
+import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
 import { fetchStudents } from '../features/students/studentService';
+import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { StudentQrModal } from '../features/qr/StudentQrModal';
 import { AddStudentModal } from '../features/students/AddStudentModal';
 import { printBatchStudentQrCards } from '../features/qr/qrUtils';
 
 export const StudentsPage: React.FC = () => {
   const [students, setStudents] = useState<StudentWithSection[]>([]);
+  const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
@@ -34,6 +36,12 @@ export const StudentsPage: React.FC = () => {
 
   const [selectedStudentForQr, setSelectedStudentForQr] = useState<StudentWithSection | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchClassSections().then((secs) => {
+      setSections(secs);
+    });
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -116,10 +124,12 @@ export const StudentsPage: React.FC = () => {
               onChange={(e) => setGradeFilter(e.target.value)}
               options={[
                 { value: 'all', label: 'All Grade Levels' },
-                { value: '12', label: 'Grade 12' },
-                { value: '11', label: 'Grade 11' },
-                { value: '10', label: 'Grade 10' },
+                { value: '7', label: 'Grade 7' },
+                { value: '8', label: 'Grade 8' },
                 { value: '9', label: 'Grade 9' },
+                { value: '10', label: 'Grade 10' },
+                { value: '11', label: 'Grade 11' },
+                { value: '12', label: 'Grade 12' },
               ]}
             />
             <Select
@@ -127,9 +137,10 @@ export const StudentsPage: React.FC = () => {
               onChange={(e) => setSectionFilter(e.target.value)}
               options={[
                 { value: 'all', label: 'All Sections' },
-                { value: 'sec-1', label: 'STEM A' },
-                { value: 'sec-2', label: 'ABM B' },
-                { value: 'sec-3', label: 'Rizal' },
+                ...sections.map((s) => ({
+                  value: s.id,
+                  label: `Grade ${s.grade_level} — ${s.section_name}`,
+                })),
               ]}
             />
           </div>
@@ -151,7 +162,7 @@ export const StudentsPage: React.FC = () => {
             <div className="p-8">
               <EmptyState
                 title="No students found"
-                description="Try adjusting your search query or grade/section filters."
+                description="Try adjusting your search query or grade/section filters, or click Add Student to register."
                 action={{
                   label: 'Add Student',
                   onClick: () => setIsAddModalOpen(true),

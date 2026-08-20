@@ -50,7 +50,7 @@ export const TodayAttendancePage: React.FC = () => {
                 : 'outline'
             }
             size="md"
-            className="self-start sm:self-auto capitalize"
+            className="self-start sm:self-auto capitalize font-bold"
           >
             {status.overallStatus === 'unrecorded' ? 'Pending Scan' : `${status.overallStatus} Today`}
           </Badge>
@@ -92,7 +92,7 @@ export const TodayAttendancePage: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Morning Session &bull; Recorded via QR Scan
+                    Recorded via QR Scan
                   </span>
                   <h3 className="text-xl font-bold text-slate-900">
                     Marked {status.overallStatus.toUpperCase()} at{' '}
@@ -101,7 +101,7 @@ export const TodayAttendancePage: React.FC = () => {
                           hour: '2-digit',
                           minute: '2-digit',
                         })
-                      : '7:42 AM'}
+                      : '—'}
                   </h3>
                   <p className="text-sm text-slate-600">
                     Recorded by <span className="font-semibold text-slate-900">{status.recordedByTeacherName || 'Class Adviser'}</span> at Grade {activeChild.grade_level} — {activeChild.section_name}
@@ -128,7 +128,7 @@ export const TodayAttendancePage: React.FC = () => {
                           hour: '2-digit',
                           minute: '2-digit',
                         })
-                      : '7:42 AM'}
+                      : '—'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -136,7 +136,7 @@ export const TodayAttendancePage: React.FC = () => {
                     <User className="h-4 w-4 text-slate-400" /> Recorded By
                   </span>
                   <span className="font-medium text-slate-900">
-                    {status.recordedByTeacherName || 'Teacher Cruz'}
+                    {status.recordedByTeacherName || 'Class Adviser'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -157,16 +157,23 @@ export const TodayAttendancePage: React.FC = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-slate-400" /> Schedule
+                    <Clock className="h-4 w-4 text-slate-400" /> Time In
                   </span>
-                  <span className="font-medium text-slate-500">1:00 PM</span>
+                  <span className="font-medium text-slate-700">
+                    {status.afternoonRecord
+                      ? new Date(status.afternoonRecord.recorded_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '—'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500 flex items-center gap-2">
                     <User className="h-4 w-4 text-slate-400" /> Status
                   </span>
-                  <Badge variant="outline" size="sm">
-                    Pending Afternoon Scan
+                  <Badge variant={status.afternoonRecord ? 'success' : 'outline'} size="sm">
+                    {status.afternoonRecord ? status.afternoonRecord.status.toUpperCase() : 'Pending Afternoon Scan'}
                   </Badge>
                 </div>
               </CardContent>

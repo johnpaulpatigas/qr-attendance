@@ -45,37 +45,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
 
-      // Default mock children structure for initial development until database tables are seeded
-      const defaultChildren: LinkedStudent[] = [
-        {
-          student_id: 'std-1',
-          lrn: '108234981234',
-          first_name: 'Juan',
-          last_name: 'Dela Cruz',
-          middle_name: 'M.',
-          suffix: null,
-          grade_level: 12,
-          section_name: 'STEM A',
-          relationship: 'Father',
-          is_primary: true,
-        },
-        {
-          student_id: 'std-2',
-          lrn: '108234981235',
-          first_name: 'Maria',
-          last_name: 'Dela Cruz',
-          middle_name: 'M.',
-          suffix: null,
-          grade_level: 9,
-          section_name: 'Rizal',
-          relationship: 'Father',
-          is_primary: false,
-        },
-      ];
+      // Fetch real linked children from student_parents table
+      const { data: parentRecord } = await client
+        .from('parents')
+        .select('id')
+        .eq('profile_id', userId)
+        .maybeSingle();
 
-      setLinkedChildren(defaultChildren);
-      if (!activeChildId && defaultChildren.length > 0) {
-        setActiveChildId(defaultChildren[0].student_id);
+      if (parentRecord) {
+        const parentId = (parentRecord as any).id;
+        const { data: relations } = await client
+          .from('student_parents')
+          .select(`
+            relationship,
+            is_primary,
+            students (
+              id,
+              lrn,
+              first_name,
+              last_name,
+              middle_name,
+              suffix,
+              grade_level,
+              class_sections (
+                section_name
+              )
+            )
+          `)
+          .eq('parent_id', parentId);
+
+        if (relations && relations.length > 0) {
+          const children: LinkedStudent[] = (relations as any[])
+            .filter((rel: any) => rel.students)
+            .map((rel: any) => ({
+              student_id: rel.students.id,
+              lrn: rel.students.lrn,
+              first_name: rel.students.first_name,
+              last_name: rel.students.last_name,
+              middle_name: rel.students.middle_name,
+              suffix: rel.students.suffix,
+              grade_level: rel.students.grade_level,
+              section_name: rel.students.class_sections?.section_name || 'Unassigned',
+              relationship: rel.relationship || 'Guardian',
+              is_primary: rel.is_primary || false,
+            }));
+
+          setLinkedChildren(children);
+          if (children.length > 0) {
+            setActiveChildId((prev) =>
+              prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
+            );
+          } else {
+            setActiveChildId(null);
+          }
+        } else {
+          setLinkedChildren([]);
+          setActiveChildId(null);
+        }
+      } else {
+        setLinkedChildren([]);
+        setActiveChildId(null);
       }
     } catch (err) {
       console.error('Error loading parent data:', err);
@@ -103,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
         setLinkedChildren([]);
+        setActiveChildId(null);
       }
       setIsLoading(false);
     });
@@ -132,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setSession(null);
     setLinkedChildren([]);
+    setActiveChildId(null);
   };
 
   const resetPassword = async (email: string): Promise<{ error: Error | null }> => {

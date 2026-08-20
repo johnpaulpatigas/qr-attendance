@@ -52,7 +52,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         attendance_date: attendanceDate,
         attendance_type: 'morning',
         status: status,
-        recorded_by: user?.id || 't-1',
+        recorded_by: user?.id || null,
         source: 'manual',
         notes: reason.trim(),
         recorded_at: new Date().toISOString(),
@@ -64,7 +64,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         .single();
 
       if (attError) {
-        console.warn('Manual record database fallback:', attError);
+        throw new Error(attError.message);
       }
 
       // Record Audit Event
@@ -72,7 +72,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         await (client.from('attendance_events') as any).insert({
           attendance_id: record.id,
           student_id: studentId,
-          teacher_id: user?.id || 't-1',
+          teacher_id: user?.id || null,
           event_type: 'corrected',
           timestamp: new Date().toISOString(),
           metadata: {
@@ -111,10 +111,14 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           label="Select Student"
           value={selectedStudentId}
           onChange={(e) => setSelectedStudentId(e.target.value)}
-          options={students.map((s) => ({
-            value: s.id,
-            label: `${s.last_name}, ${s.first_name} (LRN: ${s.lrn})`,
-          }))}
+          options={
+            students.length > 0
+              ? students.map((s) => ({
+                  value: s.id,
+                  label: `${s.last_name}, ${s.first_name} (LRN: ${s.lrn})`,
+                }))
+              : [{ value: '', label: 'No students enrolled in this section' }]
+          }
         />
 
         <Select
@@ -142,7 +146,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>
+          <Button type="submit" variant="primary" isLoading={isLoading} disabled={students.length === 0}>
             Save Record & Log Audit
           </Button>
         </div>

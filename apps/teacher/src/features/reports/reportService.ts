@@ -1,6 +1,5 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import type { StudentWithSection, AttendanceRecord } from '@qr-attendance/types';
-import { fallbackStudents } from '../students/studentService';
 
 export interface SF2StudentRow {
   student: StudentWithSection;
@@ -22,7 +21,7 @@ export interface SF2ReportData {
   monthName: string;
   month: number;
   year: number;
-  schoolDays: number[]; // e.g. [1, 2, 3, 4, 7, 8, 9...]
+  schoolDays: number[];
   maleStudents: SF2StudentRow[];
   femaleStudents: SF2StudentRow[];
   maleTotalAbsent: number;
@@ -61,9 +60,11 @@ export async function fetchDailyReport(
       .eq('section_id', classId)
       .order('last_name', { ascending: true });
 
-    const studentList: StudentWithSection[] = (students && students.length > 0)
-      ? (students as any)
-      : fallbackStudents;
+    if (!students || students.length === 0) {
+      return [];
+    }
+
+    const studentList = students as StudentWithSection[];
 
     const { data: attendance } = await client
       .from('attendance')
@@ -92,15 +93,7 @@ export async function fetchDailyReport(
       };
     });
   } catch {
-    return fallbackStudents.map((s) => ({
-      studentId: s.id,
-      lrn: s.lrn,
-      studentName: `${s.last_name}, ${s.first_name}`,
-      sex: s.sex,
-      status: 'present',
-      recordedAt: new Date().toISOString(),
-      source: 'qr_scan',
-    }));
+    return [];
   }
 }
 
@@ -121,8 +114,12 @@ export async function generateSF2Report(
     }
   }
 
-  // Fetch students for class
+  // Fetch real students from database for class
   let students: StudentWithSection[] = [];
+  let sectionName = 'Unassigned';
+  let gradeLevel = 10;
+  let schoolYearName = '2026-2027';
+
   try {
     const { data, error } = await client
       .from('students')
@@ -142,21 +139,22 @@ export async function generateSF2Report(
     if (!error && data && data.length > 0) {
       students = (data as any[]).map((d) => ({
         ...d,
-        section_name: d.class_sections?.section_name || 'STEM A',
+        section_name: d.class_sections?.section_name || 'Section',
         school_year_name: d.school_years?.name || '2026-2027',
       }));
-    } else {
-      students = fallbackStudents;
+      sectionName = students[0].section_name || sectionName;
+      gradeLevel = students[0].grade_level || gradeLevel;
+      schoolYearName = students[0].school_year_name || schoolYearName;
     }
-  } catch {
-    students = fallbackStudents;
+  } catch (err) {
+    console.warn('Could not fetch students for SF2:', err);
   }
 
-  // Fetch attendance records for the entire month
+  // Fetch real attendance records for the entire month
   const startStr = `${year}-${String(month).padStart(2, '0')}-01`;
   const endStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-  const attKeyMap = new Map<string, 'present' | 'late' | 'absent'>(); // `${studentId}_${dayOfMonth}` -> status
+  const attKeyMap = new Map<string, 'present' | 'late' | 'absent'>();
   try {
     const { data: attData } = await client
       .from('attendance')
@@ -195,14 +193,8 @@ export async function generateSF2Report(
           dailyStatus[day] = 'absent';
           totalAbsences++;
         } else {
-          // Default mock baseline for past days
-          const isPast = day <= new Date().getDate();
-          if (isPast) {
-            dailyStatus[day] = 'present';
-            totalPresent++;
-          } else {
-            dailyStatus[day] = null;
-          }
+          // Strictly unrecorded / no session on this day
+          dailyStatus[day] = null;
         }
       });
 
@@ -227,18 +219,18 @@ export async function generateSF2Report(
   const totalEnrollment = students.length;
   const totalSchoolDaysCount = Math.max(1, schoolDays.length);
   const totalDailyAttendance = (maleRows.reduce((s, r) => s + r.totalPresent, 0) + femaleRows.reduce((s, r) => s + r.totalPresent, 0));
-  const ada = Number((totalDailyAttendance / totalSchoolDaysCount).toFixed(1));
-  const attendancePercentage = Number((((ada / Math.max(1, totalEnrollment)) * 100)).toFixed(1));
+  const ada = totalEnrollment > 0 ? Number((totalDailyAttendance / totalSchoolDaysCount).toFixed(1)) : 0;
+  const attendancePercentage = totalEnrollment > 0 ? Number((((ada / totalEnrollment) * 100)).toFixed(1)) : 0;
 
   return {
-    schoolName: 'Division City National High School',
+    schoolName: 'DepEd School',
     schoolId: '301234',
     district: 'District II',
-    division: 'Division of City Schools',
-    region: 'National Capital Region',
-    gradeLevel: students[0]?.grade_level || 12,
-    sectionName: students[0]?.section_name || 'STEM A',
-    schoolYear: '2026-2027',
+    division: 'Division of Schools',
+    region: 'Region',
+    gradeLevel,
+    sectionName,
+    schoolYear: schoolYearName,
     monthName: MONTH_NAMES[month - 1] || 'August',
     month,
     year,
