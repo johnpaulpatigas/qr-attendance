@@ -56,7 +56,6 @@ export const AttendanceHistoryPage: React.FC = () => {
                   <TableHead>Time In</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Method / Source</TableHead>
-                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -95,9 +94,6 @@ export const AttendanceHistoryPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-slate-500 text-xs uppercase">
                       {rec.source.replace('_', ' ')}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500 italic">
-                      {rec.notes || '—'}
                     </TableCell>
                   </TableRow>
                 ))}
