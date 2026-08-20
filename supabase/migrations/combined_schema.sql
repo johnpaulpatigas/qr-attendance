@@ -1,0 +1,580 @@
+-- ==============================================================================
+-- Migration: Create User Roles, Profiles, and School Years
+-- ==============================================================================
+
+-- 1. Create Enums
+CREATE TYPE public.user_role AS ENUM ('teacher', 'admin', 'parent', 'student');
+
+-- 2. Create Profiles Table (References auth.users)
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role public.user_role NOT NULL DEFAULT 'teacher',
+  full_name TEXT NOT NULL,
+  email TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Create School Years Table
+CREATE TABLE public.school_years (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE, -- e.g. '2026-2027'
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_school_year_dates CHECK (end_date > start_date)
+);
+
+-- 4. Enable Row Level Security
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_years ENABLE ROW LEVEL SECURITY;
+
+-- 5. Helper Functions for RLS
+CREATE OR REPLACE FUNCTION public.get_current_user_role()
+RETURNS public.user_role
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (public.get_current_user_role() = 'admin');
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_teacher()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
+$$;
+
+-- 6. Row Level Security Policies for profiles
+CREATE POLICY "Users can view own profile"
+  ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id OR public.is_teacher());
+
+CREATE POLICY "Users can update own profile"
+  ON public.profiles
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Service role full access on profiles"
+  ON public.profiles
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 7. Row Level Security Policies for school_years
+CREATE POLICY "Authenticated users can view school years"
+  ON public.school_years
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Admins can manage school years"
+  ON public.school_years
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- 8. Auto-create Profile on auth.users insert
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, role, full_name, email, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'teacher'::public.user_role),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    NEW.email,
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+-- ==============================================================================
+-- Migration: Create Class Sections Table and RLS Policies
+-- ==============================================================================
+
+-- 1. Create class_sections Table
+CREATE TABLE public.class_sections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 1 AND 12),
+  section_name TEXT NOT NULL,
+  school_year_id UUID NOT NULL REFERENCES public.school_years(id) ON DELETE RESTRICT,
+  teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_class_section_per_school_year UNIQUE (grade_level, section_name, school_year_id)
+);
+
+-- 2. Indexes for fast lookup
+CREATE INDEX idx_class_sections_school_year ON public.class_sections(school_year_id);
+CREATE INDEX idx_class_sections_teacher ON public.class_sections(teacher_id);
+CREATE INDEX idx_class_sections_grade ON public.class_sections(grade_level);
+
+-- 3. Enable Row Level Security
+ALTER TABLE public.class_sections ENABLE ROW LEVEL SECURITY;
+
+-- 4. Helper Function: Is Teacher Assigned to Class
+CREATE OR REPLACE FUNCTION public.is_teacher_of_class(target_class_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.class_sections
+    WHERE id = target_class_id AND teacher_id = auth.uid()
+  ) OR public.is_admin();
+$$;
+
+-- 5. Row Level Security Policies
+-- Authenticated users (teachers, parents, students) can view class information
+CREATE POLICY "Authenticated users can view class sections"
+  ON public.class_sections
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Teachers assigned to the section or Admins can update class details
+CREATE POLICY "Assigned teachers and admins can update class section"
+  ON public.class_sections
+  FOR UPDATE
+  TO authenticated
+  USING (teacher_id = auth.uid() OR public.is_admin())
+  WITH CHECK (teacher_id = auth.uid() OR public.is_admin());
+
+-- Only Admins and authorized Teachers can insert new class sections
+CREATE POLICY "Teachers and admins can insert class sections"
+  ON public.class_sections
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_teacher());
+
+-- Service role full access
+CREATE POLICY "Service role full access on class_sections"
+  ON public.class_sections
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+-- ==============================================================================
+-- Migration: Create Students, Parents, and Student-Parent Relationships
+-- ==============================================================================
+
+-- 1. Create Students Table
+CREATE TABLE public.students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lrn VARCHAR(12) NOT NULL,
+  last_name TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  middle_name TEXT,
+  suffix TEXT,
+  sex VARCHAR(6) NOT NULL CHECK (sex IN ('MALE', 'FEMALE')),
+  birth_date DATE NOT NULL,
+  grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 1 AND 12),
+  section_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE RESTRICT,
+  school_year_id UUID NOT NULL REFERENCES public.school_years(id) ON DELETE RESTRICT,
+  qr_identifier TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_student_lrn_per_school_year UNIQUE (lrn, school_year_id),
+  CONSTRAINT chk_lrn_format CHECK (lrn ~ '^\d{12}$')
+);
+
+-- 2. Create Parents Table
+CREATE TABLE public.parents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
+  contact_information JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Create Student-Parents Relationship Table
+CREATE TABLE public.student_parents (
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  parent_id UUID NOT NULL REFERENCES public.parents(id) ON DELETE CASCADE,
+  relationship TEXT NOT NULL DEFAULT 'Parent',
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (student_id, parent_id)
+);
+
+-- 4. Indexes for fast query and lookup
+CREATE INDEX idx_students_section ON public.students(section_id);
+CREATE INDEX idx_students_school_year ON public.students(school_year_id);
+CREATE INDEX idx_students_qr_identifier ON public.students(qr_identifier);
+CREATE INDEX idx_students_lrn ON public.students(lrn);
+CREATE INDEX idx_student_parents_parent ON public.student_parents(parent_id);
+CREATE INDEX idx_student_parents_student ON public.student_parents(student_id);
+
+-- 5. Enable Row Level Security
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.parents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_parents ENABLE ROW LEVEL SECURITY;
+
+-- 6. Helper Functions for Student Access
+CREATE OR REPLACE FUNCTION public.is_parent_of_student(target_student_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.student_parents sp
+    JOIN public.parents p ON sp.parent_id = p.id
+    WHERE sp.student_id = target_student_id
+      AND p.profile_id = auth.uid()
+  );
+$$;
+
+-- 7. Row Level Security Policies for students
+-- Teachers and admins can view students
+CREATE POLICY "Teachers and admins can view students"
+  ON public.students
+  FOR SELECT
+  TO authenticated
+  USING (public.is_teacher() OR public.is_parent_of_student(id));
+
+-- Teachers and admins can insert students
+CREATE POLICY "Teachers and admins can insert students"
+  ON public.students
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_teacher());
+
+-- Teachers and admins can update students
+CREATE POLICY "Teachers and admins can update students"
+  ON public.students
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
+
+-- Service role full access
+CREATE POLICY "Service role full access on students"
+  ON public.students
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 8. Row Level Security Policies for parents
+CREATE POLICY "Parents can view own parent record"
+  ON public.parents
+  FOR SELECT
+  TO authenticated
+  USING (profile_id = auth.uid() OR public.is_teacher());
+
+CREATE POLICY "Parents can update own parent record"
+  ON public.parents
+  FOR UPDATE
+  TO authenticated
+  USING (profile_id = auth.uid())
+  WITH CHECK (profile_id = auth.uid());
+
+CREATE POLICY "Teachers and admins can manage parents"
+  ON public.parents
+  FOR ALL
+  TO authenticated
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
+
+CREATE POLICY "Service role full access on parents"
+  ON public.parents
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 9. Row Level Security Policies for student_parents
+CREATE POLICY "Parents and teachers can view student parent links"
+  ON public.student_parents
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id AND p.profile_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Teachers and admins can manage student parent links"
+  ON public.student_parents
+  FOR ALL
+  TO authenticated
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
+
+CREATE POLICY "Service role full access on student_parents"
+  ON public.student_parents
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+-- ==============================================================================
+-- Migration: Create Attendance Sessions, Attendance Records, and Audit Events
+-- ==============================================================================
+
+-- 1. Create Enums
+CREATE TYPE public.session_type AS ENUM ('morning', 'afternoon', 'whole_day');
+CREATE TYPE public.attendance_status AS ENUM ('present', 'late', 'absent', 'excused');
+CREATE TYPE public.attendance_source AS ENUM ('qr_scan', 'manual', 'import', 'correction');
+CREATE TYPE public.attendance_event_type AS ENUM (
+  'scanned',
+  'marked_present',
+  'marked_late',
+  'marked_absent',
+  'marked_excused',
+  'corrected',
+  'deleted'
+);
+
+-- 2. Create Attendance Sessions Table
+CREATE TABLE public.attendance_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  session_type public.session_type NOT NULL DEFAULT 'morning',
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_session_per_class_date_type UNIQUE (class_id, attendance_date, session_type)
+);
+
+-- 3. Create Attendance Table
+CREATE TABLE public.attendance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  class_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE CASCADE,
+  attendance_session_id UUID NOT NULL REFERENCES public.attendance_sessions(id) ON DELETE CASCADE,
+  attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  attendance_type public.session_type NOT NULL DEFAULT 'morning',
+  status public.attendance_status NOT NULL DEFAULT 'present',
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  recorded_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  source public.attendance_source NOT NULL DEFAULT 'qr_scan',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Database-level uniqueness constraints preventing duplicate attendance records
+  CONSTRAINT uq_attendance_student_session UNIQUE (student_id, attendance_session_id),
+  CONSTRAINT uq_attendance_student_date_type UNIQUE (student_id, attendance_date, attendance_type)
+);
+
+-- 4. Create Attendance Events Audit Table
+CREATE TABLE public.attendance_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  attendance_id UUID NOT NULL REFERENCES public.attendance(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+  event_type public.attendance_event_type NOT NULL,
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata JSONB NOT NULL DEFAULT '{}'::JSONB
+);
+
+-- 5. Indexes for fast lookup
+CREATE INDEX idx_attendance_sessions_class_date ON public.attendance_sessions(class_id, attendance_date);
+CREATE INDEX idx_attendance_student_date ON public.attendance(student_id, attendance_date);
+CREATE INDEX idx_attendance_session ON public.attendance(attendance_session_id);
+CREATE INDEX idx_attendance_class ON public.attendance(class_id);
+CREATE INDEX idx_attendance_events_attendance ON public.attendance_events(attendance_id);
+CREATE INDEX idx_attendance_events_student ON public.attendance_events(student_id);
+
+-- 6. Enable Row Level Security
+ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_events ENABLE ROW LEVEL SECURITY;
+
+-- 7. Row Level Security Policies for attendance_sessions
+CREATE POLICY "Authenticated users can view attendance sessions"
+  ON public.attendance_sessions
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Teachers can insert attendance sessions for assigned classes"
+  ON public.attendance_sessions
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_teacher_of_class(class_id));
+
+CREATE POLICY "Teachers can update attendance sessions for assigned classes"
+  ON public.attendance_sessions
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_teacher_of_class(class_id))
+  WITH CHECK (public.is_teacher_of_class(class_id));
+
+-- 8. Row Level Security Policies for attendance
+CREATE POLICY "Teachers can view class attendance and parents can view child attendance"
+  ON public.attendance
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    public.is_parent_of_student(student_id)
+  );
+
+CREATE POLICY "Teachers can insert attendance"
+  ON public.attendance
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_teacher_of_class(class_id));
+
+CREATE POLICY "Teachers can update attendance"
+  ON public.attendance
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_teacher_of_class(class_id))
+  WITH CHECK (public.is_teacher_of_class(class_id));
+
+-- 9. Row Level Security Policies for attendance_events
+CREATE POLICY "Teachers and parents can view attendance audit events"
+  ON public.attendance_events
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    public.is_parent_of_student(student_id)
+  );
+
+CREATE POLICY "Teachers can insert attendance audit events"
+  ON public.attendance_events
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_teacher());
+
+-- 10. Service role access for Edge Functions
+CREATE POLICY "Service role full access on attendance_sessions"
+  ON public.attendance_sessions
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Service role full access on attendance"
+  ON public.attendance
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Service role full access on attendance_events"
+  ON public.attendance_events
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+-- ==============================================================================
+-- Migration: Create Device Tokens and Notification Logs for FCM
+-- ==============================================================================
+
+-- 1. Create Device Tokens Table
+CREATE TABLE public.device_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
+  parent_id UUID REFERENCES public.parents(id) ON DELETE CASCADE,
+  fcm_token TEXT NOT NULL UNIQUE,
+  platform VARCHAR(20) NOT NULL DEFAULT 'web' CHECK (platform IN ('web', 'android', 'ios')),
+  device_name TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 2. Create Notification Logs Table
+CREATE TABLE public.notification_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  attendance_id UUID NOT NULL REFERENCES public.attendance(id) ON DELETE CASCADE,
+  notification_type VARCHAR(50) NOT NULL DEFAULT 'attendance_present'
+    CHECK (notification_type IN ('attendance_present', 'attendance_late', 'attendance_absent', 'general')),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'sent', 'failed')),
+  fcm_token TEXT NOT NULL,
+  error_message TEXT,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Indexes for fast token lookup and delivery reporting
+CREATE INDEX idx_device_tokens_profile ON public.device_tokens(profile_id);
+CREATE INDEX idx_device_tokens_active ON public.device_tokens(profile_id, is_active);
+CREATE INDEX idx_notification_logs_recipient ON public.notification_logs(recipient_profile_id);
+CREATE INDEX idx_notification_logs_student ON public.notification_logs(student_id);
+CREATE INDEX idx_notification_logs_attendance ON public.notification_logs(attendance_id);
+
+-- 4. Enable Row Level Security
+ALTER TABLE public.device_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
+
+-- 5. Row Level Security Policies for device_tokens
+CREATE POLICY "Users can manage own device tokens"
+  ON public.device_tokens
+  FOR ALL
+  TO authenticated
+  USING (profile_id = auth.uid())
+  WITH CHECK (profile_id = auth.uid());
+
+CREATE POLICY "Service role full access on device_tokens"
+  ON public.device_tokens
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 6. Row Level Security Policies for notification_logs
+CREATE POLICY "Users can view own notification logs"
+  ON public.notification_logs
+  FOR SELECT
+  TO authenticated
+  USING (recipient_profile_id = auth.uid() OR public.is_teacher());
+
+CREATE POLICY "Service role full access on notification_logs"
+  ON public.notification_logs
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
