@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   BookOpen,
-  FileSpreadsheet,
   BarChart3,
   LogOut,
   Wifi,
@@ -21,15 +20,13 @@ export const TeacherLayout: React.FC = () => {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Scan Attendance', href: '/attendance', icon: QrCode },
     { name: 'Students', href: '/students', icon: Users },
-    { name: 'SF1 Import', href: '/students/import-sf1', icon: FileSpreadsheet },
     { name: 'Classes', href: '/classes', icon: BookOpen },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];
 
   const isActive = (path: string) => {
-    if (path === '/' && location.pathname === '/') return true;
-    if (path !== '/' && location.pathname.startsWith(path)) return true;
-    return false;
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Teacher';
@@ -141,7 +138,7 @@ export const TeacherLayout: React.FC = () => {
 
         {/* Mobile Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white lg:hidden">
-          {navigation.slice(0, 5).map((item) => {
+          {navigation.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (
