@@ -1,13 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Printer, FileSpreadsheet } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Badge, Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@qr-attendance/ui';
+import { Search, Plus, Printer, FileSpreadsheet, QrCode } from 'lucide-react';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  Select,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  LoadingState,
+  EmptyState,
+} from '@qr-attendance/ui';
+import type { StudentWithSection } from '@qr-attendance/types';
+import { fetchStudents } from '../features/students/studentService';
+import { StudentQrModal } from '../features/qr/StudentQrModal';
+import { AddStudentModal } from '../features/students/AddStudentModal';
+import { printBatchStudentQrCards } from '../features/qr/qrUtils';
 
 export const StudentsPage: React.FC = () => {
+  const [students, setStudents] = useState<StudentWithSection[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
+
+  const [selectedStudentForQr, setSelectedStudentForQr] = useState<StudentWithSection | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    const data = await fetchStudents({
+      search,
+      gradeLevel: gradeFilter !== 'all' ? Number(gradeFilter) : undefined,
+      sectionId: sectionFilter !== 'all' ? sectionFilter : undefined,
+    });
+    setStudents(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [search, gradeFilter, sectionFilter]);
+
+  const handleBatchPrint = () => {
+    if (students.length === 0) return;
+    printBatchStudentQrCards(students);
+  };
+
+  const handleStudentUpdated = (updated: StudentWithSection) => {
+    setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setSelectedStudentForQr(updated);
+  };
+
+  const handleStudentCreated = (newStudent: StudentWithSection) => {
+    setStudents((prev) => [newStudent, ...prev]);
+    setSelectedStudentForQr(newStudent);
+  };
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Student Directory</h2>
@@ -21,10 +81,21 @@ export const StudentsPage: React.FC = () => {
               Import SF1
             </Button>
           </Link>
-          <Button variant="outline" size="sm" leftIcon={<Printer className="h-4 w-4" />}>
-            Print All QRs
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Printer className="h-4 w-4" />}
+            onClick={handleBatchPrint}
+            disabled={students.length === 0}
+          >
+            Print Filtered QRs ({students.length})
           </Button>
-          <Button variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />}>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={() => setIsAddModalOpen(true)}
+          >
             Add Student
           </Button>
         </div>
@@ -41,19 +112,24 @@ export const StudentsPage: React.FC = () => {
               leftIcon={<Search className="h-4 w-4" />}
             />
             <Select
+              value={gradeFilter}
+              onChange={(e) => setGradeFilter(e.target.value)}
               options={[
                 { value: 'all', label: 'All Grade Levels' },
                 { value: '12', label: 'Grade 12' },
                 { value: '11', label: 'Grade 11' },
                 { value: '10', label: 'Grade 10' },
+                { value: '9', label: 'Grade 9' },
               ]}
             />
             <Select
+              value={sectionFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
               options={[
                 { value: 'all', label: 'All Sections' },
-                { value: 'stem-a', label: 'STEM A' },
-                { value: 'abm-b', label: 'ABM B' },
-                { value: 'rizal', label: 'Rizal' },
+                { value: 'sec-1', label: 'STEM A' },
+                { value: 'sec-2', label: 'ABM B' },
+                { value: 'sec-3', label: 'Rizal' },
               ]}
             />
           </div>
@@ -62,42 +138,93 @@ export const StudentsPage: React.FC = () => {
 
       {/* Students Data Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Enrolled Students</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base">
+            Enrolled Students ({students.length})
+          </CardTitle>
+          <Badge variant="info" size="sm">SY 2026-2027</Badge>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>LRN</TableHead>
-                <TableHead>Student Name</TableHead>
-                <TableHead>Sex</TableHead>
-                <TableHead>Grade & Section</TableHead>
-                <TableHead>QR Identifier</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-mono text-xs font-semibold">108234981234</TableCell>
-                <TableCell className="font-medium text-slate-900">Dela Cruz, Juan M.</TableCell>
-                <TableCell>Male</TableCell>
-                <TableCell>Grade 12 — STEM A</TableCell>
-                <TableCell>
-                  <Badge variant="outline" size="sm" className="font-mono text-[10px]">
-                    ATTENDANCE:a1b2c3d4...
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">
-                    View QR
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+          {loading ? (
+            <LoadingState message="Loading student records..." />
+          ) : students.length === 0 ? (
+            <div className="p-8">
+              <EmptyState
+                title="No students found"
+                description="Try adjusting your search query or grade/section filters."
+                action={{
+                  label: 'Add Student',
+                  onClick: () => setIsAddModalOpen(true),
+                }}
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>LRN</TableHead>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead>Sex</TableHead>
+                  <TableHead>Grade & Section</TableHead>
+                  <TableHead>QR Identifier</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => {
+                  const fullName = `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
+                  return (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-mono text-xs font-semibold text-slate-800">
+                        {student.lrn}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-900">
+                        {fullName}
+                      </TableCell>
+                      <TableCell className="capitalize text-xs text-slate-600">
+                        {student.sex.toLowerCase()}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        Grade {student.grade_level} — {student.section_name || 'Section'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" size="sm" className="font-mono text-[10px] truncate max-w-[140px]">
+                          ATTENDANCE:{student.qr_identifier.slice(0, 8)}...
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          leftIcon={<QrCode className="h-3.5 w-3.5" />}
+                          onClick={() => setSelectedStudentForQr(student)}
+                        >
+                          View QR
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      {/* QR Display / Print Modal */}
+      <StudentQrModal
+        student={selectedStudentForQr}
+        isOpen={Boolean(selectedStudentForQr)}
+        onClose={() => setSelectedStudentForQr(null)}
+        onStudentUpdated={handleStudentUpdated}
+      />
+
+      {/* Add Student Modal */}
+      <AddStudentModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onStudentCreated={handleStudentCreated}
+      />
     </div>
   );
 };
