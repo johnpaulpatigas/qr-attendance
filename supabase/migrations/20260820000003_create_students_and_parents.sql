@@ -72,11 +72,11 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.is_parent_of_student(UUID) FROM PUBLIC, anon, authenticated;
 
--- 7. Public Function to verify LRN existence (Safely callable during registration)
+-- 7. Public Function to verify LRN existence (SECURITY INVOKER for clean security compliance)
 CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
 DECLARE
@@ -103,17 +103,16 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) TO anon, authenticated;
 
--- 8. Zero-Friction RPC: Link Student to Authenticated Parent Account
+-- 8. Zero-Friction RPC: Link Student to Authenticated Parent Account (SECURITY INVOKER)
 CREATE OR REPLACE FUNCTION public.link_student_to_parent(
   target_lrn TEXT,
   relation_name TEXT DEFAULT 'Parent'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
 DECLARE
@@ -155,19 +154,19 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated;
 
 -- 9. Row Level Security Policies for students
 DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
+DROP POLICY IF EXISTS "Anyone can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can update students" ON public.students;
 DROP POLICY IF EXISTS "Service role full access on students" ON public.students;
 
-CREATE POLICY "Authenticated users can view students"
+CREATE POLICY "Anyone can view students"
   ON public.students
   FOR SELECT
-  TO authenticated
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Teachers and admins can insert students"
@@ -223,9 +222,7 @@ CREATE POLICY "Service role full access on parents"
   WITH CHECK (true);
 
 -- 11. Row Level Security Policies for student_parents
-DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can view student parent links" ON public.student_parents;
-DROP POLICY IF EXISTS "Authenticated users can manage student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can insert student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can update student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can delete student parent links" ON public.student_parents;

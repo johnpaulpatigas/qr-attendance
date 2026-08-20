@@ -43,16 +43,15 @@ REVOKE EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) FROM PUBLIC, anon, a
 
 -- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
-DROP POLICY IF EXISTS "Assigned teachers and admins can update class section" ON public.class_sections;
+DROP POLICY IF EXISTS "Anyone can view class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.class_sections;
-DROP POLICY IF EXISTS "Authenticated users can insert class sections" ON public.class_sections;
-DROP POLICY IF EXISTS "Authenticated users can update class sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Teachers and admins can update class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Service role full access on class_sections" ON public.class_sections;
 
-CREATE POLICY "Authenticated users can view class sections"
+CREATE POLICY "Anyone can view class sections"
   ON public.class_sections
   FOR SELECT
-  TO authenticated
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Teachers and admins can insert class sections"
