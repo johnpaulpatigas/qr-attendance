@@ -172,19 +172,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const trimmedLrn = params.studentLrn.trim();
 
-      // 1. Verify student exists by LRN
-      const { data: student, error: studentError } = await client
-        .from('students')
-        .select('id, first_name, last_name')
-        .eq('lrn', trimmedLrn)
-        .maybeSingle();
-
-      if (studentError || !student) {
-        return {
-          error: new Error(
-            `No enrolled student found with LRN "${trimmedLrn}". Please verify the 12-digit number with the class adviser.`
-          ),
-        };
+      // 1. Verify student exists using public RPC (bypasses anon RLS restrictions)
+      try {
+        const { data: verifyRes, error: verifyErr } = await (client as any).rpc(
+          'verify_student_lrn',
+          { target_lrn: trimmedLrn }
+        );
+        if (!verifyErr && verifyRes && verifyRes.exists === false) {
+          return {
+            error: new Error(
+              `No enrolled student found with LRN "${trimmedLrn}". Please verify the 12-digit number with the class adviser.`
+            ),
+          };
+        }
+      } catch {
+        // Fall back gracefully to link_student_to_parent check
       }
 
       // 2. Register user in Supabase Auth
@@ -203,27 +205,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const newUserId = authData.user?.id;
       if (newUserId) {
-        // 3. Create parent and link student via RPC or direct insert
-        const { error: rpcErr } = await (client as any).rpc('link_student_to_parent', {
-          target_lrn: trimmedLrn,
-          relation_name: params.relationship || 'Parent',
-        });
-
-        if (rpcErr) {
-          // Direct fallback insert
-          const { data: parentRec } = await (client.from('parents') as any)
-            .insert({ profile_id: newUserId })
-            .select('id')
-            .single();
-
-          if (parentRec) {
-            await (client.from('student_parents') as any).insert({
-              student_id: (student as any).id,
-              parent_id: parentRec.id,
-              relationship: params.relationship || 'Parent',
-              is_primary: true,
-            });
+        // 3. Atomically create parent and link student via SECURITY DEFINER RPC
+        const { data: linkRes, error: rpcErr } = await (client as any).rpc(
+          'link_student_to_parent',
+          {
+            target_lrn: trimmedLrn,
+            relation_name: params.relationship || 'Parent',
           }
+        );
+
+        if (!rpcErr && linkRes && linkRes.success === false) {
+          return { error: new Error(linkRes.message) };
         }
 
         await loadProfileAndChildren(newUserId, params.email.trim());

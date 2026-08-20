@@ -317,7 +317,40 @@ AS $$
   );
 $$;
 
--- 7. Zero-Friction RPC: Link Student to Authenticated Parent Account
+-- 7. Public Function to verify LRN existence (Can be called anonymously during sign up)
+CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_name TEXT;
+  v_section TEXT;
+  v_grade INTEGER;
+BEGIN
+  SELECT (s.first_name || ' ' || s.last_name), cs.section_name, s.grade_level
+  INTO v_name, v_section, v_grade
+  FROM public.students s
+  LEFT JOIN public.class_sections cs ON s.section_id = cs.id
+  WHERE s.lrn = target_lrn;
+
+  IF v_name IS NULL THEN
+    RETURN jsonb_build_object('exists', false);
+  END IF;
+
+  RETURN jsonb_build_object(
+    'exists', true,
+    'student_name', v_name,
+    'grade_level', v_grade,
+    'section_name', v_section
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) TO anon, authenticated;
+
+-- 8. Zero-Friction RPC: Link Student to Authenticated Parent Account
 CREATE OR REPLACE FUNCTION public.link_student_to_parent(
   target_lrn TEXT,
   relation_name TEXT DEFAULT 'Parent'
@@ -368,7 +401,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated, anon;
 
--- 8. Row Level Security Policies for students
+-- 9. Row Level Security Policies for students
 DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
@@ -401,7 +434,7 @@ CREATE POLICY "Service role full access on students"
   USING (true)
   WITH CHECK (true);
 
--- 9. Row Level Security Policies for parents
+-- 10. Row Level Security Policies for parents
 DROP POLICY IF EXISTS "Parents can view own parent record" ON public.parents;
 DROP POLICY IF EXISTS "Parents can insert own parent record" ON public.parents;
 DROP POLICY IF EXISTS "Parents can update own parent record" ON public.parents;
@@ -434,7 +467,7 @@ CREATE POLICY "Service role full access on parents"
   USING (true)
   WITH CHECK (true);
 
--- 10. Row Level Security Policies for student_parents
+-- 11. Row Level Security Policies for student_parents
 DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Parents can manage own student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Teachers and admins can manage student parent links" ON public.student_parents;
