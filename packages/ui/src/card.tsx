@@ -63,7 +63,11 @@ export const CardContent: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   children,
   ...props
 }) => {
-  return <div className={cn('p-6 pt-0', className)} {...props} />;
+  return (
+    <div className={cn('p-6 pt-0', className)} {...props}>
+      {children}
+    </div>
+  );
 };
 
 export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
@@ -71,5 +75,9 @@ export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   children,
   ...props
 }) => {
-  return <div className={cn('flex items-center p-6 pt-0', className)} {...props} />;
+  return (
+    <div className={cn('flex items-center p-6 pt-0', className)} {...props}>
+      {children}
+    </div>
+  );
 };
