@@ -3,10 +3,14 @@
 -- ==============================================================================
 
 -- 1. Create Enums
-CREATE TYPE public.user_role AS ENUM ('teacher', 'admin', 'parent', 'student');
+DO $$ BEGIN
+  CREATE TYPE public.user_role AS ENUM ('teacher', 'admin', 'parent', 'student');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 2. Create Profiles Table (References auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role public.user_role NOT NULL DEFAULT 'teacher',
   full_name TEXT NOT NULL,
@@ -17,7 +21,7 @@ CREATE TABLE public.profiles (
 );
 
 -- 3. Create School Years Table
-CREATE TABLE public.school_years (
+CREATE TABLE IF NOT EXISTS public.school_years (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE, -- e.g. '2026-2027'
   start_date DATE NOT NULL,
@@ -31,7 +35,17 @@ CREATE TABLE public.school_years (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_years ENABLE ROW LEVEL SECURITY;
 
--- 5. Helper Functions for RLS
+-- 5. Grant schema and table permissions
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+
+-- 6. Helper Functions for RLS
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
@@ -62,12 +76,34 @@ AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- 6. Row Level Security Policies for profiles
+-- 7. Row Level Security Policies for profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Teachers and admins can view profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Service role full access on profiles" ON public.profiles;
+
 CREATE POLICY "Users can view own profile"
   ON public.profiles
   FOR SELECT
   TO authenticated
-  USING (auth.uid() = id OR public.is_teacher());
+  USING (auth.uid() = id);
+
+CREATE POLICY "Teachers and admins can view profiles"
+  ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (
+    auth.uid() = id
+    OR
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('teacher', 'admin')
+  );
+
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "Users can update own profile"
   ON public.profiles
@@ -83,7 +119,10 @@ CREATE POLICY "Service role full access on profiles"
   USING (true)
   WITH CHECK (true);
 
--- 7. Row Level Security Policies for school_years
+-- 8. Row Level Security Policies for school_years
+DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
+DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
+
 CREATE POLICY "Authenticated users can view school years"
   ON public.school_years
   FOR SELECT
@@ -97,7 +136,7 @@ CREATE POLICY "Admins can manage school years"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
--- 8. Auto-create Profile on auth.users insert
+-- 9. Auto-create Profile on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -120,6 +159,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
