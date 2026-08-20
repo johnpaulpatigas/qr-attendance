@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserCheck, Lock, Mail, KeyRound } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input } from '@qr-attendance/ui';
+import { UserCheck, Lock, Mail, KeyRound, User, Hash, HeartHandshake } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Select } from '@qr-attendance/ui';
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 
 export const LoginPage: React.FC = () => {
-  const [isResetMode, setIsResetMode] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
+  
+  // Sign In fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Sign Up fields
+  const [fullName, setFullName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [studentLrn, setStudentLrn] = useState('');
+  const [relationship, setRelationship] = useState('Parent');
+
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { signInWithEmail, resetPassword } = useAuth();
+  const { signInWithEmail, signUpWithStudentLrn, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -38,6 +48,47 @@ export const LoginPage: React.FC = () => {
       setError(authError.message);
     } else {
       navigate(from, { replace: true });
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+
+    const trimmedLrn = studentLrn.replace(/\D/g, '');
+    if (trimmedLrn.length !== 12) {
+      setError('Please enter a valid 12-digit Learner Reference Number (LRN).');
+      return;
+    }
+
+    if (signUpPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    const { error: signUpErr } = await signUpWithStudentLrn({
+      fullName,
+      email: signUpEmail,
+      password: signUpPassword,
+      studentLrn: trimmedLrn,
+      relationship,
+    });
+    setLoading(false);
+
+    if (signUpErr) {
+      setError(signUpErr.message);
+    } else {
+      setSuccessMessage('Account created and student successfully linked! Logging you in...');
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 1000);
     }
   };
 
@@ -72,32 +123,125 @@ export const LoginPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Parent & Student Portal</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Sign in to track student attendance in real time and receive instant alerts.
+            Real-time attendance tracker, daily scan history, and instant alerts.
           </p>
         </div>
 
+        {/* Tab Selector */}
+        {mode !== 'reset' && (
+          <div className="flex rounded-xl bg-slate-200 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setError(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                mode === 'signin' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                setError(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                mode === 'signup' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+        )}
+
         <Card className="shadow-lg border-slate-200">
           <CardHeader>
-            <CardTitle>{isResetMode ? 'Reset Password' : 'Sign In'}</CardTitle>
+            <CardTitle>
+              {mode === 'signup'
+                ? 'Create Parent Account'
+                : mode === 'reset'
+                ? 'Reset Password'
+                : 'Sign In'}
+            </CardTitle>
             <CardDescription>
-              {isResetMode
-                ? 'Enter your registered email address to receive password reset instructions'
-                : 'Enter your account credentials to view attendance'}
+              {mode === 'signup'
+                ? 'Link your student with their 12-digit LRN for instant attendance access'
+                : mode === 'reset'
+                ? 'Enter your registered email address to receive reset instructions'
+                : 'Enter your credentials to view attendance'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isResetMode ? (
+            {error && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 mb-4">
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700 mb-4">
+                {successMessage}
+              </div>
+            )}
+
+            {mode === 'signup' ? (
+              <form onSubmit={handleSignUp} className="space-y-3.5">
+                <Input
+                  label="Your Full Name"
+                  placeholder="e.g. Maria Santos"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  leftIcon={<User className="h-4 w-4" />}
+                  required
+                />
+                <Input
+                  label="Email Address"
+                  type="email"
+                  placeholder="parent@example.com"
+                  value={signUpEmail}
+                  onChange={(e) => setSignUpEmail(e.target.value)}
+                  leftIcon={<Mail className="h-4 w-4" />}
+                  required
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  placeholder="At least 6 characters"
+                  value={signUpPassword}
+                  onChange={(e) => setSignUpPassword(e.target.value)}
+                  leftIcon={<Lock className="h-4 w-4" />}
+                  required
+                />
+                <Input
+                  label="Student Learner Reference No. (LRN)"
+                  placeholder="12 numeric digits"
+                  value={studentLrn}
+                  onChange={(e) => setStudentLrn(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                  leftIcon={<Hash className="h-4 w-4" />}
+                  helperText="12-digit LRN on student ID card or report card"
+                  required
+                />
+                <Select
+                  label="Relationship to Student"
+                  value={relationship}
+                  onChange={(e) => setRelationship(e.target.value)}
+                  options={[
+                    { value: 'Mother', label: 'Mother' },
+                    { value: 'Father', label: 'Father' },
+                    { value: 'Guardian', label: 'Guardian' },
+                    { value: 'Student (Self)', label: 'Student (Self)' },
+                  ]}
+                />
+                <Button type="submit" variant="success" className="w-full mt-2" isLoading={loading} leftIcon={<HeartHandshake className="h-4 w-4" />}>
+                  Register & Link Student
+                </Button>
+              </form>
+            ) : mode === 'reset' ? (
               <form onSubmit={handlePasswordReset} className="space-y-4">
-                {error && (
-                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-                    {error}
-                  </div>
-                )}
-                {successMessage && (
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
-                    {successMessage}
-                  </div>
-                )}
                 <Input
                   label="Email Address"
                   type="email"
@@ -120,7 +264,7 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setIsResetMode(false);
+                      setMode('signin');
                       setError(null);
                       setSuccessMessage(null);
                     }}
@@ -132,11 +276,6 @@ export const LoginPage: React.FC = () => {
               </form>
             ) : (
               <form onSubmit={handleLogin} className="space-y-4">
-                {error && (
-                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-                    {error}
-                  </div>
-                )}
                 <Input
                   label="Email Address"
                   type="email"
@@ -159,7 +298,7 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setIsResetMode(true);
+                      setMode('reset');
                       setError(null);
                     }}
                     className="text-xs text-emerald-700 hover:text-emerald-800 underline"

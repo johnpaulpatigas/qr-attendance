@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
   CalendarCheck,
@@ -8,13 +8,16 @@ import {
   LogOut,
   UserCheck,
   ChevronDown,
+  UserPlus,
 } from 'lucide-react';
 import { Button, Badge } from '@qr-attendance/ui';
 import { useAuth } from '../../features/auth/AuthContext';
+import { LinkStudentModal } from './LinkStudentModal';
 
 export const ParentLayout: React.FC = () => {
   const location = useLocation();
   const { user, profile, linkedChildren, activeChild, setActiveChildId, signOut } = useAuth();
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   const navigation = [
     { name: "Today's Status", href: '/', icon: CalendarCheck },
@@ -24,9 +27,8 @@ export const ParentLayout: React.FC = () => {
   ];
 
   const isActive = (path: string) => {
-    if (path === '/' && location.pathname === '/') return true;
-    if (path !== '/' && location.pathname.startsWith(path)) return true;
-    return false;
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Parent / Student';
@@ -52,12 +54,21 @@ export const ParentLayout: React.FC = () => {
           </div>
         </div>
 
-        {/* Child Selector Dropdown */}
-        {linkedChildren.length > 0 && (
-          <div className="border-b border-slate-100 p-4">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-              Viewing Student
+        {/* Child Selector & Link Child Button */}
+        <div className="border-b border-slate-100 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Linked Student
             </label>
+            <button
+              onClick={() => setIsLinkModalOpen(true)}
+              className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline"
+            >
+              <UserPlus className="h-3 w-3" /> + Link Child
+            </button>
+          </div>
+
+          {linkedChildren.length > 0 ? (
             <div className="relative">
               <select
                 value={activeChild?.student_id || ''}
@@ -72,8 +83,15 @@ export const ParentLayout: React.FC = () => {
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-slate-400" />
             </div>
-          </div>
-        )}
+          ) : (
+            <button
+              onClick={() => setIsLinkModalOpen(true)}
+              className="w-full rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 py-2 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100/60 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <UserPlus className="h-3.5 w-3.5" /> Link Student by LRN
+            </button>
+          )}
+        </div>
 
         {/* Navigation Links */}
         <nav className="flex-1 space-y-1.5 p-4">
@@ -137,7 +155,13 @@ export const ParentLayout: React.FC = () => {
             <Badge variant="success" size="sm">FCM Push Active</Badge>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsLinkModalOpen(true)}
+              className="lg:hidden p-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1"
+            >
+              <UserPlus className="h-4 w-4" /> Link Child
+            </button>
             <Link to="/notifications" className="relative p-1.5 text-slate-500 hover:text-slate-700">
               <Bell className="h-5 w-5" />
             </Link>
@@ -172,6 +196,12 @@ export const ParentLayout: React.FC = () => {
           })}
         </nav>
       </div>
+
+      {/* Link Student Modal */}
+      <LinkStudentModal
+        isOpen={isLinkModalOpen}
+        onClose={() => setIsLinkModalOpen(false)}
+      />
     </div>
   );
 };

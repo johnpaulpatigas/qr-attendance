@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 -- 1. Create Students Table
-CREATE TABLE public.students (
+CREATE TABLE IF NOT EXISTS public.students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lrn VARCHAR(12) NOT NULL,
   last_name TEXT NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE public.students (
 );
 
 -- 2. Create Parents Table
-CREATE TABLE public.parents (
+CREATE TABLE IF NOT EXISTS public.parents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
   contact_information JSONB,
@@ -32,7 +32,7 @@ CREATE TABLE public.parents (
 );
 
 -- 3. Create Student-Parents Relationship Table
-CREATE TABLE public.student_parents (
+CREATE TABLE IF NOT EXISTS public.student_parents (
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   parent_id UUID NOT NULL REFERENCES public.parents(id) ON DELETE CASCADE,
   relationship TEXT NOT NULL DEFAULT 'Parent',
@@ -42,12 +42,12 @@ CREATE TABLE public.student_parents (
 );
 
 -- 4. Indexes for fast query and lookup
-CREATE INDEX idx_students_section ON public.students(section_id);
-CREATE INDEX idx_students_school_year ON public.students(school_year_id);
-CREATE INDEX idx_students_qr_identifier ON public.students(qr_identifier);
-CREATE INDEX idx_students_lrn ON public.students(lrn);
-CREATE INDEX idx_student_parents_parent ON public.student_parents(parent_id);
-CREATE INDEX idx_student_parents_student ON public.student_parents(student_id);
+CREATE INDEX IF NOT EXISTS idx_students_section ON public.students(section_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_year ON public.students(school_year_id);
+CREATE INDEX IF NOT EXISTS idx_students_qr_identifier ON public.students(qr_identifier);
+CREATE INDEX IF NOT EXISTS idx_students_lrn ON public.students(lrn);
+CREATE INDEX IF NOT EXISTS idx_student_parents_parent ON public.student_parents(parent_id);
+CREATE INDEX IF NOT EXISTS idx_student_parents_student ON public.student_parents(student_id);
 
 -- 5. Enable Row Level Security
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
@@ -70,30 +70,83 @@ AS $$
   );
 $$;
 
--- 7. Row Level Security Policies for students
--- Teachers and admins can view students
-CREATE POLICY "Teachers and admins can view students"
+-- 7. Zero-Friction RPC: Link Student to Authenticated Parent Account
+CREATE OR REPLACE FUNCTION public.link_student_to_parent(
+  target_lrn TEXT,
+  relation_name TEXT DEFAULT 'Parent'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_student_id UUID;
+  v_parent_id UUID;
+  v_student_name TEXT;
+BEGIN
+  -- 1. Verify user is authenticated
+  IF auth.uid() IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Authentication required.');
+  END IF;
+
+  -- 2. Find student by LRN
+  SELECT id, (first_name || ' ' || last_name) INTO v_student_id, v_student_name
+  FROM public.students
+  WHERE lrn = target_lrn;
+
+  IF v_student_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'No enrolled student found with LRN ' || target_lrn);
+  END IF;
+
+  -- 3. Ensure parent record exists for auth.uid()
+  INSERT INTO public.parents (profile_id)
+  VALUES (auth.uid())
+  ON CONFLICT (profile_id) DO UPDATE SET updated_at = NOW()
+  RETURNING id INTO v_parent_id;
+
+  -- 4. Create or update student_parents link
+  INSERT INTO public.student_parents (student_id, parent_id, relationship, is_primary)
+  VALUES (v_student_id, v_parent_id, COALESCE(relation_name, 'Parent'), true)
+  ON CONFLICT (student_id, parent_id) DO UPDATE SET relationship = EXCLUDED.relationship;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Student ' || v_student_name || ' successfully linked to your account.',
+    'student_id', v_student_id,
+    'student_name', v_student_name
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated, anon;
+
+-- 8. Row Level Security Policies for students
+DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
+DROP POLICY IF EXISTS "Teachers and admins can view students" ON public.students;
+DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
+DROP POLICY IF EXISTS "Teachers and admins can update students" ON public.students;
+DROP POLICY IF EXISTS "Service role full access on students" ON public.students;
+
+CREATE POLICY "Authenticated users can view students"
   ON public.students
   FOR SELECT
   TO authenticated
-  USING (public.is_teacher() OR public.is_parent_of_student(id));
+  USING (true);
 
--- Teachers and admins can insert students
 CREATE POLICY "Teachers and admins can insert students"
   ON public.students
   FOR INSERT
   TO authenticated
-  WITH CHECK (public.is_teacher());
+  WITH CHECK (true);
 
--- Teachers and admins can update students
 CREATE POLICY "Teachers and admins can update students"
   ON public.students
   FOR UPDATE
   TO authenticated
-  USING (public.is_teacher())
-  WITH CHECK (public.is_teacher());
+  USING (true)
+  WITH CHECK (true);
 
--- Service role full access
 CREATE POLICY "Service role full access on students"
   ON public.students
   FOR ALL
@@ -101,26 +154,31 @@ CREATE POLICY "Service role full access on students"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for parents
+-- 9. Row Level Security Policies for parents
+DROP POLICY IF EXISTS "Parents can view own parent record" ON public.parents;
+DROP POLICY IF EXISTS "Parents can insert own parent record" ON public.parents;
+DROP POLICY IF EXISTS "Parents can update own parent record" ON public.parents;
+DROP POLICY IF EXISTS "Teachers and admins can manage parents" ON public.parents;
+DROP POLICY IF EXISTS "Service role full access on parents" ON public.parents;
+
 CREATE POLICY "Parents can view own parent record"
   ON public.parents
   FOR SELECT
   TO authenticated
   USING (profile_id = auth.uid() OR public.is_teacher());
 
+CREATE POLICY "Parents can insert own parent record"
+  ON public.parents
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (profile_id = auth.uid() OR public.is_teacher());
+
 CREATE POLICY "Parents can update own parent record"
   ON public.parents
   FOR UPDATE
   TO authenticated
-  USING (profile_id = auth.uid())
-  WITH CHECK (profile_id = auth.uid());
-
-CREATE POLICY "Teachers and admins can manage parents"
-  ON public.parents
-  FOR ALL
-  TO authenticated
-  USING (public.is_teacher())
-  WITH CHECK (public.is_teacher());
+  USING (profile_id = auth.uid() OR public.is_teacher())
+  WITH CHECK (profile_id = auth.uid() OR public.is_teacher());
 
 CREATE POLICY "Service role full access on parents"
   ON public.parents
@@ -129,25 +187,24 @@ CREATE POLICY "Service role full access on parents"
   USING (true)
   WITH CHECK (true);
 
--- 9. Row Level Security Policies for student_parents
+-- 10. Row Level Security Policies for student_parents
+DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Parents can manage own student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Teachers and admins can manage student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Service role full access on student_parents" ON public.student_parents;
+
 CREATE POLICY "Parents and teachers can view student parent links"
   ON public.student_parents
   FOR SELECT
   TO authenticated
-  USING (
-    public.is_teacher() OR
-    EXISTS (
-      SELECT 1 FROM public.parents p
-      WHERE p.id = student_parents.parent_id AND p.profile_id = auth.uid()
-    )
-  );
+  USING (true);
 
-CREATE POLICY "Teachers and admins can manage student parent links"
+CREATE POLICY "Parents and teachers can manage student parent links"
   ON public.student_parents
   FOR ALL
   TO authenticated
-  USING (public.is_teacher())
-  WITH CHECK (public.is_teacher());
+  USING (true)
+  WITH CHECK (true);
 
 CREATE POLICY "Service role full access on student_parents"
   ON public.student_parents

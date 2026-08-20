@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState } from '@qr-attendance/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, EmptyState } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
 import { fetchTodayAttendance, type TodayStudentStatus } from '../features/attendance/parentAttendanceService';
+import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 
 export const TodayAttendancePage: React.FC = () => {
   const { activeChild } = useAuth();
   const [status, setStatus] = useState<TodayStudentStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!activeChild) return;
+    if (!activeChild) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchTodayAttendance(activeChild.student_id).then((res) => {
       setStatus(res);
@@ -20,8 +25,19 @@ export const TodayAttendancePage: React.FC = () => {
 
   if (!activeChild) {
     return (
-      <div className="max-w-4xl mx-auto p-6 text-center text-slate-500">
-        No linked student selected.
+      <div className="max-w-4xl mx-auto py-8">
+        <EmptyState
+          title="No Student Linked to Account"
+          description="Your parent account is ready! Enter your student's 12-digit Learner Reference Number (LRN) to start receiving real-time attendance updates."
+          action={{
+            label: 'Link Student by LRN',
+            onClick: () => setIsLinkModalOpen(true),
+          }}
+        />
+        <LinkStudentModal
+          isOpen={isLinkModalOpen}
+          onClose={() => setIsLinkModalOpen(false)}
+        />
       </div>
     );
   }

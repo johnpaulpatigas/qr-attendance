@@ -3,6 +3,14 @@ import { User, Session } from '@supabase/supabase-js';
 import { getSupabaseClient, getCurrentUserProfile } from '@qr-attendance/supabase';
 import type { UserProfile, LinkedStudent } from '@qr-attendance/types';
 
+export interface SignUpParentParams {
+  fullName: string;
+  email: string;
+  password: string;
+  studentLrn: string;
+  relationship: string;
+}
+
 interface ParentAuthContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -13,6 +21,8 @@ interface ParentAuthContextType {
   setActiveChildId: (studentId: string) => void;
   isLoading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
+  signUpWithStudentLrn: (params: SignUpParentParams) => Promise<{ error: Error | null }>;
+  linkStudentByLrn: (studentLrn: string, relationship?: string) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
 }
@@ -156,6 +166,160 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signUpWithStudentLrn = async (
+    params: SignUpParentParams
+  ): Promise<{ error: Error | null }> => {
+    try {
+      const trimmedLrn = params.studentLrn.trim();
+
+      // 1. Verify student exists by LRN
+      const { data: student, error: studentError } = await client
+        .from('students')
+        .select('id, first_name, last_name')
+        .eq('lrn', trimmedLrn)
+        .maybeSingle();
+
+      if (studentError || !student) {
+        return {
+          error: new Error(
+            `No enrolled student found with LRN "${trimmedLrn}". Please verify the 12-digit number with the class adviser.`
+          ),
+        };
+      }
+
+      // 2. Register user in Supabase Auth
+      const { data: authData, error: signUpError } = await client.auth.signUp({
+        email: params.email.trim(),
+        password: params.password,
+        options: {
+          data: {
+            full_name: params.fullName.trim(),
+            role: 'parent',
+          },
+        },
+      });
+
+      if (signUpError) return { error: signUpError };
+
+      const newUserId = authData.user?.id;
+      if (newUserId) {
+        // 3. Create parent and link student via RPC or direct insert
+        const { error: rpcErr } = await (client as any).rpc('link_student_to_parent', {
+          target_lrn: trimmedLrn,
+          relation_name: params.relationship || 'Parent',
+        });
+
+        if (rpcErr) {
+          // Direct fallback insert
+          const { data: parentRec } = await (client.from('parents') as any)
+            .insert({ profile_id: newUserId })
+            .select('id')
+            .single();
+
+          if (parentRec) {
+            await (client.from('student_parents') as any).insert({
+              student_id: (student as any).id,
+              parent_id: parentRec.id,
+              relationship: params.relationship || 'Parent',
+              is_primary: true,
+            });
+          }
+        }
+
+        await loadProfileAndChildren(newUserId, params.email.trim());
+      }
+
+      return { error: null };
+    } catch (err: unknown) {
+      return {
+        error: err instanceof Error ? err : new Error('Failed to create parent account.'),
+      };
+    }
+  };
+
+  const linkStudentByLrn = async (
+    studentLrn: string,
+    relationship: string = 'Parent'
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!user) {
+      return { success: false, message: 'You must be logged in to link a student.' };
+    }
+
+    try {
+      const trimmedLrn = studentLrn.trim();
+
+      // Attempt RPC
+      const { data: rpcRes, error: rpcErr } = await (client as any).rpc('link_student_to_parent', {
+        target_lrn: trimmedLrn,
+        relation_name: relationship,
+      });
+
+      if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
+        const res = rpcRes as { success: boolean; message: string };
+        if (res.success) {
+          await loadProfileAndChildren(user.id, user.email);
+          return res;
+        }
+        return res;
+      }
+
+      // Direct fallback
+      const { data: student, error: studentError } = await client
+        .from('students')
+        .select('id, first_name, last_name')
+        .eq('lrn', trimmedLrn)
+        .maybeSingle();
+
+      if (studentError || !student) {
+        return {
+          success: false,
+          message: `No enrolled student found with LRN ${trimmedLrn}.`,
+        };
+      }
+
+      let parentId: string;
+      const { data: existingParent } = await client
+        .from('parents')
+        .select('id')
+        .eq('profile_id', user.id)
+        .maybeSingle();
+
+      if (existingParent) {
+        parentId = (existingParent as any).id;
+      } else {
+        const { data: newParent, error: parentErr } = await (client.from('parents') as any)
+          .insert({ profile_id: user.id })
+          .select('id')
+          .single();
+
+        if (parentErr) throw new Error(parentErr.message);
+        parentId = newParent.id;
+      }
+
+      await (client.from('student_parents') as any).upsert(
+        {
+          student_id: (student as any).id,
+          parent_id: parentId,
+          relationship,
+          is_primary: true,
+        },
+        { onConflict: 'student_id,parent_id' }
+      );
+
+      await loadProfileAndChildren(user.id, user.email);
+      const studentName = `${(student as any).first_name} ${(student as any).last_name}`;
+      return {
+        success: true,
+        message: `Student ${studentName} successfully linked to your account.`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Failed to link student record.',
+      };
+    }
+  };
+
   const signOut = async () => {
     await client.auth.signOut();
     setUser(null);
@@ -190,6 +354,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveChildId,
         isLoading,
         signInWithEmail,
+        signUpWithStudentLrn,
+        linkStudentByLrn,
         signOut,
         resetPassword,
       }}
