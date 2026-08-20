@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CameraOff, AlertCircle, Keyboard } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats, CameraDevice } from 'html5-qrcode';
+import { CameraOff, AlertCircle, Keyboard } from 'lucide-react';
 import { Button, Input } from '@qr-attendance/ui';
 import { parseQrPayload } from '@qr-attendance/validation';
 
@@ -25,22 +25,109 @@ export const QrScanner: React.FC<QrScannerProps> = ({
   const lastScannedPayloadRef = useRef<string>('');
   const elementId = 'qr-camera-viewport';
 
+  const handleDecoded = useCallback(
+    (decodedText: string) => {
+      const now = Date.now();
+      // Debounce same QR code scanned within 2 seconds
+      if (
+        decodedText === lastScannedPayloadRef.current &&
+        now - lastScannedTimeRef.current < 2000
+      ) {
+        return;
+      }
+
+      lastScannedPayloadRef.current = decodedText;
+      lastScannedTimeRef.current = now;
+
+      // Validate QR payload format
+      const parsed = parseQrPayload(decodedText);
+      if (parsed.success) {
+        onScan(decodedText);
+      } else {
+        onScan(decodedText);
+      }
+    },
+    [onScan]
+  );
+
+  // Helper to accurately pick the Main 1x back sensor (skipping 0.5x ultra-wide)
+  const getMain1xCameraId = (cameras: CameraDevice[]): string => {
+    if (!cameras || cameras.length === 0) return '';
+
+    const backCameras = cameras.filter((c) => {
+      const l = c.label.toLowerCase();
+      return !l.includes('front') && !l.includes('user') && !l.includes('selfie');
+    });
+
+    if (backCameras.length === 0) return cameras[0].id;
+    if (backCameras.length === 1) return backCameras[0].id;
+
+    // 1. Look for explicit main / primary / 1x label
+    const explicitMain = backCameras.find((c) => {
+      const l = c.label.toLowerCase();
+      return l.includes('main') || l.includes('primary') || l.includes('standard') || l.includes('1x');
+    });
+    if (explicitMain) return explicitMain.id;
+
+    // 2. Filter out any lens with ultra, 0.5, super-wide, macro
+    const nonUltraBack = backCameras.filter((c) => {
+      const l = c.label.toLowerCase();
+      return !l.includes('ultra') && !l.includes('0.5') && !l.includes('wide-angle') && !l.includes('macro');
+    });
+
+    if (nonUltraBack.length === 1) return nonUltraBack[0].id;
+
+    // 3. On Android multi-camera arrays (e.g. camera2 0 = 0.5x, camera2 2 = 1x main)
+    const cam2 = backCameras.find((c) => c.label.toLowerCase().includes('camera2 2'));
+    if (cam2) return cam2.id;
+
+    const cam1Back = backCameras.find((c) => c.label.toLowerCase().includes('camera2 1') && !c.label.toLowerCase().includes('front'));
+    if (cam1Back) return cam1Back.id;
+
+    // 4. If nonUltraBack has candidates, pick the last non-ultra camera
+    if (nonUltraBack.length > 0) return nonUltraBack[nonUltraBack.length - 1].id;
+
+    // 5. Default to the second back camera (index 1) to avoid camera2 0 ultrawide
+    return backCameras[1]?.id || backCameras[0].id;
+  };
+
+  // Automatically lock video track strictly to 1.0x standard zoom
+  const enforce1xZoom = async () => {
+    try {
+      const videoEl = document.querySelector(`#${elementId} video`) as HTMLVideoElement;
+      if (videoEl && videoEl.srcObject) {
+        const stream = videoEl.srcObject as MediaStream;
+        const track = stream.getVideoTracks()[0];
+        if (track && track.getCapabilities) {
+          const caps = track.getCapabilities() as any;
+          if (caps && caps.zoom) {
+            const min = caps.zoom.min || 1;
+            const targetZoom = Math.max(1.0, min);
+
+            await (track as any).applyConstraints({
+              advanced: [{ zoom: targetZoom }],
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignore if browser doesn't support track constraint
+    }
+  };
+
   useEffect(() => {
     if (!isActive) {
       if (scannerRef.current && scannerRef.current.isScanning) {
         scannerRef.current
           .stop()
-          .then(() => {
-            scannerRef.current?.clear();
-          })
-          .catch((err) => {
-            console.error('Error stopping QR scanner:', err);
-          });
+          .then(() => scannerRef.current?.clear())
+          .catch((err) => console.error('Error stopping QR scanner:', err));
       }
       return;
     }
 
     setCameraError(null);
+
     const html5QrCode = new Html5Qrcode(elementId, {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       verbose: false,
@@ -48,50 +135,55 @@ export const QrScanner: React.FC<QrScannerProps> = ({
     scannerRef.current = html5QrCode;
 
     const qrConfig = {
-      fps: 10,
+      fps: 15,
       qrbox: { width: 260, height: 260 },
       aspectRatio: 1.0,
     };
 
-    html5QrCode
-      .start(
-        { facingMode: 'environment' },
-        qrConfig,
-        (decodedText) => {
-          const now = Date.now();
-          // Debounce same QR code scanned within 2 seconds
-          if (
-            decodedText === lastScannedPayloadRef.current &&
-            now - lastScannedTimeRef.current < 2000
-          ) {
-            return;
-          }
-
-          lastScannedPayloadRef.current = decodedText;
-          lastScannedTimeRef.current = now;
-
-          // Pre-validate QR payload format
-          const parsed = parseQrPayload(decodedText);
-          if (parsed.success) {
-            onScan(decodedText);
-          } else {
-            console.warn('Scanned payload failed format validation:', decodedText);
-            onScan(decodedText);
-          }
-        },
-        undefined
-      )
+    Html5Qrcode.getCameras()
+      .then((availableCameras) => {
+        if (availableCameras && availableCameras.length > 0) {
+          const mainCamId = getMain1xCameraId(availableCameras);
+          return html5QrCode.start(
+            mainCamId,
+            qrConfig,
+            handleDecoded,
+            undefined
+          );
+        } else {
+          return html5QrCode.start(
+            { facingMode: 'environment' },
+            qrConfig,
+            handleDecoded,
+            undefined
+          );
+        }
+      })
       .then(() => {
         setHasPermission(true);
+        setTimeout(() => {
+          enforce1xZoom();
+        }, 300);
       })
       .catch((err) => {
-        console.error('Unable to start camera:', err);
-        setHasPermission(false);
-        setCameraError(
-          typeof err === 'string'
-            ? err
-            : 'Camera access denied or camera not found on this device.'
-        );
+        console.warn('Initial camera start failed, retrying with environment mode...', err);
+        html5QrCode
+          .start({ facingMode: 'environment' }, qrConfig, handleDecoded, undefined)
+          .then(() => {
+            setHasPermission(true);
+            setTimeout(() => {
+              enforce1xZoom();
+            }, 300);
+          })
+          .catch((secondErr) => {
+            console.error('Camera stream error:', secondErr);
+            setHasPermission(false);
+            setCameraError(
+              typeof secondErr === 'string'
+                ? secondErr
+                : 'Camera permission denied or camera unavailable.'
+            );
+          });
       });
 
     return () => {
@@ -102,7 +194,7 @@ export const QrScanner: React.FC<QrScannerProps> = ({
           .catch(() => {});
       }
     };
-  }, [isActive, onScan]);
+  }, [isActive, handleDecoded]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,42 +233,46 @@ export const QrScanner: React.FC<QrScannerProps> = ({
             </div>
             <h4 className="text-base font-semibold text-slate-200">Scanner Inactive</h4>
             <p className="mt-1 max-w-xs text-xs text-slate-400">
-              Select class session and activate camera to start taking attendance.
+              Select class session and click start camera to begin taking attendance.
             </p>
           </div>
         )}
 
         {/* Camera Permission / Error Screen */}
         {isActive && hasPermission === false && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900/95">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/20 text-rose-400 mb-3">
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900/95 space-y-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/20 text-rose-400">
               <AlertCircle className="h-6 w-6" />
             </div>
             <h4 className="text-sm font-semibold text-rose-200">Camera Unavailable</h4>
-            <p className="mt-1 text-xs text-slate-400 max-w-xs">{cameraError}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 border-slate-700 text-slate-300 hover:bg-slate-800"
-              onClick={() => setShowManualInput(true)}
-              leftIcon={<Keyboard className="h-4 w-4" />}
-            >
-              Use Manual Code Input
-            </Button>
+            <p className="mt-1 text-xs text-slate-400 max-w-xs leading-relaxed">{cameraError}</p>
+
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                onClick={() => setShowManualInput(true)}
+                leftIcon={<Keyboard className="h-4 w-4" />}
+              >
+                Use Manual Entry
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Manual Input Toggle / Quick Simulation */}
+      {/* Footer Controls Bar */}
       <div className="mt-4 w-full max-w-md">
         {showManualInput ? (
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <Input
-              placeholder="e.g. ATTENDANCE:7f9a1b2c-3d4e..."
+              placeholder="Paste or type QR payload / LRN"
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               disabled={disabled}
               className="text-xs font-mono"
+              autoFocus
             />
             <Button type="submit" size="sm" variant="primary" disabled={disabled}>
               Submit
@@ -191,17 +287,13 @@ export const QrScanner: React.FC<QrScannerProps> = ({
             </Button>
           </form>
         ) : (
-          <div className="flex items-center justify-between text-xs text-slate-500 px-2">
-            <span className="flex items-center gap-1">
-              <Camera className="h-3.5 w-3.5 text-blue-500" />
-              Environment Camera (Back)
-            </span>
+          <div className="flex items-center justify-end text-xs text-slate-500 px-2">
             <button
               type="button"
               onClick={() => setShowManualInput(true)}
-              className="text-blue-600 hover:underline flex items-center gap-1"
+              className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
             >
-              <Keyboard className="h-3 w-3" /> Manual Entry
+              <Keyboard className="h-3.5 w-3.5" /> Manual Entry
             </button>
           </div>
         )}
