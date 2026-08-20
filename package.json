@@ -14,10 +14,12 @@
     "build:parent": "npm run build --workspace=parent",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=18.0.0",
