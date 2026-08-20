@@ -1,0 +1,26 @@
+{
+  "name": "qr-attendance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QR-based school attendance system monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:teacher": "npm run dev --workspace=teacher",
+    "dev:parent": "npm run dev --workspace=parent",
+    "build:teacher": "npm run build --workspace=teacher",
+    "build:parent": "npm run build --workspace=parent",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
