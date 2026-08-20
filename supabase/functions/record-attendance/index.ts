@@ -215,6 +215,20 @@ serve(async (req) => {
       },
     });
 
+    // 10. Trigger FCM push notification to linked parents
+    try {
+      supabase.functions.invoke('send-fcm-notification', {
+        body: {
+          student_id: student.id,
+          attendance_id: attendanceRecord.id,
+          status: status,
+          recorded_at: attendanceRecord.recorded_at,
+        },
+      }).catch((e: Error) => console.warn('Background FCM dispatch non-blocking error:', e));
+    } catch {
+      // Non-blocking for instant attendance response
+    }
+
     const recordedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     return new Response(
