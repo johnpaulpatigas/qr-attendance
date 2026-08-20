@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
+import { getUtc8DateString } from '@qr-attendance/validation';
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -32,7 +33,7 @@ export async function fetchTodayAttendance(
   studentId: string,
   dateStr?: string
 ): Promise<TodayStudentStatus> {
-  const targetDate = dateStr || new Date().toISOString().slice(0, 10);
+  const targetDate = dateStr || getUtc8DateString();
   const client = getSupabaseClient();
 
   try {

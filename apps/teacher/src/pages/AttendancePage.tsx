@@ -38,6 +38,7 @@ import { submitAttendanceScan } from '../features/attendance/attendanceRecorderS
 import { fetchStudents } from '../features/students/studentService';
 import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceModal';
 import { useAuth } from '../features/auth/AuthContext';
+import { getUtc8DateString } from '@qr-attendance/validation';
 
 // Synthesize pleasant success / warning audio chime via Web Audio API
 function playScanTone(type: 'success' | 'duplicate' | 'error') {
@@ -82,7 +83,7 @@ export const AttendancePage: React.FC = () => {
   const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [sessionType, setSessionType] = useState<SessionType>('morning');
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState(getUtc8DateString());
 
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [summary, setSummary] = useState<AttendanceSummary>({

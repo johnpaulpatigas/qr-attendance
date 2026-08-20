@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, LoadingState } from '@qr-attendance/ui';
 import { getSupabaseClient } from '@qr-attendance/supabase';
+import { getUtc8DateString } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 
 interface DashboardClass {
@@ -87,8 +88,8 @@ export const DashboardPage: React.FC = () => {
         const { data: enrolledStudents } = await studentQuery;
         const totalEnrolled = enrolledStudents?.length || 0;
 
-        // 3. Fetch today's attendance records
-        const todayStr = new Date().toISOString().slice(0, 10);
+        // 3. Fetch today's attendance records (UTC+8)
+        const todayStr = getUtc8DateString();
         let attendanceQuery = client
           .from('attendance')
           .select(`

@@ -36,6 +36,7 @@ import {
 } from '../features/reports/reportService';
 import { exportSF2ToExcel, printSF2Document } from '../features/reports/sf2Exporter';
 import type { ClassSectionWithDetails } from '@qr-attendance/types';
+import { getUtc8DateString } from '@qr-attendance/validation';
 
 export const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sf2' | 'daily'>('sf2');
@@ -43,7 +44,7 @@ export const ReportsPage: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('8'); // August
   const [selectedYear, setSelectedYear] = useState('2026');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(getUtc8DateString());
 
   const [sf2Data, setSf2Data] = useState<SF2ReportData | null>(null);
   const [dailyData, setDailyData] = useState<DailyReportRow[]>([]);
