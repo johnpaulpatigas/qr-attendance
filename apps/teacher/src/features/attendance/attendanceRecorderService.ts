@@ -13,32 +13,35 @@ interface StudentQueryResult {
 }
 
 /**
- * Calculates standard attendance status based on school session schedule
+ * Calculates standard attendance status based on session type, date, and scan time.
+ * - Morning session cutoff: 7:45 AM of the attendance date.
+ * - Afternoon session cutoff: 1:15 PM of the attendance date.
+ * Scans occurring after the session cutoff are marked 'late'.
  */
 export function calculateAttendanceStatus(
   sessionType: SessionType,
+  attendanceDateStr: string,
   scanTime: Date = new Date()
 ): AttendanceStatus {
-  const hours = scanTime.getHours();
-  const minutes = scanTime.getMinutes();
-  const timeInMinutes = hours * 60 + minutes;
-
-  // Morning Session: Cutoff is 7:45 AM (465 minutes)
-  if (sessionType === 'morning') {
-    // If scanned between 7:46 AM and 12:00 PM -> late
-    if (timeInMinutes > 465 && timeInMinutes < 720) {
-      return 'late';
-    }
+  if (!attendanceDateStr) {
     return 'present';
   }
 
-  // Afternoon Session: Cutoff is 1:15 PM (795 minutes)
-  if (sessionType === 'afternoon') {
-    // If scanned between 1:16 PM and 5:00 PM -> late
-    if (timeInMinutes > 795 && timeInMinutes < 1020) {
-      return 'late';
-    }
+  const [year, month, day] = attendanceDateStr.split('-').map(Number);
+  if (!year || !month || !day) {
     return 'present';
+  }
+
+  if (sessionType === 'morning') {
+    // 7:45:59 AM on the attendance date
+    const cutoff = new Date(year, month - 1, day, 7, 45, 59, 999);
+    return scanTime.getTime() > cutoff.getTime() ? 'late' : 'present';
+  }
+
+  if (sessionType === 'afternoon') {
+    // 1:15:59 PM (13:15:59) on the attendance date
+    const cutoff = new Date(year, month - 1, day, 13, 15, 59, 999);
+    return scanTime.getTime() > cutoff.getTime() ? 'late' : 'present';
   }
 
   return 'present';
@@ -150,9 +153,10 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 5. Determine status based on explicit payload or session time schedule
+    // 5. Determine status based on explicit payload or date/session cutoff
     const scanTime = new Date();
-    const finalStatus: AttendanceStatus = payload.status || calculateAttendanceStatus(payload.session_type, scanTime);
+    const finalStatus: AttendanceStatus =
+      payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
 
     // 6. Insert attendance record into Supabase with valid recorded_by
     const { data: inserted, error: insertError } = await (client.from('attendance') as any)
