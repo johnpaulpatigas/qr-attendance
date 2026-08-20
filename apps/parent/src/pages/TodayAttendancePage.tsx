@@ -1,9 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle, QrCode } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, EmptyState } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
-import { fetchTodayAttendance, type TodayStudentStatus } from '../features/attendance/parentAttendanceService';
+import {
+  fetchTodayAttendance,
+  type TodayStudentStatus,
+  type AttendanceRecordWithTeacher,
+} from '../features/attendance/parentAttendanceService';
 import { LinkStudentModal } from '../components/layout/LinkStudentModal';
+
+interface SessionCardProps {
+  sessionTitle: string;
+  record: AttendanceRecordWithTeacher | null;
+  gradeLevel: number;
+  sectionName: string;
+  defaultAdviser?: string | null;
+}
+
+const SessionCard: React.FC<SessionCardProps> = ({
+  sessionTitle,
+  record,
+  gradeLevel,
+  sectionName,
+  defaultAdviser,
+}) => {
+  const isRecorded = !!record;
+  const status = record?.status;
+
+  const badgeVariant = !isRecorded
+    ? 'outline'
+    : status === 'present'
+    ? 'success'
+    : status === 'late'
+    ? 'warning'
+    : status === 'absent'
+    ? 'danger'
+    : 'info';
+
+  const timeFormatted = isRecorded
+    ? new Date(record.recorded_at).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
+
+  return (
+    <Card className="h-full flex flex-col justify-between border shadow-xs">
+      <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-semibold text-slate-800">{sessionTitle}</CardTitle>
+        <Badge variant={badgeVariant} size="sm" className="capitalize font-semibold">
+          {isRecorded ? `${status}` : 'Pending Scan'}
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-3.5 pt-4 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-slate-400" /> Time In / Recorded
+          </span>
+          <span className={`font-semibold ${isRecorded ? 'text-slate-900' : 'text-slate-400 font-mono'}`}>
+            {timeFormatted}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500 flex items-center gap-2">
+            <User className="h-4 w-4 text-slate-400" /> Recorded By
+          </span>
+          <span className={`font-medium ${isRecorded ? 'text-slate-900' : 'text-slate-400'}`}>
+            {record?.teacher_name || (isRecorded ? defaultAdviser || 'Class Adviser' : '—')}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500 flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-slate-400" /> Section
+          </span>
+          <span className="font-medium text-slate-900">
+            Grade {gradeLevel} — {sectionName}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500 flex items-center gap-2">
+            <QrCode className="h-4 w-4 text-slate-400" /> Method
+          </span>
+          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+            {isRecorded ? (record.source === 'qr_scan' ? 'QR Code Scan' : 'Manual Entry') : '—'}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export const TodayAttendancePage: React.FC = () => {
   const { activeChild } = useAuth();
@@ -127,73 +215,22 @@ export const TodayAttendancePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Session Breakdown */}
+          {/* Symmetrical Session Cards (Morning & Afternoon) */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Morning Attendance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-slate-400" /> Time In
-                  </span>
-                  <span className="font-semibold text-emerald-700">
-                    {status.morningRecord
-                      ? new Date(status.morningRecord.recorded_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <User className="h-4 w-4 text-slate-400" /> Recorded By
-                  </span>
-                  <span className="font-medium text-slate-900">
-                    {status.recordedByTeacherName || 'Class Adviser'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-slate-400" /> Section
-                  </span>
-                  <span className="font-medium text-slate-900">
-                    Grade {activeChild.grade_level} — {activeChild.section_name}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Afternoon Session</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-slate-400" /> Time In
-                  </span>
-                  <span className="font-medium text-slate-700">
-                    {status.afternoonRecord
-                      ? new Date(status.afternoonRecord.recorded_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <User className="h-4 w-4 text-slate-400" /> Status
-                  </span>
-                  <Badge variant={status.afternoonRecord ? 'success' : 'outline'} size="sm">
-                    {status.afternoonRecord ? status.afternoonRecord.status.toUpperCase() : 'Pending Afternoon Scan'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+            <SessionCard
+              sessionTitle="Morning Session"
+              record={status.morningRecord}
+              gradeLevel={activeChild.grade_level}
+              sectionName={activeChild.section_name}
+              defaultAdviser={status.recordedByTeacherName}
+            />
+            <SessionCard
+              sessionTitle="Afternoon Session"
+              record={status.afternoonRecord}
+              gradeLevel={activeChild.grade_level}
+              sectionName={activeChild.section_name}
+              defaultAdviser={status.recordedByTeacherName}
+            />
           </div>
         </div>
       ) : (

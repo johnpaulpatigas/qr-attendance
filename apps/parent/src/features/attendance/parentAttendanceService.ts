@@ -5,10 +5,14 @@ import type {
   NotificationLog,
 } from '@qr-attendance/types';
 
+export interface AttendanceRecordWithTeacher extends AttendanceRecord {
+  teacher_name?: string | null;
+}
+
 export interface TodayStudentStatus {
   hasScannedToday: boolean;
-  morningRecord: AttendanceRecord | null;
-  afternoonRecord: AttendanceRecord | null;
+  morningRecord: AttendanceRecordWithTeacher | null;
+  afternoonRecord: AttendanceRecordWithTeacher | null;
   overallStatus: AttendanceStatus | 'unrecorded';
   lastRecordedAt: string | null;
   recordedByTeacherName: string | null;
@@ -54,10 +58,15 @@ export async function fetchTodayAttendance(
       };
     }
 
-    const records = data as any[];
+    const records = (data as any[]).map((r) => ({
+      ...r,
+      teacher_name: r.profiles?.full_name || 'Class Adviser',
+    })) as AttendanceRecordWithTeacher[];
+
     const morning = records.find((r) => r.attendance_type === 'morning') || null;
     const afternoon = records.find((r) => r.attendance_type === 'afternoon') || null;
-    const primary = morning || afternoon;
+    // The latest record is considered primary for overall badge
+    const primary = afternoon || morning;
 
     return {
       hasScannedToday: records.length > 0,
@@ -65,7 +74,7 @@ export async function fetchTodayAttendance(
       afternoonRecord: afternoon,
       overallStatus: primary ? primary.status : 'unrecorded',
       lastRecordedAt: primary ? primary.recorded_at : null,
-      recordedByTeacherName: primary?.profiles?.full_name || 'Class Adviser',
+      recordedByTeacherName: primary?.teacher_name || 'Class Adviser',
     };
   } catch {
     return {
