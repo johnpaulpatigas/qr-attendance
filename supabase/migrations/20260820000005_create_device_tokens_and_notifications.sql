@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 -- 1. Create Device Tokens Table
-CREATE TABLE public.device_tokens (
+CREATE TABLE IF NOT EXISTS public.device_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
@@ -18,7 +18,7 @@ CREATE TABLE public.device_tokens (
 );
 
 -- 2. Create Notification Logs Table
-CREATE TABLE public.notification_logs (
+CREATE TABLE IF NOT EXISTS public.notification_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -34,23 +34,27 @@ CREATE TABLE public.notification_logs (
 );
 
 -- 3. Indexes for fast token lookup and delivery reporting
-CREATE INDEX idx_device_tokens_profile ON public.device_tokens(profile_id);
-CREATE INDEX idx_device_tokens_active ON public.device_tokens(profile_id, is_active);
-CREATE INDEX idx_notification_logs_recipient ON public.notification_logs(recipient_profile_id);
-CREATE INDEX idx_notification_logs_student ON public.notification_logs(student_id);
-CREATE INDEX idx_notification_logs_attendance ON public.notification_logs(attendance_id);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_profile ON public.device_tokens(profile_id);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_active ON public.device_tokens(profile_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_recipient ON public.notification_logs(recipient_profile_id);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_student ON public.notification_logs(student_id);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_attendance ON public.notification_logs(attendance_id);
 
 -- 4. Enable Row Level Security
 ALTER TABLE public.device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
 
--- 5. Row Level Security Policies for device_tokens
-CREATE POLICY "Users can manage own device tokens"
+-- 5. Row Level Security Policies for device_tokens (Single policy per action, InitPlan optimized)
+DROP POLICY IF EXISTS "Users can manage own device tokens" ON public.device_tokens;
+DROP POLICY IF EXISTS "Authenticated users can manage device tokens" ON public.device_tokens;
+DROP POLICY IF EXISTS "Service role full access on device_tokens" ON public.device_tokens;
+
+CREATE POLICY "Authenticated users can manage device tokens"
   ON public.device_tokens
   FOR ALL
   TO authenticated
-  USING (profile_id = auth.uid())
-  WITH CHECK (profile_id = auth.uid());
+  USING (profile_id = (SELECT auth.uid()))
+  WITH CHECK (profile_id = (SELECT auth.uid()));
 
 CREATE POLICY "Service role full access on device_tokens"
   ON public.device_tokens
@@ -59,12 +63,16 @@ CREATE POLICY "Service role full access on device_tokens"
   USING (true)
   WITH CHECK (true);
 
--- 6. Row Level Security Policies for notification_logs
-CREATE POLICY "Users can view own notification logs"
+-- 6. Row Level Security Policies for notification_logs (Single policy per action, InitPlan optimized)
+DROP POLICY IF EXISTS "Users can view own notification logs" ON public.notification_logs;
+DROP POLICY IF EXISTS "Authenticated users can view notification logs" ON public.notification_logs;
+DROP POLICY IF EXISTS "Service role full access on notification_logs" ON public.notification_logs;
+
+CREATE POLICY "Authenticated users can view notification logs"
   ON public.notification_logs
   FOR SELECT
   TO authenticated
-  USING (recipient_profile_id = auth.uid() OR public.is_teacher());
+  USING (recipient_profile_id = (SELECT auth.uid()) OR public.is_teacher());
 
 CREATE POLICY "Service role full access on notification_logs"
   ON public.notification_logs

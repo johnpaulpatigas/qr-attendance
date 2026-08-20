@@ -35,11 +35,11 @@ SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.class_sections
-    WHERE id = target_class_id AND teacher_id = auth.uid()
+    WHERE id = target_class_id AND teacher_id = (SELECT auth.uid())
   ) OR public.is_admin();
 $$;
 
--- 5. Row Level Security Policies
+-- 5. Row Level Security Policies (Single consolidated policy per action)
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Assigned teachers and admins can update class section" ON public.class_sections;
 DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.class_sections;

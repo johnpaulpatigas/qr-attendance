@@ -66,7 +66,7 @@ AS $$
     SELECT 1 FROM public.student_parents sp
     JOIN public.parents p ON sp.parent_id = p.id
     WHERE sp.student_id = target_student_id
-      AND p.profile_id = auth.uid()
+      AND p.profile_id = (SELECT auth.uid())
   );
 $$;
 
@@ -119,7 +119,7 @@ DECLARE
   v_student_name TEXT;
 BEGIN
   -- 1. Verify user is authenticated
-  IF auth.uid() IS NULL THEN
+  IF (SELECT auth.uid()) IS NULL THEN
     RETURN jsonb_build_object('success', false, 'message', 'Authentication required.');
   END IF;
 
@@ -134,7 +134,7 @@ BEGIN
 
   -- 3. Ensure parent record exists for auth.uid()
   INSERT INTO public.parents (profile_id)
-  VALUES (auth.uid())
+  VALUES ((SELECT auth.uid()))
   ON CONFLICT (profile_id) DO UPDATE SET updated_at = NOW()
   RETURNING id INTO v_parent_id;
 
@@ -154,7 +154,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated, anon;
 
--- 9. Row Level Security Policies for students
+-- 9. Row Level Security Policies for students (Single consolidated policy per action)
 DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
@@ -187,31 +187,34 @@ CREATE POLICY "Service role full access on students"
   USING (true)
   WITH CHECK (true);
 
--- 10. Row Level Security Policies for parents
+-- 10. Row Level Security Policies for parents (Single consolidated policy per action, InitPlan optimized)
 DROP POLICY IF EXISTS "Parents can view own parent record" ON public.parents;
 DROP POLICY IF EXISTS "Parents can insert own parent record" ON public.parents;
 DROP POLICY IF EXISTS "Parents can update own parent record" ON public.parents;
 DROP POLICY IF EXISTS "Teachers and admins can manage parents" ON public.parents;
+DROP POLICY IF EXISTS "Authenticated users can view parents" ON public.parents;
+DROP POLICY IF EXISTS "Authenticated users can insert parents" ON public.parents;
+DROP POLICY IF EXISTS "Authenticated users can update parents" ON public.parents;
 DROP POLICY IF EXISTS "Service role full access on parents" ON public.parents;
 
-CREATE POLICY "Parents can view own parent record"
+CREATE POLICY "Authenticated users can view parents"
   ON public.parents
   FOR SELECT
   TO authenticated
-  USING (profile_id = auth.uid() OR public.is_teacher());
+  USING (profile_id = (SELECT auth.uid()) OR public.is_teacher());
 
-CREATE POLICY "Parents can insert own parent record"
+CREATE POLICY "Authenticated users can insert parents"
   ON public.parents
   FOR INSERT
   TO authenticated
-  WITH CHECK (profile_id = auth.uid() OR public.is_teacher());
+  WITH CHECK (profile_id = (SELECT auth.uid()) OR public.is_teacher());
 
-CREATE POLICY "Parents can update own parent record"
+CREATE POLICY "Authenticated users can update parents"
   ON public.parents
   FOR UPDATE
   TO authenticated
-  USING (profile_id = auth.uid() OR public.is_teacher())
-  WITH CHECK (profile_id = auth.uid() OR public.is_teacher());
+  USING (profile_id = (SELECT auth.uid()) OR public.is_teacher())
+  WITH CHECK (profile_id = (SELECT auth.uid()) OR public.is_teacher());
 
 CREATE POLICY "Service role full access on parents"
   ON public.parents
@@ -220,19 +223,21 @@ CREATE POLICY "Service role full access on parents"
   USING (true)
   WITH CHECK (true);
 
--- 11. Row Level Security Policies for student_parents
+-- 11. Row Level Security Policies for student_parents (Single consolidated policy per action)
 DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Parents can manage own student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Teachers and admins can manage student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can view student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can manage student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Service role full access on student_parents" ON public.student_parents;
 
-CREATE POLICY "Parents and teachers can view student parent links"
+CREATE POLICY "Authenticated users can view student parent links"
   ON public.student_parents
   FOR SELECT
   TO authenticated
   USING (true);
 
-CREATE POLICY "Parents and teachers can manage student parent links"
+CREATE POLICY "Authenticated users can manage student parent links"
   ON public.student_parents
   FOR ALL
   TO authenticated

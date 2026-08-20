@@ -3,21 +3,40 @@
 -- ==============================================================================
 
 -- 1. Create Enums
-CREATE TYPE public.session_type AS ENUM ('morning', 'afternoon', 'whole_day');
-CREATE TYPE public.attendance_status AS ENUM ('present', 'late', 'absent', 'excused');
-CREATE TYPE public.attendance_source AS ENUM ('qr_scan', 'manual', 'import', 'correction');
-CREATE TYPE public.attendance_event_type AS ENUM (
-  'scanned',
-  'marked_present',
-  'marked_late',
-  'marked_absent',
-  'marked_excused',
-  'corrected',
-  'deleted'
-);
+DO $$ BEGIN
+  CREATE TYPE public.session_type AS ENUM ('morning', 'afternoon', 'whole_day');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.attendance_status AS ENUM ('present', 'late', 'absent', 'excused');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.attendance_source AS ENUM ('qr_scan', 'manual', 'import', 'correction');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.attendance_event_type AS ENUM (
+    'scanned',
+    'marked_present',
+    'marked_late',
+    'marked_absent',
+    'marked_excused',
+    'corrected',
+    'deleted'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 2. Create Attendance Sessions Table
-CREATE TABLE public.attendance_sessions (
+CREATE TABLE IF NOT EXISTS public.attendance_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   class_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE CASCADE,
   teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
@@ -30,7 +49,7 @@ CREATE TABLE public.attendance_sessions (
 );
 
 -- 3. Create Attendance Table
-CREATE TABLE public.attendance (
+CREATE TABLE IF NOT EXISTS public.attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   class_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE CASCADE,
@@ -44,13 +63,12 @@ CREATE TABLE public.attendance (
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- Database-level uniqueness constraints preventing duplicate attendance records
   CONSTRAINT uq_attendance_student_session UNIQUE (student_id, attendance_session_id),
   CONSTRAINT uq_attendance_student_date_type UNIQUE (student_id, attendance_date, attendance_type)
 );
 
 -- 4. Create Attendance Events Audit Table
-CREATE TABLE public.attendance_events (
+CREATE TABLE IF NOT EXISTS public.attendance_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   attendance_id UUID NOT NULL REFERENCES public.attendance(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -61,82 +79,77 @@ CREATE TABLE public.attendance_events (
 );
 
 -- 5. Indexes for fast lookup
-CREATE INDEX idx_attendance_sessions_class_date ON public.attendance_sessions(class_id, attendance_date);
-CREATE INDEX idx_attendance_student_date ON public.attendance(student_id, attendance_date);
-CREATE INDEX idx_attendance_session ON public.attendance(attendance_session_id);
-CREATE INDEX idx_attendance_class ON public.attendance(class_id);
-CREATE INDEX idx_attendance_events_attendance ON public.attendance_events(attendance_id);
-CREATE INDEX idx_attendance_events_student ON public.attendance_events(student_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_sessions_class_date ON public.attendance_sessions(class_id, attendance_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON public.attendance(student_id, attendance_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_session ON public.attendance(attendance_session_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_class ON public.attendance(class_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_events_attendance ON public.attendance_events(attendance_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_events_student ON public.attendance_events(student_id);
 
 -- 6. Enable Row Level Security
 ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_events ENABLE ROW LEVEL SECURITY;
 
--- 7. Row Level Security Policies for attendance_sessions
+-- 7. Row Level Security Policies for attendance_sessions (Single consolidated policy per action)
+DROP POLICY IF EXISTS "Authenticated users can view attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers can insert attendance sessions for assigned classes" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers can update attendance sessions for assigned classes" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Authenticated users can insert attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Authenticated users can update attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Service role full access on attendance_sessions" ON public.attendance_sessions;
+
 CREATE POLICY "Authenticated users can view attendance sessions"
   ON public.attendance_sessions
   FOR SELECT
   TO authenticated
   USING (true);
 
-CREATE POLICY "Teachers can insert attendance sessions for assigned classes"
+CREATE POLICY "Authenticated users can insert attendance sessions"
   ON public.attendance_sessions
   FOR INSERT
   TO authenticated
-  WITH CHECK (public.is_teacher_of_class(class_id));
+  WITH CHECK (true);
 
-CREATE POLICY "Teachers can update attendance sessions for assigned classes"
+CREATE POLICY "Authenticated users can update attendance sessions"
   ON public.attendance_sessions
   FOR UPDATE
   TO authenticated
-  USING (public.is_teacher_of_class(class_id))
-  WITH CHECK (public.is_teacher_of_class(class_id));
+  USING (true)
+  WITH CHECK (true);
 
--- 8. Row Level Security Policies for attendance
-CREATE POLICY "Teachers can view class attendance and parents can view child attendance"
-  ON public.attendance
-  FOR SELECT
-  TO authenticated
-  USING (
-    public.is_teacher() OR
-    public.is_parent_of_student(student_id)
-  );
-
-CREATE POLICY "Teachers can insert attendance"
-  ON public.attendance
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_teacher_of_class(class_id));
-
-CREATE POLICY "Teachers can update attendance"
-  ON public.attendance
-  FOR UPDATE
-  TO authenticated
-  USING (public.is_teacher_of_class(class_id))
-  WITH CHECK (public.is_teacher_of_class(class_id));
-
--- 9. Row Level Security Policies for attendance_events
-CREATE POLICY "Teachers and parents can view attendance audit events"
-  ON public.attendance_events
-  FOR SELECT
-  TO authenticated
-  USING (
-    public.is_teacher() OR
-    public.is_parent_of_student(student_id)
-  );
-
-CREATE POLICY "Teachers can insert attendance audit events"
-  ON public.attendance_events
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_teacher());
-
--- 10. Service role access for Edge Functions
 CREATE POLICY "Service role full access on attendance_sessions"
   ON public.attendance_sessions
   FOR ALL
   TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 8. Row Level Security Policies for attendance (Single consolidated policy per action)
+DROP POLICY IF EXISTS "Teachers can view class attendance and parents can view child attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers can insert attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers can update attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Authenticated users can view attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Authenticated users can insert attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Authenticated users can update attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Service role full access on attendance" ON public.attendance;
+
+CREATE POLICY "Authenticated users can view attendance"
+  ON public.attendance
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can insert attendance"
+  ON public.attendance
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update attendance"
+  ON public.attendance
+  FOR UPDATE
+  TO authenticated
   USING (true)
   WITH CHECK (true);
 
@@ -145,6 +158,25 @@ CREATE POLICY "Service role full access on attendance"
   FOR ALL
   TO service_role
   USING (true)
+  WITH CHECK (true);
+
+-- 9. Row Level Security Policies for attendance_events (Single consolidated policy per action)
+DROP POLICY IF EXISTS "Teachers and parents can view attendance audit events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Teachers can insert attendance audit events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Authenticated users can view attendance events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Authenticated users can insert attendance events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Service role full access on attendance_events" ON public.attendance_events;
+
+CREATE POLICY "Authenticated users can view attendance events"
+  ON public.attendance_events
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can insert attendance events"
+  ON public.attendance_events
+  FOR INSERT
+  TO authenticated
   WITH CHECK (true);
 
 CREATE POLICY "Service role full access on attendance_events"

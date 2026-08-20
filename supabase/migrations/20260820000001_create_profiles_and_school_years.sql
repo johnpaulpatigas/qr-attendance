@@ -53,7 +53,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid();
+  SELECT role FROM public.profiles WHERE id = (SELECT auth.uid());
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -76,7 +76,7 @@ AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- 7. Row Level Security Policies for profiles (Zero-recursion SELECT)
+-- 7. Row Level Security Policies for profiles (Single permissive policy per action, InitPlan optimized)
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Teachers and admins can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
@@ -94,14 +94,14 @@ CREATE POLICY "Users can insert own profile"
   ON public.profiles
   FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can update own profile"
   ON public.profiles
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  USING ((SELECT auth.uid()) = id)
+  WITH CHECK ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Service role full access on profiles"
   ON public.profiles
@@ -110,9 +110,10 @@ CREATE POLICY "Service role full access on profiles"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for school_years
+-- 8. Row Level Security Policies for school_years (Single permissive policy per action)
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
 DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
+DROP POLICY IF EXISTS "Teachers and admins can manage school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
