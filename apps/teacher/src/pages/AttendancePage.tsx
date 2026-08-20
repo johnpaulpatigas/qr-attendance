@@ -469,6 +469,7 @@ export const AttendancePage: React.FC = () => {
           sessionId={activeSession.id}
           classId={selectedClassId}
           attendanceDate={attendanceDate}
+          sessionType={sessionType}
           onRecordUpdated={initSession}
         />
       )}
