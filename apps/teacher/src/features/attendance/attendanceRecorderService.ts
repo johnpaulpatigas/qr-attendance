@@ -23,8 +23,8 @@ export function calculateAttendanceStatus(
   const minutes = scanTime.getMinutes();
   const timeInMinutes = hours * 60 + minutes;
 
-  // Morning / Whole Day Session: Cutoff is 7:45 AM (465 minutes)
-  if (sessionType === 'morning' || sessionType === 'whole_day') {
+  // Morning Session: Cutoff is 7:45 AM (465 minutes)
+  if (sessionType === 'morning') {
     // If scanned between 7:46 AM and 12:00 PM -> late
     if (timeInMinutes > 465 && timeInMinutes < 720) {
       return 'late';

@@ -612,7 +612,6 @@ Possible session types:
 
 - `morning`
 - `afternoon`
-- `whole_day`
 
 ---
 
@@ -885,7 +884,6 @@ Possible session types:
 
 - Morning
 - Afternoon
-- Whole Day
 
 This structure should allow future expansion.
 

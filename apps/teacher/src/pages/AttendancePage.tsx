@@ -268,7 +268,6 @@ export const AttendancePage: React.FC = () => {
               options={[
                 { value: 'morning', label: 'Morning Session' },
                 { value: 'afternoon', label: 'Afternoon Session' },
-                { value: 'whole_day', label: 'Whole Day' },
               ]}
             />
 

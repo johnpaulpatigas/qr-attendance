@@ -1,4 +1,4 @@
-export type SessionType = 'morning' | 'afternoon' | 'whole_day';
+export type SessionType = 'morning' | 'afternoon';
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused';
 export type AttendanceSource = 'qr_scan' | 'manual' | 'import' | 'correction';
 export type AttendanceEventType =

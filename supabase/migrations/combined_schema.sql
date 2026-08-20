@@ -578,7 +578,7 @@ CREATE POLICY "Service role full access on student_parents"
 
 -- 1. Create Enums
 DO $$ BEGIN
-  CREATE TYPE public.session_type AS ENUM ('morning', 'afternoon', 'whole_day');
+  CREATE TYPE public.session_type AS ENUM ('morning', 'afternoon');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

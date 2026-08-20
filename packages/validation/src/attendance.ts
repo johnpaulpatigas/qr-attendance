@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { qrPayloadSchema } from './qr';
 
-export const sessionTypeSchema = z.enum(['morning', 'afternoon', 'whole_day']);
+export const sessionTypeSchema = z.enum(['morning', 'afternoon']);
 export const attendanceStatusSchema = z.enum(['present', 'late', 'absent', 'excused']);
 export const attendanceSourceSchema = z.enum(['qr_scan', 'manual', 'import', 'correction']);
 

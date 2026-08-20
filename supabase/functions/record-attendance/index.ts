@@ -17,7 +17,7 @@ interface RecordAttendancePayload {
   class_id: string;
   session_id: string;
   attendance_date: string;
-  session_type: 'morning' | 'afternoon' | 'whole_day';
+  session_type: 'morning' | 'afternoon';
   status?: 'present' | 'late' | 'absent' | 'excused';
   client_event_id?: string;
 }

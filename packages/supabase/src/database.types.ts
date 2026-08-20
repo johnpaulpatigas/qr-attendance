@@ -122,7 +122,7 @@ export interface Database {
     };
     Enums: {
       user_role: 'teacher' | 'admin' | 'parent' | 'student';
-      session_type: 'morning' | 'afternoon' | 'whole_day';
+      session_type: 'morning' | 'afternoon';
       attendance_status: 'present' | 'late' | 'absent' | 'excused';
       attendance_source: 'qr_scan' | 'manual' | 'import' | 'correction';
       notification_type:
