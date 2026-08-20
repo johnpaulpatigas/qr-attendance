@@ -113,6 +113,9 @@ CREATE POLICY "Service role full access on profiles"
 -- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
 DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
+DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
+DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
+DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
 
 CREATE POLICY "Authenticated users can view school years"
   ON public.school_years
@@ -120,12 +123,25 @@ CREATE POLICY "Authenticated users can view school years"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Admins can manage school years"
+CREATE POLICY "Authenticated users can insert school years"
+  ON public.school_years
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update school years"
+  ON public.school_years
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Service role full access on school_years"
   ON public.school_years
   FOR ALL
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 -- 9. Auto-create Profile on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -160,10 +176,11 @@ CREATE TRIGGER on_auth_user_created
 -- ==============================================================================
 
 -- 1. Create class_sections Table
-CREATE TABLE public.class_sections (
+CREATE TABLE IF NOT EXISTS public.class_sections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 1 AND 12),
   section_name TEXT NOT NULL,
+  room_number TEXT,
   school_year_id UUID NOT NULL REFERENCES public.school_years(id) ON DELETE RESTRICT,
   teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -171,10 +188,12 @@ CREATE TABLE public.class_sections (
   CONSTRAINT uq_class_section_per_school_year UNIQUE (grade_level, section_name, school_year_id)
 );
 
+ALTER TABLE public.class_sections ADD COLUMN IF NOT EXISTS room_number TEXT;
+
 -- 2. Indexes for fast lookup
-CREATE INDEX idx_class_sections_school_year ON public.class_sections(school_year_id);
-CREATE INDEX idx_class_sections_teacher ON public.class_sections(teacher_id);
-CREATE INDEX idx_class_sections_grade ON public.class_sections(grade_level);
+CREATE INDEX IF NOT EXISTS idx_class_sections_school_year ON public.class_sections(school_year_id);
+CREATE INDEX IF NOT EXISTS idx_class_sections_teacher ON public.class_sections(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_class_sections_grade ON public.class_sections(grade_level);
 
 -- 3. Enable Row Level Security
 ALTER TABLE public.class_sections ENABLE ROW LEVEL SECURITY;
@@ -194,29 +213,32 @@ AS $$
 $$;
 
 -- 5. Row Level Security Policies
--- Authenticated users (teachers, parents, students) can view class information
+DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Assigned teachers and admins can update class section" ON public.class_sections;
+DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Authenticated users can insert class sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Authenticated users can update class sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Service role full access on class_sections" ON public.class_sections;
+
 CREATE POLICY "Authenticated users can view class sections"
   ON public.class_sections
   FOR SELECT
   TO authenticated
   USING (true);
 
--- Teachers assigned to the section or Admins can update class details
-CREATE POLICY "Assigned teachers and admins can update class section"
-  ON public.class_sections
-  FOR UPDATE
-  TO authenticated
-  USING (teacher_id = auth.uid() OR public.is_admin())
-  WITH CHECK (teacher_id = auth.uid() OR public.is_admin());
-
--- Only Admins and authorized Teachers can insert new class sections
-CREATE POLICY "Teachers and admins can insert class sections"
+CREATE POLICY "Authenticated users can insert class sections"
   ON public.class_sections
   FOR INSERT
   TO authenticated
-  WITH CHECK (public.is_teacher());
+  WITH CHECK (true);
 
--- Service role full access
+CREATE POLICY "Authenticated users can update class sections"
+  ON public.class_sections
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
 CREATE POLICY "Service role full access on class_sections"
   ON public.class_sections
   FOR ALL

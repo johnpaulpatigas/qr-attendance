@@ -113,6 +113,9 @@ CREATE POLICY "Service role full access on profiles"
 -- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
 DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
+DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
+DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
+DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
 
 CREATE POLICY "Authenticated users can view school years"
   ON public.school_years
@@ -120,12 +123,25 @@ CREATE POLICY "Authenticated users can view school years"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Admins can manage school years"
+CREATE POLICY "Authenticated users can insert school years"
+  ON public.school_years
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update school years"
+  ON public.school_years
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Service role full access on school_years"
   ON public.school_years
   FOR ALL
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 -- 9. Auto-create Profile on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
