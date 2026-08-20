@@ -73,7 +73,7 @@ export const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    const { error: signUpErr } = await signUpWithStudentLrn({
+    const res = await signUpWithStudentLrn({
       fullName,
       email: signUpEmail,
       password: signUpPassword,
@@ -82,8 +82,14 @@ export const LoginPage: React.FC = () => {
     });
     setLoading(false);
 
-    if (signUpErr) {
-      setError(signUpErr.message);
+    if (res.error) {
+      setError(res.error.message);
+    } else if (res.emailConfirmationRequired) {
+      setSuccessMessage('Account registered and student linked! Please check your email inbox to confirm your account, then sign in.');
+      setEmail(signUpEmail);
+      setTimeout(() => {
+        setMode('signin');
+      }, 3000);
     } else {
       setSuccessMessage('Account created and student successfully linked! Logging you in...');
       setTimeout(() => {

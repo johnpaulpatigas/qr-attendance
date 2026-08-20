@@ -143,25 +143,57 @@ CREATE POLICY "Service role full access on school_years"
   USING (true)
   WITH CHECK (true);
 
--- 9. Auto-create Profile on auth.users insert
+-- 9. Auto-create Profile and Auto-link Student on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_role public.user_role;
+  v_lrn TEXT;
+  v_relation TEXT;
+  v_student_id UUID;
+  v_parent_id UUID;
 BEGIN
+  v_role := COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'teacher'::public.user_role);
+  v_lrn := NEW.raw_user_meta_data->>'student_lrn';
+  v_relation := COALESCE(NEW.raw_user_meta_data->>'relationship', 'Parent');
+
+  -- 1. Insert or update Profile
   INSERT INTO public.profiles (id, role, full_name, email, avatar_url)
   VALUES (
     NEW.id,
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'teacher'::public.user_role),
+    v_role,
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
     NEW.email,
     NEW.raw_user_meta_data->>'avatar_url'
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role,
     updated_at = NOW();
+
+  -- 2. If student_lrn is supplied in metadata (e.g. from parent signup), link atomically!
+  IF v_lrn IS NOT NULL THEN
+    SELECT id INTO v_student_id FROM public.students WHERE lrn = v_lrn;
+
+    IF v_student_id IS NOT NULL THEN
+      -- Create parent row
+      INSERT INTO public.parents (profile_id)
+      VALUES (NEW.id)
+      ON CONFLICT (profile_id) DO UPDATE SET updated_at = NOW()
+      RETURNING id INTO v_parent_id;
+
+      -- Create student_parents link
+      INSERT INTO public.student_parents (student_id, parent_id, relationship, is_primary)
+      VALUES (v_student_id, v_parent_id, v_relation, true)
+      ON CONFLICT (student_id, parent_id) DO UPDATE SET relationship = EXCLUDED.relationship;
+    END IF;
+  END IF;
+
   RETURN NEW;
 END;
 $$;

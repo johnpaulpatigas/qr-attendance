@@ -21,7 +21,7 @@ interface ParentAuthContextType {
   setActiveChildId: (studentId: string) => void;
   isLoading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
-  signUpWithStudentLrn: (params: SignUpParentParams) => Promise<{ error: Error | null }>;
+  signUpWithStudentLrn: (params: SignUpParentParams) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
   linkStudentByLrn: (studentLrn: string, relationship?: string) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -168,11 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUpWithStudentLrn = async (
     params: SignUpParentParams
-  ): Promise<{ error: Error | null }> => {
+  ): Promise<{ error: Error | null; emailConfirmationRequired?: boolean }> => {
     try {
       const trimmedLrn = params.studentLrn.trim();
 
-      // 1. Verify student exists using public RPC (bypasses anon RLS restrictions)
+      // 1. Check student via public RPC
       try {
         const { data: verifyRes, error: verifyErr } = await (client as any).rpc(
           'verify_student_lrn',
@@ -186,10 +186,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         }
       } catch {
-        // Fall back gracefully to link_student_to_parent check
+        // Fall back gracefully
       }
 
-      // 2. Register user in Supabase Auth
+      // 2. Register user in Supabase Auth with student_lrn metadata for atomic trigger execution
       const { data: authData, error: signUpError } = await client.auth.signUp({
         email: params.email.trim(),
         password: params.password,
@@ -197,31 +197,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             full_name: params.fullName.trim(),
             role: 'parent',
+            student_lrn: trimmedLrn,
+            relationship: params.relationship || 'Parent',
           },
         },
       });
 
       if (signUpError) return { error: signUpError };
 
-      const newUserId = authData.user?.id;
-      if (newUserId) {
-        // 3. Atomically create parent and link student via SECURITY DEFINER RPC
-        const { data: linkRes, error: rpcErr } = await (client as any).rpc(
-          'link_student_to_parent',
-          {
-            target_lrn: trimmedLrn,
-            relation_name: params.relationship || 'Parent',
-          }
-        );
+      // 3. If session is not automatically created (e.g. Supabase requires sign-in), attempt sign-in
+      if (!authData.session) {
+        const { data: signInData, error: signInErr } = await client.auth.signInWithPassword({
+          email: params.email.trim(),
+          password: params.password,
+        });
 
-        if (!rpcErr && linkRes && linkRes.success === false) {
-          return { error: new Error(linkRes.message) };
+        if (!signInErr && signInData.user) {
+          await loadProfileAndChildren(signInData.user.id, params.email.trim());
+          return { error: null, emailConfirmationRequired: false };
+        } else if (signInErr) {
+          // If email confirmation is required by Supabase project settings
+          return { error: null, emailConfirmationRequired: true };
         }
-
-        await loadProfileAndChildren(newUserId, params.email.trim());
       }
 
-      return { error: null };
+      if (authData.user) {
+        await loadProfileAndChildren(authData.user.id, params.email.trim());
+      }
+
+      return { error: null, emailConfirmationRequired: false };
     } catch (err: unknown) {
       return {
         error: err instanceof Error ? err : new Error('Failed to create parent account.'),
