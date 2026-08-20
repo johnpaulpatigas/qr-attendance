@@ -39,7 +39,9 @@ AS $$
   ) OR public.is_admin();
 $$;
 
--- 5. Row Level Security Policies (Single consolidated policy per action)
+REVOKE EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) FROM PUBLIC, anon, authenticated;
+
+-- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Assigned teachers and admins can update class section" ON public.class_sections;
 DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.class_sections;
@@ -53,18 +55,18 @@ CREATE POLICY "Authenticated users can view class sections"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert class sections"
+CREATE POLICY "Teachers and admins can insert class sections"
   ON public.class_sections
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update class sections"
+CREATE POLICY "Teachers and admins can update class sections"
   ON public.class_sections
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on class_sections"
   ON public.class_sections

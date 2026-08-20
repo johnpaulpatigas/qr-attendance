@@ -45,7 +45,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, bypassing RLS)
+-- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, internal use only)
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
@@ -76,9 +76,12 @@ AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- 7. Row Level Security Policies for profiles (Single permissive policy per action, InitPlan optimized)
-DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Teachers and admins can view profiles" ON public.profiles;
+-- Revoke public API execution on internal helper functions
+REVOKE EXECUTE ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.is_teacher() FROM PUBLIC, anon, authenticated;
+
+-- 7. Row Level Security Policies for profiles
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
@@ -110,12 +113,12 @@ CREATE POLICY "Service role full access on profiles"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for school_years (Single permissive policy per action)
+-- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
-DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
-DROP POLICY IF EXISTS "Teachers and admins can manage school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
+DROP POLICY IF EXISTS "Teachers and admins can insert school years" ON public.school_years;
+DROP POLICY IF EXISTS "Teachers and admins can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
 
 CREATE POLICY "Authenticated users can view school years"
@@ -124,18 +127,18 @@ CREATE POLICY "Authenticated users can view school years"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert school years"
+CREATE POLICY "Teachers and admins can insert school years"
   ON public.school_years
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update school years"
+CREATE POLICY "Teachers and admins can update school years"
   ON public.school_years
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on school_years"
   ON public.school_years
@@ -177,7 +180,7 @@ BEGIN
     role = EXCLUDED.role,
     updated_at = NOW();
 
-  -- 2. If student_lrn is supplied in metadata (e.g. from parent signup), link atomically!
+  -- 2. If student_lrn is supplied in metadata from parent signup, link atomically!
   IF v_lrn IS NOT NULL THEN
     SELECT id INTO v_student_id FROM public.students WHERE lrn = v_lrn;
 
@@ -198,6 +201,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

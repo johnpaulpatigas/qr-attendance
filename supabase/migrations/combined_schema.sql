@@ -45,7 +45,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, bypassing RLS)
+-- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, internal use only)
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
@@ -76,9 +76,12 @@ AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- 7. Row Level Security Policies for profiles (Single permissive policy per action, InitPlan optimized)
-DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Teachers and admins can view profiles" ON public.profiles;
+-- Revoke public API execution on internal helper functions
+REVOKE EXECUTE ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.is_teacher() FROM PUBLIC, anon, authenticated;
+
+-- 7. Row Level Security Policies for profiles
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
@@ -110,12 +113,12 @@ CREATE POLICY "Service role full access on profiles"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for school_years (Single permissive policy per action)
+-- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
-DROP POLICY IF EXISTS "Admins can manage school years" ON public.school_years;
-DROP POLICY IF EXISTS "Teachers and admins can manage school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
 DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
+DROP POLICY IF EXISTS "Teachers and admins can insert school years" ON public.school_years;
+DROP POLICY IF EXISTS "Teachers and admins can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
 
 CREATE POLICY "Authenticated users can view school years"
@@ -124,18 +127,18 @@ CREATE POLICY "Authenticated users can view school years"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert school years"
+CREATE POLICY "Teachers and admins can insert school years"
   ON public.school_years
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update school years"
+CREATE POLICY "Teachers and admins can update school years"
   ON public.school_years
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on school_years"
   ON public.school_years
@@ -177,7 +180,7 @@ BEGIN
     role = EXCLUDED.role,
     updated_at = NOW();
 
-  -- 2. If student_lrn is supplied in metadata (e.g. from parent signup), link atomically!
+  -- 2. If student_lrn is supplied in metadata from parent signup, link atomically!
   IF v_lrn IS NOT NULL THEN
     SELECT id INTO v_student_id FROM public.students WHERE lrn = v_lrn;
 
@@ -198,6 +201,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -245,7 +250,9 @@ AS $$
   ) OR public.is_admin();
 $$;
 
--- 5. Row Level Security Policies (Single consolidated policy per action)
+REVOKE EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) FROM PUBLIC, anon, authenticated;
+
+-- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Assigned teachers and admins can update class section" ON public.class_sections;
 DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.class_sections;
@@ -259,18 +266,18 @@ CREATE POLICY "Authenticated users can view class sections"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert class sections"
+CREATE POLICY "Teachers and admins can insert class sections"
   ON public.class_sections
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update class sections"
+CREATE POLICY "Teachers and admins can update class sections"
   ON public.class_sections
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on class_sections"
   ON public.class_sections
@@ -350,7 +357,9 @@ AS $$
   );
 $$;
 
--- 7. Public Function to verify LRN existence (Can be called anonymously during sign up)
+REVOKE EXECUTE ON FUNCTION public.is_parent_of_student(UUID) FROM PUBLIC, anon, authenticated;
+
+-- 7. Public Function to verify LRN existence (Safely callable during registration)
 CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -381,6 +390,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) TO anon, authenticated;
 
 -- 8. Zero-Friction RPC: Link Student to Authenticated Parent Account
@@ -432,11 +442,11 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated, anon;
+REVOKE EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated;
 
--- 9. Row Level Security Policies for students (Single consolidated policy per action)
+-- 9. Row Level Security Policies for students
 DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
-DROP POLICY IF EXISTS "Teachers and admins can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can update students" ON public.students;
 DROP POLICY IF EXISTS "Service role full access on students" ON public.students;
@@ -451,14 +461,14 @@ CREATE POLICY "Teachers and admins can insert students"
   ON public.students
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Teachers and admins can update students"
   ON public.students
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on students"
   ON public.students
@@ -467,11 +477,7 @@ CREATE POLICY "Service role full access on students"
   USING (true)
   WITH CHECK (true);
 
--- 10. Row Level Security Policies for parents (Single consolidated policy per action, InitPlan optimized)
-DROP POLICY IF EXISTS "Parents can view own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Parents can insert own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Parents can update own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Teachers and admins can manage parents" ON public.parents;
+-- 10. Row Level Security Policies for parents
 DROP POLICY IF EXISTS "Authenticated users can view parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can insert parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can update parents" ON public.parents;
@@ -503,12 +509,13 @@ CREATE POLICY "Service role full access on parents"
   USING (true)
   WITH CHECK (true);
 
--- 11. Row Level Security Policies for student_parents (Single consolidated policy per action)
+-- 11. Row Level Security Policies for student_parents
 DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
-DROP POLICY IF EXISTS "Parents can manage own student parent links" ON public.student_parents;
-DROP POLICY IF EXISTS "Teachers and admins can manage student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can view student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can manage student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can insert student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can update student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can delete student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Service role full access on student_parents" ON public.student_parents;
 
 CREATE POLICY "Authenticated users can view student parent links"
@@ -517,12 +524,52 @@ CREATE POLICY "Authenticated users can view student parent links"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can manage student parent links"
+CREATE POLICY "Authenticated users can insert student parent links"
   ON public.student_parents
-  FOR ALL
+  FOR INSERT
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  WITH CHECK (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "Authenticated users can update student parent links"
+  ON public.student_parents
+  FOR UPDATE
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "Authenticated users can delete student parent links"
+  ON public.student_parents
+  FOR DELETE
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
 
 CREATE POLICY "Service role full access on student_parents"
   ON public.student_parents
@@ -623,12 +670,12 @@ ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_events ENABLE ROW LEVEL SECURITY;
 
--- 7. Row Level Security Policies for attendance_sessions (Single consolidated policy per action)
+-- 7. Row Level Security Policies for attendance_sessions
 DROP POLICY IF EXISTS "Authenticated users can view attendance sessions" ON public.attendance_sessions;
-DROP POLICY IF EXISTS "Teachers can insert attendance sessions for assigned classes" ON public.attendance_sessions;
-DROP POLICY IF EXISTS "Teachers can update attendance sessions for assigned classes" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Authenticated users can update attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers and admins can update attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Service role full access on attendance_sessions" ON public.attendance_sessions;
 
 CREATE POLICY "Authenticated users can view attendance sessions"
@@ -637,18 +684,18 @@ CREATE POLICY "Authenticated users can view attendance sessions"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance sessions"
+CREATE POLICY "Teachers and admins can insert attendance sessions"
   ON public.attendance_sessions
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update attendance sessions"
+CREATE POLICY "Teachers and admins can update attendance sessions"
   ON public.attendance_sessions
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance_sessions"
   ON public.attendance_sessions
@@ -657,13 +704,12 @@ CREATE POLICY "Service role full access on attendance_sessions"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for attendance (Single consolidated policy per action)
-DROP POLICY IF EXISTS "Teachers can view class attendance and parents can view child attendance" ON public.attendance;
-DROP POLICY IF EXISTS "Teachers can insert attendance" ON public.attendance;
-DROP POLICY IF EXISTS "Teachers can update attendance" ON public.attendance;
+-- 8. Row Level Security Policies for attendance
 DROP POLICY IF EXISTS "Authenticated users can view attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Authenticated users can update attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers and admins can update attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Service role full access on attendance" ON public.attendance;
 
 CREATE POLICY "Authenticated users can view attendance"
@@ -672,18 +718,18 @@ CREATE POLICY "Authenticated users can view attendance"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance"
+CREATE POLICY "Teachers and admins can insert attendance"
   ON public.attendance
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update attendance"
+CREATE POLICY "Teachers and admins can update attendance"
   ON public.attendance
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance"
   ON public.attendance
@@ -692,11 +738,10 @@ CREATE POLICY "Service role full access on attendance"
   USING (true)
   WITH CHECK (true);
 
--- 9. Row Level Security Policies for attendance_events (Single consolidated policy per action)
-DROP POLICY IF EXISTS "Teachers and parents can view attendance audit events" ON public.attendance_events;
-DROP POLICY IF EXISTS "Teachers can insert attendance audit events" ON public.attendance_events;
+-- 9. Row Level Security Policies for attendance_events
 DROP POLICY IF EXISTS "Authenticated users can view attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Service role full access on attendance_events" ON public.attendance_events;
 
 CREATE POLICY "Authenticated users can view attendance events"
@@ -705,11 +750,11 @@ CREATE POLICY "Authenticated users can view attendance events"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance events"
+CREATE POLICY "Teachers and admins can insert attendance events"
   ON public.attendance_events
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance_events"
   ON public.attendance_events

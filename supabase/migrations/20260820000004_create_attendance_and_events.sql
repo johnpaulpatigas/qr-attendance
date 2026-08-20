@@ -91,12 +91,12 @@ ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_events ENABLE ROW LEVEL SECURITY;
 
--- 7. Row Level Security Policies for attendance_sessions (Single consolidated policy per action)
+-- 7. Row Level Security Policies for attendance_sessions
 DROP POLICY IF EXISTS "Authenticated users can view attendance sessions" ON public.attendance_sessions;
-DROP POLICY IF EXISTS "Teachers can insert attendance sessions for assigned classes" ON public.attendance_sessions;
-DROP POLICY IF EXISTS "Teachers can update attendance sessions for assigned classes" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Authenticated users can update attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Teachers and admins can update attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Service role full access on attendance_sessions" ON public.attendance_sessions;
 
 CREATE POLICY "Authenticated users can view attendance sessions"
@@ -105,18 +105,18 @@ CREATE POLICY "Authenticated users can view attendance sessions"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance sessions"
+CREATE POLICY "Teachers and admins can insert attendance sessions"
   ON public.attendance_sessions
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update attendance sessions"
+CREATE POLICY "Teachers and admins can update attendance sessions"
   ON public.attendance_sessions
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance_sessions"
   ON public.attendance_sessions
@@ -125,13 +125,12 @@ CREATE POLICY "Service role full access on attendance_sessions"
   USING (true)
   WITH CHECK (true);
 
--- 8. Row Level Security Policies for attendance (Single consolidated policy per action)
-DROP POLICY IF EXISTS "Teachers can view class attendance and parents can view child attendance" ON public.attendance;
-DROP POLICY IF EXISTS "Teachers can insert attendance" ON public.attendance;
-DROP POLICY IF EXISTS "Teachers can update attendance" ON public.attendance;
+-- 8. Row Level Security Policies for attendance
 DROP POLICY IF EXISTS "Authenticated users can view attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Authenticated users can update attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Teachers and admins can update attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Service role full access on attendance" ON public.attendance;
 
 CREATE POLICY "Authenticated users can view attendance"
@@ -140,18 +139,18 @@ CREATE POLICY "Authenticated users can view attendance"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance"
+CREATE POLICY "Teachers and admins can insert attendance"
   ON public.attendance
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
-CREATE POLICY "Authenticated users can update attendance"
+CREATE POLICY "Teachers and admins can update attendance"
   ON public.attendance
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance"
   ON public.attendance
@@ -160,11 +159,10 @@ CREATE POLICY "Service role full access on attendance"
   USING (true)
   WITH CHECK (true);
 
--- 9. Row Level Security Policies for attendance_events (Single consolidated policy per action)
-DROP POLICY IF EXISTS "Teachers and parents can view attendance audit events" ON public.attendance_events;
-DROP POLICY IF EXISTS "Teachers can insert attendance audit events" ON public.attendance_events;
+-- 9. Row Level Security Policies for attendance_events
 DROP POLICY IF EXISTS "Authenticated users can view attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Authenticated users can insert attendance events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Teachers and admins can insert attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Service role full access on attendance_events" ON public.attendance_events;
 
 CREATE POLICY "Authenticated users can view attendance events"
@@ -173,11 +171,11 @@ CREATE POLICY "Authenticated users can view attendance events"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can insert attendance events"
+CREATE POLICY "Teachers and admins can insert attendance events"
   ON public.attendance_events
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on attendance_events"
   ON public.attendance_events

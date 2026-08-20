@@ -70,7 +70,9 @@ AS $$
   );
 $$;
 
--- 7. Public Function to verify LRN existence (Can be called anonymously during sign up)
+REVOKE EXECUTE ON FUNCTION public.is_parent_of_student(UUID) FROM PUBLIC, anon, authenticated;
+
+-- 7. Public Function to verify LRN existence (Safely callable during registration)
 CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -101,6 +103,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_student_lrn(TEXT) TO anon, authenticated;
 
 -- 8. Zero-Friction RPC: Link Student to Authenticated Parent Account
@@ -152,11 +155,11 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated, anon;
+REVOKE EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.link_student_to_parent(TEXT, TEXT) TO authenticated;
 
--- 9. Row Level Security Policies for students (Single consolidated policy per action)
+-- 9. Row Level Security Policies for students
 DROP POLICY IF EXISTS "Authenticated users can view students" ON public.students;
-DROP POLICY IF EXISTS "Teachers and admins can view students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can update students" ON public.students;
 DROP POLICY IF EXISTS "Service role full access on students" ON public.students;
@@ -171,14 +174,14 @@ CREATE POLICY "Teachers and admins can insert students"
   ON public.students
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Teachers and admins can update students"
   ON public.students
   FOR UPDATE
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.is_teacher())
+  WITH CHECK (public.is_teacher());
 
 CREATE POLICY "Service role full access on students"
   ON public.students
@@ -187,11 +190,7 @@ CREATE POLICY "Service role full access on students"
   USING (true)
   WITH CHECK (true);
 
--- 10. Row Level Security Policies for parents (Single consolidated policy per action, InitPlan optimized)
-DROP POLICY IF EXISTS "Parents can view own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Parents can insert own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Parents can update own parent record" ON public.parents;
-DROP POLICY IF EXISTS "Teachers and admins can manage parents" ON public.parents;
+-- 10. Row Level Security Policies for parents
 DROP POLICY IF EXISTS "Authenticated users can view parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can insert parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can update parents" ON public.parents;
@@ -223,12 +222,13 @@ CREATE POLICY "Service role full access on parents"
   USING (true)
   WITH CHECK (true);
 
--- 11. Row Level Security Policies for student_parents (Single consolidated policy per action)
+-- 11. Row Level Security Policies for student_parents
 DROP POLICY IF EXISTS "Parents and teachers can view student parent links" ON public.student_parents;
-DROP POLICY IF EXISTS "Parents can manage own student parent links" ON public.student_parents;
-DROP POLICY IF EXISTS "Teachers and admins can manage student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can view student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can manage student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can insert student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can update student parent links" ON public.student_parents;
+DROP POLICY IF EXISTS "Authenticated users can delete student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Service role full access on student_parents" ON public.student_parents;
 
 CREATE POLICY "Authenticated users can view student parent links"
@@ -237,12 +237,52 @@ CREATE POLICY "Authenticated users can view student parent links"
   TO authenticated
   USING (true);
 
-CREATE POLICY "Authenticated users can manage student parent links"
+CREATE POLICY "Authenticated users can insert student parent links"
   ON public.student_parents
-  FOR ALL
+  FOR INSERT
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  WITH CHECK (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "Authenticated users can update student parent links"
+  ON public.student_parents
+  FOR UPDATE
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "Authenticated users can delete student parent links"
+  ON public.student_parents
+  FOR DELETE
+  TO authenticated
+  USING (
+    public.is_teacher() OR
+    EXISTS (
+      SELECT 1 FROM public.parents p
+      WHERE p.id = student_parents.parent_id
+        AND p.profile_id = (SELECT auth.uid())
+    )
+  );
 
 CREATE POLICY "Service role full access on student_parents"
   ON public.student_parents
