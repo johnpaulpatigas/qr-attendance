@@ -1,0 +1,126 @@
+-- ==============================================================================
+-- Migration: Create User Roles, Profiles, and School Years
+-- ==============================================================================
+
+-- 1. Create Enums
+CREATE TYPE public.user_role AS ENUM ('teacher', 'admin', 'parent', 'student');
+
+-- 2. Create Profiles Table (References auth.users)
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role public.user_role NOT NULL DEFAULT 'teacher',
+  full_name TEXT NOT NULL,
+  email TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Create School Years Table
+CREATE TABLE public.school_years (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE, -- e.g. '2026-2027'
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_school_year_dates CHECK (end_date > start_date)
+);
+
+-- 4. Enable Row Level Security
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_years ENABLE ROW LEVEL SECURITY;
+
+-- 5. Helper Functions for RLS
+CREATE OR REPLACE FUNCTION public.get_current_user_role()
+RETURNS public.user_role
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (public.get_current_user_role() = 'admin');
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_teacher()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
+$$;
+
+-- 6. Row Level Security Policies for profiles
+CREATE POLICY "Users can view own profile"
+  ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id OR public.is_teacher());
+
+CREATE POLICY "Users can update own profile"
+  ON public.profiles
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Service role full access on profiles"
+  ON public.profiles
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 7. Row Level Security Policies for school_years
+CREATE POLICY "Authenticated users can view school years"
+  ON public.school_years
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Admins can manage school years"
+  ON public.school_years
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- 8. Auto-create Profile on auth.users insert
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, role, full_name, email, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'teacher'::public.user_role),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    NEW.email,
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
