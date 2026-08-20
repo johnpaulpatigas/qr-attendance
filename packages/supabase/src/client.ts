@@ -1,35 +1,72 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL?: string;
+    readonly VITE_SUPABASE_ANON_KEY?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
 export type TypedSupabaseClient = SupabaseClient<Database>;
 
 let globalClient: TypedSupabaseClient | null = null;
 
 export interface SupabaseConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
-function getEnvVar(key: string): string {
-  const g = globalThis as Record<string, unknown>;
-  if (g.process && typeof g.process === 'object' && 'env' in g.process) {
-    const env = (g.process as { env: Record<string, string | undefined> }).env;
-    if (env && env[key]) return env[key] as string;
+function getSupabaseUrl(configUrl?: string): string {
+  if (configUrl) return configUrl;
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) {
+      return import.meta.env.VITE_SUPABASE_URL;
+    }
+  } catch {
+    // Ignore environment error
   }
-  const meta = import.meta as unknown as { env?: Record<string, string> };
-  if (meta && meta.env && meta.env[key]) {
-    return meta.env[key];
+  try {
+    const g = globalThis as any;
+    if (g.process?.env?.VITE_SUPABASE_URL) {
+      return g.process.env.VITE_SUPABASE_URL;
+    }
+  } catch {
+    // Ignore process error
+  }
+  return '';
+}
+
+function getSupabaseAnonKey(configKey?: string): string {
+  if (configKey) return configKey;
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      return import.meta.env.VITE_SUPABASE_ANON_KEY;
+    }
+  } catch {
+    // Ignore environment error
+  }
+  try {
+    const g = globalThis as any;
+    if (g.process?.env?.VITE_SUPABASE_ANON_KEY) {
+      return g.process.env.VITE_SUPABASE_ANON_KEY;
+    }
+  } catch {
+    // Ignore process error
   }
   return '';
 }
 
 export function createSupabaseClient(config?: SupabaseConfig): TypedSupabaseClient {
-  const url = config?.supabaseUrl || getEnvVar('VITE_SUPABASE_URL');
-  const key = config?.supabaseAnonKey || getEnvVar('VITE_SUPABASE_ANON_KEY');
+  const url = getSupabaseUrl(config?.supabaseUrl);
+  const key = getSupabaseAnonKey(config?.supabaseAnonKey);
 
   if (!url || !key) {
     console.warn(
-      'Supabase URL or Anon Key is missing. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.'
+      'Supabase URL or Anon Key is missing. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.'
     );
   }
 
