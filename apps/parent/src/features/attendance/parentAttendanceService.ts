@@ -108,36 +108,69 @@ export async function fetchAttendanceHistory(
   }
 }
 
+/**
+ * Computes metrics by grouping session records into distinct calendar school days (DepEd SF2 format).
+ */
+export function computeStudentAttendanceMetrics(
+  history: AttendanceRecord[]
+): StudentAttendanceMetrics {
+  // Group individual session records by unique calendar date (YYYY-MM-DD)
+  const dateMap = new Map<string, AttendanceRecord[]>();
+
+  for (const record of history) {
+    const dateKey = record.attendance_date;
+    const recordsForDate = dateMap.get(dateKey) || [];
+    recordsForDate.push(record);
+    dateMap.set(dateKey, recordsForDate);
+  }
+
+  let presentDays = 0;
+  let lateDays = 0;
+  let absentDays = 0;
+  let excusedDays = 0;
+
+  for (const records of dateMap.values()) {
+    const statuses = records.map((r) => r.status);
+
+    if (statuses.includes('absent')) {
+      if (statuses.every((s) => s === 'absent')) {
+        absentDays++;
+      } else {
+        // Partial day attendance (e.g. absent in one session, attended another) counts as late/tardy
+        lateDays++;
+      }
+    } else if (statuses.includes('late')) {
+      lateDays++;
+    } else if (statuses.includes('excused')) {
+      excusedDays++;
+    } else if (statuses.includes('present')) {
+      presentDays++;
+    }
+  }
+
+  const totalDays = dateMap.size;
+  const attendedDays = presentDays + lateDays;
+  const attendanceRate =
+    totalDays > 0 ? Number(((attendedDays / totalDays) * 100).toFixed(1)) : 0;
+  const tardinessRate =
+    totalDays > 0 ? Number(((lateDays / totalDays) * 100).toFixed(1)) : 0;
+
+  return {
+    total_school_days: totalDays,
+    present_days: presentDays,
+    late_days: lateDays,
+    absent_days: absentDays,
+    excused_days: excusedDays,
+    attendance_rate_percentage: attendanceRate,
+    tardiness_rate_percentage: tardinessRate,
+  };
+}
+
 export async function fetchStudentStatistics(
   studentId: string
 ): Promise<StudentAttendanceMetrics> {
   const history = await fetchAttendanceHistory(studentId);
-
-  let present = 0;
-  let late = 0;
-  let absent = 0;
-  let excused = 0;
-
-  history.forEach((r) => {
-    if (r.status === 'present') present++;
-    else if (r.status === 'late') late++;
-    else if (r.status === 'absent') absent++;
-    else if (r.status === 'excused') excused++;
-  });
-
-  const total = present + late + absent + excused;
-  const attendanceRate = total > 0 ? Number((((present + late) / total) * 100).toFixed(1)) : 0;
-  const tardinessRate = total > 0 ? Number(((late / total) * 100).toFixed(1)) : 0;
-
-  return {
-    total_school_days: total,
-    present_days: present,
-    late_days: late,
-    absent_days: absent,
-    excused_days: excused,
-    attendance_rate_percentage: attendanceRate,
-    tardiness_rate_percentage: tardinessRate,
-  };
+  return computeStudentAttendanceMetrics(history);
 }
 
 export async function fetchStudentNotificationLogs(
