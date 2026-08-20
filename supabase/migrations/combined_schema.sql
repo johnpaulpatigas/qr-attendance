@@ -1,5 +1,9 @@
 -- ==============================================================================
--- Migration: Create User Roles, Profiles, and School Years
+-- Combined Supabase Schema & Migration File
+-- ==============================================================================
+
+-- ==============================================================================
+-- 1. Create User Roles, Profiles, and School Years
 -- ==============================================================================
 
 -- 1. Create Enums
@@ -45,12 +49,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, internal use only)
+-- 6. Helper Functions for RLS (Stable Security Invoker functions)
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT role FROM public.profiles WHERE id = (SELECT auth.uid());
@@ -60,7 +63,6 @@ CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT (public.get_current_user_role() = 'admin');
@@ -70,16 +72,14 @@ CREATE OR REPLACE FUNCTION public.is_teacher()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- Revoke public API execution on internal helper functions
-REVOKE EXECUTE ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.is_teacher() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_current_user_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_teacher() TO authenticated;
 
 -- 7. Row Level Security Policies for profiles
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
@@ -115,8 +115,6 @@ CREATE POLICY "Service role full access on profiles"
 
 -- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
-DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
-DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Teachers and admins can insert school years" ON public.school_years;
 DROP POLICY IF EXISTS "Teachers and admins can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;
@@ -209,8 +207,9 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
+
 -- ==============================================================================
--- Migration: Create Class Sections Table and RLS Policies
+-- 2. Create Class Sections Table and RLS Policies
 -- ==============================================================================
 
 -- 1. Create class_sections Table
@@ -236,12 +235,11 @@ CREATE INDEX IF NOT EXISTS idx_class_sections_grade ON public.class_sections(gra
 -- 3. Enable Row Level Security
 ALTER TABLE public.class_sections ENABLE ROW LEVEL SECURITY;
 
--- 4. Helper Function: Is Teacher Assigned to Class
+-- 4. Helper Function: Is Teacher Assigned to Class (Stable Security Invoker)
 CREATE OR REPLACE FUNCTION public.is_teacher_of_class(target_class_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT EXISTS (
@@ -250,7 +248,7 @@ AS $$
   ) OR public.is_admin();
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) TO authenticated;
 
 -- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
@@ -284,8 +282,9 @@ CREATE POLICY "Service role full access on class_sections"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
 -- ==============================================================================
--- Migration: Create Students, Parents, and Student-Parent Relationships
+-- 3. Create Students, Parents, and Student-Parent Relationships
 -- ==============================================================================
 
 -- 1. Create Students Table
@@ -340,12 +339,11 @@ ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.parents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_parents ENABLE ROW LEVEL SECURITY;
 
--- 6. Helper Functions for Student Access
+-- 6. Helper Functions for Student Access (Stable Security Invoker)
 CREATE OR REPLACE FUNCTION public.is_parent_of_student(target_student_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT EXISTS (
@@ -356,7 +354,7 @@ AS $$
   );
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.is_parent_of_student(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_parent_of_student(UUID) TO authenticated;
 
 -- 7. Public Function to verify LRN existence (SECURITY INVOKER for clean security compliance)
 CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)
@@ -573,8 +571,9 @@ CREATE POLICY "Service role full access on student_parents"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
 -- ==============================================================================
--- Migration: Create Attendance Sessions, Attendance Records, and Audit Events
+-- 4. Create Attendance Sessions, Attendance Records, and Audit Events
 -- ==============================================================================
 
 -- 1. Create Enums
@@ -758,8 +757,9 @@ CREATE POLICY "Service role full access on attendance_events"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
 -- ==============================================================================
--- Migration: Create Device Tokens and Notification Logs for FCM
+-- 5. Create Device Tokens and Notification Logs for FCM
 -- ==============================================================================
 
 -- 1. Create Device Tokens Table

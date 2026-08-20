@@ -54,12 +54,11 @@ ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.parents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_parents ENABLE ROW LEVEL SECURITY;
 
--- 6. Helper Functions for Student Access
+-- 6. Helper Functions for Student Access (Stable Security Invoker)
 CREATE OR REPLACE FUNCTION public.is_parent_of_student(target_student_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT EXISTS (
@@ -70,7 +69,7 @@ AS $$
   );
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.is_parent_of_student(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_parent_of_student(UUID) TO authenticated;
 
 -- 7. Public Function to verify LRN existence (SECURITY INVOKER for clean security compliance)
 CREATE OR REPLACE FUNCTION public.verify_student_lrn(target_lrn TEXT)

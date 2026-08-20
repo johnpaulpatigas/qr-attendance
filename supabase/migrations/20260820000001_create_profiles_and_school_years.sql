@@ -45,12 +45,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 6. Helper Functions for RLS (SECURITY DEFINER runs as database owner, internal use only)
+-- 6. Helper Functions for RLS (Stable Security Invoker functions)
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS public.user_role
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT role FROM public.profiles WHERE id = (SELECT auth.uid());
@@ -60,7 +59,6 @@ CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT (public.get_current_user_role() = 'admin');
@@ -70,16 +68,14 @@ CREATE OR REPLACE FUNCTION public.is_teacher()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT (public.get_current_user_role() IN ('teacher', 'admin'));
 $$;
 
--- Revoke public API execution on internal helper functions
-REVOKE EXECUTE ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.is_teacher() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_current_user_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_teacher() TO authenticated;
 
 -- 7. Row Level Security Policies for profiles
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
@@ -115,8 +111,6 @@ CREATE POLICY "Service role full access on profiles"
 
 -- 8. Row Level Security Policies for school_years
 DROP POLICY IF EXISTS "Authenticated users can view school years" ON public.school_years;
-DROP POLICY IF EXISTS "Authenticated users can insert school years" ON public.school_years;
-DROP POLICY IF EXISTS "Authenticated users can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Teachers and admins can insert school years" ON public.school_years;
 DROP POLICY IF EXISTS "Teachers and admins can update school years" ON public.school_years;
 DROP POLICY IF EXISTS "Service role full access on school_years" ON public.school_years;

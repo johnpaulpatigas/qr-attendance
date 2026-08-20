@@ -25,12 +25,11 @@ CREATE INDEX IF NOT EXISTS idx_class_sections_grade ON public.class_sections(gra
 -- 3. Enable Row Level Security
 ALTER TABLE public.class_sections ENABLE ROW LEVEL SECURITY;
 
--- 4. Helper Function: Is Teacher Assigned to Class
+-- 4. Helper Function: Is Teacher Assigned to Class (Stable Security Invoker)
 CREATE OR REPLACE FUNCTION public.is_teacher_of_class(target_class_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT EXISTS (
@@ -39,7 +38,7 @@ AS $$
   ) OR public.is_admin();
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) TO authenticated;
 
 -- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Authenticated users can view class sections" ON public.class_sections;
