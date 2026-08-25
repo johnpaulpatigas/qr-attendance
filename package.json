@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "concurrently -c \"blue.bold,green.bold\" -n \"teacher,parent\" \"npm run dev:teacher\" \"npm run dev:parent\"",
+    "dev:all": "npm run dev",
     "dev:teacher": "npm run dev --workspace=teacher",
     "dev:parent": "npm run dev --workspace=parent",
     "build:teacher": "npm run build --workspace=teacher",
@@ -18,6 +20,7 @@
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
