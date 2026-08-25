@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.0",
     "@capacitor/network": "^8.0.1",
+    "@capacitor/toast": "^8.0.1",
     "@qr-attendance/supabase": "*",
     "@qr-attendance/types": "*",
     "@qr-attendance/ui": "*",

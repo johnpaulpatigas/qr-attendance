@@ -13,11 +13,13 @@ import {
 import { Button, Badge } from '@qr-attendance/ui';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { useAppBackButton } from '../../hooks/useAppBackButton';
 
 export const TeacherLayout: React.FC = () => {
   const location = useLocation();
   const { profile, user, signOut } = useAuth();
   const { isOnline, queuedCount } = useNetworkStatus();
+  useAppBackButton();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },

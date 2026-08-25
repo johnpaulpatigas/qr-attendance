@@ -4,6 +4,7 @@ import { QrCode, Lock, Mail, KeyRound } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input } from '@qr-attendance/ui';
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
+import { useAppBackButton } from '../hooks/useAppBackButton';
 
 export const LoginPage: React.FC = () => {
   const [isResetMode, setIsResetMode] = useState(false);
@@ -12,6 +13,18 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useAppBackButton({
+    onCustomBack: () => {
+      if (isResetMode) {
+        setIsResetMode(false);
+        setError(null);
+        setSuccessMessage(null);
+        return true;
+      }
+      return false;
+    },
+  });
 
   const { signInWithEmail, resetPassword } = useAuth();
   const navigate = useNavigate();

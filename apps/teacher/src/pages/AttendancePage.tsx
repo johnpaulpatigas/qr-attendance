@@ -41,6 +41,7 @@ import {
 import { submitAttendanceScan } from '../features/attendance/attendanceRecorderService';
 import { syncOfflineQueue, cacheClassRoster } from '../features/attendance/offlineQueueService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useAppBackButton } from '../hooks/useAppBackButton';
 import { fetchStudents } from '../features/students/studentService';
 import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceModal';
 import { useAuth } from '../features/auth/AuthContext';
@@ -106,6 +107,21 @@ export const AttendancePage: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [studentsInClass, setStudentsInClass] = useState<StudentWithSection[]>([]);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+
+  // Android back button: stop camera scanner or close modal first
+  useAppBackButton({
+    onCustomBack: () => {
+      if (isScanning) {
+        setIsScanning(false);
+        return true;
+      }
+      if (isManualModalOpen) {
+        setIsManualModalOpen(false);
+        return true;
+      }
+      return false;
+    },
+  });
 
   // Scan feedback state
   const [feedback, setFeedback] = useState<{

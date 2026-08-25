@@ -15,6 +15,7 @@ import {
 import { Button, Badge } from '@qr-attendance/ui';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { useAppBackButton } from '../../hooks/useAppBackButton';
 import { LinkStudentModal } from './LinkStudentModal';
 
 export const ParentLayout: React.FC = () => {
@@ -22,6 +23,16 @@ export const ParentLayout: React.FC = () => {
   const { user, profile, linkedChildren, activeChild, setActiveChildId, signOut } = useAuth();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const isOnline = useNetworkStatus();
+
+  useAppBackButton({
+    onCustomBack: () => {
+      if (isLinkModalOpen) {
+        setIsLinkModalOpen(false);
+        return true;
+      }
+      return false;
+    },
+  });
 
   const navigation = [
     { name: "Today's Status", href: '/', icon: CalendarCheck },
