@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getStudentQrPayload, validateScannedQr } from './qrUtils';
+import { getStudentQrPayload, validateScannedQr, generateQrDataUrl } from './qrUtils';
 
 describe('Teacher QR Utilities', () => {
   it('formats student QR payload properly', () => {
@@ -20,4 +20,14 @@ describe('Teacher QR Utilities', () => {
     const result = validateScannedQr('RANDOM_BARCODE');
     expect(result.success).toBe(false);
   });
+
+  it('generates valid base64 PNG data URL for printing', async () => {
+    const qrId = '7f9a1b2c-3d4e-5f6a-7b8c-9d0e1f2a3b4c';
+    const payload = getStudentQrPayload(qrId);
+    const dataUrl = await generateQrDataUrl(payload, 200);
+
+    expect(dataUrl).toBeDefined();
+    expect(dataUrl.startsWith('data:image/png;base64,')).toBe(true);
+  });
 });
+

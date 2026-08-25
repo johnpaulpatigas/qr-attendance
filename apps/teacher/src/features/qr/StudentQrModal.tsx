@@ -20,6 +20,7 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
   onStudentUpdated,
 }) => {
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   if (!student) return null;
 
@@ -31,8 +32,13 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
     downloadQrCode(canvasId, `QR_${student.lrn}_${student.last_name}`);
   };
 
-  const handlePrint = () => {
-    printStudentQrCard(student);
+  const handlePrint = async () => {
+    setIsPrinting(true);
+    try {
+      await printStudentQrCard(student);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleRegenerate = async () => {
@@ -83,6 +89,7 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
               variant="primary"
               size="sm"
               onClick={handlePrint}
+              isLoading={isPrinting}
               leftIcon={<Printer className="h-4 w-4" />}
             >
               Print ID Pass

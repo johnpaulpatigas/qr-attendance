@@ -36,6 +36,7 @@ export const StudentsPage: React.FC = () => {
 
   const [selectedStudentForQr, setSelectedStudentForQr] = useState<StudentWithSection | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBatchPrinting, setIsBatchPrinting] = useState(false);
 
   useEffect(() => {
     fetchClassSections().then((secs) => {
@@ -58,9 +59,14 @@ export const StudentsPage: React.FC = () => {
     loadData();
   }, [search, gradeFilter, sectionFilter]);
 
-  const handleBatchPrint = () => {
+  const handleBatchPrint = async () => {
     if (students.length === 0) return;
-    printBatchStudentQrCards(students);
+    setIsBatchPrinting(true);
+    try {
+      await printBatchStudentQrCards(students);
+    } finally {
+      setIsBatchPrinting(false);
+    }
   };
 
   const handleStudentUpdated = (updated: StudentWithSection) => {
@@ -94,6 +100,7 @@ export const StudentsPage: React.FC = () => {
             size="sm"
             leftIcon={<Printer className="h-4 w-4" />}
             onClick={handleBatchPrint}
+            isLoading={isBatchPrinting}
             disabled={students.length === 0}
           >
             Print Filtered QRs ({students.length})
