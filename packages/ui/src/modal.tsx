@@ -62,22 +62,22 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Card */}
       <div
         className={cn(
-          'relative w-full rounded-2xl bg-white shadow-2xl transition-all dark:bg-slate-900 border border-slate-200 dark:border-slate-800 z-10 my-8',
+          'relative w-full rounded-2xl bg-white shadow-2xl transition-all border border-slate-200 z-10 my-8',
           sizes[size]
         )}
         role="dialog"
         aria-modal="true"
       >
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <div>
               {title && (
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-slate-900">
                   {title}
                 </h3>
               )}
               {description && (
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-sm text-slate-500">
                   {description}
                 </p>
               )}
@@ -88,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
                 size="icon"
                 onClick={onClose}
                 aria-label="Close dialog"
-                className="rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="rounded-full text-slate-400 hover:text-slate-600"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -99,7 +99,7 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="px-6 py-5">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 rounded-b-2xl">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4 rounded-b-2xl">
             {footer}
           </div>
         )}

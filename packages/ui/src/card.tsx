@@ -9,7 +9,7 @@ export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   return (
     <div
       className={cn(
-        'rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100',
+        'rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm',
         className
       )}
       {...props}
@@ -52,7 +52,7 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
   ...props
 }) => {
   return (
-    <p className={cn('text-sm text-slate-500 dark:text-slate-400', className)} {...props}>
+    <p className={cn('text-sm text-slate-500', className)} {...props}>
       {children}
     </p>
   );
