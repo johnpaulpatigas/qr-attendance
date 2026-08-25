@@ -105,9 +105,12 @@ FCM_SERVER_KEY=your-firebase-server-key
 | `npm run dev` | Start both Teacher App (port 3000) and Parent App (port 3001) concurrently |
 | `npm run dev:teacher` | Start Teacher App dev server on http://localhost:3000 |
 | `npm run dev:parent` | Start Parent App dev server on http://localhost:3001 |
-| `npm run typecheck` | Run TypeScript typechecking across all 6 workspaces |
+| `npm run typecheck` | Run TypeScript typechecking across all workspaces |
 | `npm test` | Run Vitest unit & integration test suite |
 | `npm run build` | Build production bundles for all apps and packages |
+| `npm run cap:sync` | Build both apps and sync web bundles into Android projects |
+| `npm run cap:open:teacher` | Open Teacher App in Android Studio |
+| `npm run cap:open:parent` | Open Parent App in Android Studio |
 
 ---
 
