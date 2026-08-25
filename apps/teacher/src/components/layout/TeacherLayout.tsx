@@ -8,13 +8,16 @@ import {
   BarChart3,
   LogOut,
   Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Button, Badge } from '@qr-attendance/ui';
 import { useAuth } from '../../features/auth/AuthContext';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 
 export const TeacherLayout: React.FC = () => {
   const location = useLocation();
   const { profile, user, signOut } = useAuth();
+  const { isOnline, queuedCount } = useNetworkStatus();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -77,10 +80,22 @@ export const TeacherLayout: React.FC = () => {
         {/* Teacher Info & Logout */}
         <div className="border-t border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between px-2 text-xs text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <Wifi className="h-3.5 w-3.5 text-emerald-500" />
-              Online
-            </span>
+            {isOnline ? (
+              <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                Online
+                {queuedCount > 0 && (
+                  <Badge variant="warning" size="sm" className="text-[10px] py-0 px-1">
+                    {queuedCount} Q
+                  </Badge>
+                )}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-rose-600 font-medium animate-pulse">
+                <WifiOff className="h-3.5 w-3.5 text-rose-500" />
+                Offline ({queuedCount})
+              </span>
+            )}
             <Badge variant="info" size="sm">
               {profile?.role === 'admin' ? 'Administrator' : 'Teacher'}
             </Badge>

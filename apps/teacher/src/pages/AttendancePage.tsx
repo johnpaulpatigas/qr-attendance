@@ -9,6 +9,10 @@ import {
   HelpCircle,
   UserCheck,
   Edit3,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  CloudOff,
 } from 'lucide-react';
 import {
   Card,
@@ -35,6 +39,8 @@ import {
   fetchSessionRecords,
 } from '../features/attendance/attendanceSessionService';
 import { submitAttendanceScan } from '../features/attendance/attendanceRecorderService';
+import { syncOfflineQueue, cacheClassRoster } from '../features/attendance/offlineQueueService';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fetchStudents } from '../features/students/studentService';
 import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceModal';
 import { useAuth } from '../features/auth/AuthContext';
@@ -80,6 +86,8 @@ function playScanTone(type: 'success' | 'duplicate' | 'error') {
 
 export const AttendancePage: React.FC = () => {
   const { user } = useAuth();
+  const { isOnline, queuedCount } = useNetworkStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [sessionType, setSessionType] = useState<SessionType>('morning');
@@ -101,7 +109,7 @@ export const AttendancePage: React.FC = () => {
 
   // Scan feedback state
   const [feedback, setFeedback] = useState<{
-    type: 'success' | 'duplicate' | 'error';
+    type: 'success' | 'duplicate' | 'error' | 'offline';
     title: string;
     message: string;
     studentName?: string;
@@ -139,11 +147,59 @@ export const AttendancePage: React.FC = () => {
     setSummary(summ);
     setRecentRecords(recs);
     setStudentsInClass(stds);
+
+    // Cache students roster locally for offline recognition
+    if (stds && stds.length > 0) {
+      cacheClassRoster(
+        selectedClassId,
+        stds.map((s) => ({
+          id: s.id,
+          lrn: s.lrn,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          middle_name: s.middle_name,
+          suffix: s.suffix,
+          qr_identifier: s.qr_identifier,
+          section_id: s.section_id,
+        }))
+      );
+    }
   }, [selectedClassId, attendanceDate, sessionType, user?.id]);
 
   useEffect(() => {
     initSession();
   }, [initSession]);
+
+  const handleManualSync = async () => {
+    if (isSyncing || queuedCount === 0) return;
+    setIsSyncing(true);
+    try {
+      const syncResult = await syncOfflineQueue();
+      if (syncResult.synced > 0 || syncResult.duplicates > 0) {
+        await initSession();
+        setFeedback({
+          type: 'success',
+          title: '✓ Offline Scans Synchronized',
+          message: `Synced ${syncResult.synced} scan(s) successfully (${syncResult.duplicates} already up to date).`,
+        });
+      }
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        title: 'Sync Incomplete',
+        message: err?.message || 'Failed to sync all queued scans. Will retry automatically.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Automatically flush offline queue when device reconnects
+  useEffect(() => {
+    if (isOnline && queuedCount > 0 && !isSyncing) {
+      handleManualSync();
+    }
+  }, [isOnline, queuedCount]);
 
   // Handle incoming QR scan
   const handleScan = async (decodedPayload: string) => {
@@ -162,12 +218,17 @@ export const AttendancePage: React.FC = () => {
       ? `${response.student.first_name} ${response.student.last_name}`
       : 'Student';
 
-    if (response.status === 'recorded') {
+    if (response.status === 'recorded' || response.status === 'queued_offline') {
+      const isOfflineQueued = response.status === 'queued_offline';
       const recordedStatus = response.attendance?.status || 'present';
       playScanTone('success');
       setFeedback({
-        type: 'success',
-        title: recordedStatus === 'late' ? '✓ Marked Late' : '✓ Attendance Recorded',
+        type: isOfflineQueued ? 'offline' : 'success',
+        title: isOfflineQueued
+          ? '✓ Saved Offline'
+          : recordedStatus === 'late'
+          ? '✓ Marked Late'
+          : '✓ Attendance Recorded',
         message: response.message,
         studentName: studentFullName,
       });
@@ -182,7 +243,7 @@ export const AttendancePage: React.FC = () => {
 
       if (response.student) {
         const newRecord: AttendanceRecordWithStudent = {
-          id: response.attendance?.id || crypto.randomUUID(),
+          id: response.attendance?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `offline_${Date.now()}`),
           student_id: response.student.id,
           class_id: selectedClassId,
           attendance_session_id: activeSession.id,
@@ -192,7 +253,7 @@ export const AttendancePage: React.FC = () => {
           recorded_at: response.attendance?.recorded_at || new Date().toISOString(),
           recorded_by: user?.id || '',
           source: 'qr_scan',
-          notes: null,
+          notes: isOfflineQueued ? 'Recorded offline (queued for sync)' : null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           student: response.student,
@@ -223,12 +284,35 @@ export const AttendancePage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Attendance Scanner</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-slate-900">Attendance Scanner</h2>
+            {isOnline ? (
+              <Badge variant="success" size="sm" className="flex items-center gap-1 font-semibold">
+                <Wifi className="h-3 w-3" /> Online
+              </Badge>
+            ) : (
+              <Badge variant="danger" size="sm" className="flex items-center gap-1 font-semibold animate-pulse">
+                <WifiOff className="h-3 w-3" /> Offline Mode
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-slate-500">
-            Real-time QR barcode scanner for teacher-led classroom attendance.
+            Real-time QR barcode scanner for teacher-led classroom attendance with offline tolerance.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {queuedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualSync}
+              isLoading={isSyncing}
+              leftIcon={<RefreshCw className="h-4 w-4 text-blue-600" />}
+              className="border-blue-300 bg-blue-50/50 text-blue-800 hover:bg-blue-100"
+            >
+              Sync Queue ({queuedCount})
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -306,6 +390,8 @@ export const AttendancePage: React.FC = () => {
           className={`flex items-center justify-between rounded-2xl p-5 shadow-lg transition-all animate-in fade-in slide-in-from-top-2 ${
             feedback.type === 'success'
               ? 'bg-emerald-600 text-white'
+              : feedback.type === 'offline'
+              ? 'bg-blue-600 text-white'
               : feedback.type === 'duplicate'
               ? 'bg-amber-600 text-white'
               : 'bg-rose-600 text-white'
@@ -315,6 +401,8 @@ export const AttendancePage: React.FC = () => {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
               {feedback.type === 'success' ? (
                 <CheckCircle2 className="h-7 w-7 text-white" />
+              ) : feedback.type === 'offline' ? (
+                <CloudOff className="h-7 w-7 text-white" />
               ) : feedback.type === 'duplicate' ? (
                 <Clock className="h-7 w-7 text-white" />
               ) : (

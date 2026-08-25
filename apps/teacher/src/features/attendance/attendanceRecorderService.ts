@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import type { RecordAttendancePayload, RecordAttendanceResponse, SessionType, AttendanceStatus } from '@qr-attendance/types';
 import { parseQrPayload } from '@qr-attendance/validation';
+import { enqueueScan, findCachedStudent } from './offlineQueueService';
 
 interface StudentQueryResult {
   id: string;
@@ -50,8 +51,6 @@ export function calculateAttendanceStatus(
 export async function submitAttendanceScan(
   payload: RecordAttendancePayload
 ): Promise<RecordAttendanceResponse> {
-  const client = getSupabaseClient();
-
   // Validate format before dispatching
   const parsedQr = parseQrPayload(payload.qr_payload);
   if (!parsedQr.success || !parsedQr.identifier) {
@@ -61,6 +60,39 @@ export async function submitAttendanceScan(
       message: 'Invalid student QR code format.',
     };
   }
+
+  // 0. If device is currently offline, queue locally and return immediate confirmation
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (isOffline) {
+    const cachedStudent = findCachedStudent(payload.class_id, payload.qr_payload);
+    const studentName = cachedStudent ? `${cachedStudent.first_name} ${cachedStudent.last_name}` : 'Student';
+    const scanTime = new Date();
+    const finalStatus = payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
+    const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    enqueueScan(payload, {
+      name: studentName,
+      lrn: cachedStudent?.lrn,
+    });
+
+    return {
+      success: true,
+      status: 'queued_offline',
+      message: `${studentName} marked ${finalStatus.toUpperCase()} (${timeStr}) [Saved Offline]`,
+      student: cachedStudent
+        ? {
+            id: cachedStudent.id,
+            lrn: cachedStudent.lrn,
+            first_name: cachedStudent.first_name,
+            last_name: cachedStudent.last_name,
+            middle_name: cachedStudent.middle_name,
+            suffix: cachedStudent.suffix,
+          }
+        : undefined,
+    };
+  }
+
+  const client = getSupabaseClient();
 
   try {
     // 1. Attempt invoking Supabase Edge Function
@@ -216,6 +248,41 @@ export async function submitAttendanceScan(
       attendance: inserted,
     };
   } catch (err: any) {
+    const isNetworkError =
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      err?.message?.includes('Failed to fetch') ||
+      err?.message?.includes('NetworkError') ||
+      err?.name === 'TypeError';
+
+    if (isNetworkError) {
+      const cachedStudent = findCachedStudent(payload.class_id, payload.qr_payload);
+      const studentName = cachedStudent ? `${cachedStudent.first_name} ${cachedStudent.last_name}` : 'Student';
+      const scanTime = new Date();
+      const finalStatus = payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
+      const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      enqueueScan(payload, {
+        name: studentName,
+        lrn: cachedStudent?.lrn,
+      });
+
+      return {
+        success: true,
+        status: 'queued_offline',
+        message: `${studentName} marked ${finalStatus.toUpperCase()} (${timeStr}) [Saved Offline - Network Disconnected]`,
+        student: cachedStudent
+          ? {
+              id: cachedStudent.id,
+              lrn: cachedStudent.lrn,
+              first_name: cachedStudent.first_name,
+              last_name: cachedStudent.last_name,
+              middle_name: cachedStudent.middle_name,
+              suffix: cachedStudent.suffix,
+            }
+          : undefined,
+      };
+    }
+
     return {
       success: false,
       status: 'error',

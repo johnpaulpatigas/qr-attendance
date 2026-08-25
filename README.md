@@ -35,6 +35,7 @@ qr-attendance/
 - **Live Session Metrics:** Real-time counters for Present, Late, Absent, and Unrecorded students.
 - **DepEd School Form 1 (SF1) Importer:** Parses .xlsx, .xls, and .csv files; auto-detects headers; validates 12-digit LRNs; detects duplicate LRN collisions; and auto-generates QR identifiers.
 - **DepEd School Form 2 (SF2) Generator:** Generates monthly attendance registers segregated by Male/Female learners with official codes (/, T, X), Average Daily Attendance (ADA), attendance rate percentages, .xlsx spreadsheet export, and landscape A4 printable registers.
+- **Offline Scan Queue & Auto-Reconciliation:** Tolerates spotty or disconnected school Wi-Fi by caching enrolled student rosters and queueing scans locally with client UUID idempotency keys. Automatically flushes and syncs to Supabase upon reconnection with live connection badges.
 - **Student QR ID Passes:** Single-student printable ID badges with QR codes and whole-class batch printing.
 - **Manual Attendance & Audit Trails:** Manual status corrections requiring explicit reason logs persisted in attendance_events.
 

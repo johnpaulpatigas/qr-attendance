@@ -13,7 +13,7 @@ export interface RecordAttendancePayload {
 
 export interface RecordAttendanceResponse {
   success: boolean;
-  status: 'recorded' | 'already_recorded' | 'unauthorized' | 'invalid_qr' | 'not_enrolled' | 'error';
+  status: 'recorded' | 'already_recorded' | 'unauthorized' | 'invalid_qr' | 'not_enrolled' | 'queued_offline' | 'error';
   message: string;
   student?: {
     id: string;
@@ -24,6 +24,25 @@ export interface RecordAttendanceResponse {
     suffix: string | null;
   };
   attendance?: AttendanceRecord;
+}
+
+export interface QueuedAttendanceScan {
+  id: string; // client UUID (idempotency key / client_event_id)
+  payload: RecordAttendancePayload;
+  scanned_at: string; // ISO string
+  student_name?: string;
+  student_lrn?: string;
+  retry_count: number;
+  status: 'pending' | 'syncing' | 'synced' | 'failed';
+  last_error?: string;
+}
+
+export interface OfflineSyncSummary {
+  total: number;
+  synced: number;
+  duplicates: number;
+  failed: number;
+  errors: string[];
 }
 
 export interface SF1ParsedStudent {
