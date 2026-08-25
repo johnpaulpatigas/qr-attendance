@@ -9,15 +9,19 @@ import {
   UserCheck,
   ChevronDown,
   UserPlus,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Button, Badge } from '@qr-attendance/ui';
 import { useAuth } from '../../features/auth/AuthContext';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { LinkStudentModal } from './LinkStudentModal';
 
 export const ParentLayout: React.FC = () => {
   const location = useLocation();
   const { user, profile, linkedChildren, activeChild, setActiveChildId, signOut } = useAuth();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const isOnline = useNetworkStatus();
 
   const navigation = [
     { name: "Today's Status", href: '/', icon: CalendarCheck },
@@ -119,6 +123,22 @@ export const ParentLayout: React.FC = () => {
 
         {/* User Info & Logout */}
         <div className="border-t border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between px-2 text-xs text-slate-500">
+            {isOnline ? (
+              <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                Online
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-rose-600 font-medium animate-pulse">
+                <WifiOff className="h-3.5 w-3.5 text-rose-500" />
+                Offline (Cached)
+              </span>
+            )}
+            <Badge variant="info" size="sm">
+              Parent
+            </Badge>
+          </div>
           <div className="flex items-center gap-3 px-2 py-1">
             <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-800 shrink-0">
               {initials}
@@ -152,7 +172,15 @@ export const ParentLayout: React.FC = () => {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <Badge variant="success" size="sm">FCM Push Active</Badge>
+            {isOnline ? (
+              <Badge variant="success" size="sm" className="flex items-center gap-1">
+                <Wifi className="h-3 w-3" /> Online & FCM Active
+              </Badge>
+            ) : (
+              <Badge variant="danger" size="sm" className="flex items-center gap-1 animate-pulse">
+                <WifiOff className="h-3 w-3" /> Offline (Showing Cached Data)
+              </Badge>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

@@ -29,11 +29,38 @@ export interface StudentAttendanceMetrics {
   tardiness_rate_percentage: number;
 }
 
+const CACHE_PREFIX = 'deped_parent_cache_';
+
+export function getCachedItem<T>(key: string): T | null {
+  try {
+    const data = localStorage.getItem(`${CACHE_PREFIX}${key}`);
+    return data ? (JSON.parse(data) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedItem<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(value));
+  } catch (err) {
+    console.warn('Failed to save parent cache:', err);
+  }
+}
+
 export async function fetchTodayAttendance(
   studentId: string,
   dateStr?: string
 ): Promise<TodayStudentStatus> {
   const targetDate = dateStr || getUtc8DateString();
+  const cacheKey = `today_${studentId}_${targetDate}`;
+
+  // If offline, return immediately from cache if present
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const cached = getCachedItem<TodayStudentStatus>(cacheKey);
+    if (cached) return cached;
+  }
+
   const client = getSupabaseClient();
 
   try {
@@ -49,7 +76,7 @@ export async function fetchTodayAttendance(
       .eq('attendance_date', targetDate);
 
     if (error || !data || data.length === 0) {
-      return {
+      const defaultStatus: TodayStudentStatus = {
         hasScannedToday: false,
         morningRecord: null,
         afternoonRecord: null,
@@ -57,6 +84,8 @@ export async function fetchTodayAttendance(
         lastRecordedAt: null,
         recordedByTeacherName: null,
       };
+      setCachedItem(cacheKey, defaultStatus);
+      return defaultStatus;
     }
 
     const records = (data as any[]).map((r) => ({
@@ -69,7 +98,7 @@ export async function fetchTodayAttendance(
     // The latest record is considered primary for overall badge
     const primary = afternoon || morning;
 
-    return {
+    const result: TodayStudentStatus = {
       hasScannedToday: records.length > 0,
       morningRecord: morning,
       afternoonRecord: afternoon,
@@ -77,7 +106,13 @@ export async function fetchTodayAttendance(
       lastRecordedAt: primary ? primary.recorded_at : null,
       recordedByTeacherName: primary?.teacher_name || 'Class Adviser',
     };
+
+    setCachedItem(cacheKey, result);
+    return result;
   } catch {
+    const cached = getCachedItem<TodayStudentStatus>(cacheKey);
+    if (cached) return cached;
+
     return {
       hasScannedToday: false,
       morningRecord: null,
@@ -92,6 +127,13 @@ export async function fetchTodayAttendance(
 export async function fetchAttendanceHistory(
   studentId: string
 ): Promise<AttendanceRecord[]> {
+  const cacheKey = `history_${studentId}`;
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const cached = getCachedItem<AttendanceRecord[]>(cacheKey);
+    if (cached) return cached;
+  }
+
   const client = getSupabaseClient();
   try {
     const { data, error } = await client
@@ -101,11 +143,16 @@ export async function fetchAttendanceHistory(
       .order('attendance_date', { ascending: false });
 
     if (error || !data) {
-      return [];
+      const cached = getCachedItem<AttendanceRecord[]>(cacheKey);
+      return cached || [];
     }
-    return data as unknown as AttendanceRecord[];
+
+    const records = data as unknown as AttendanceRecord[];
+    setCachedItem(cacheKey, records);
+    return records;
   } catch {
-    return [];
+    const cached = getCachedItem<AttendanceRecord[]>(cacheKey);
+    return cached || [];
   }
 }
 
@@ -177,6 +224,13 @@ export async function fetchStudentStatistics(
 export async function fetchStudentNotificationLogs(
   studentId: string
 ): Promise<NotificationLog[]> {
+  const cacheKey = `notifs_${studentId}`;
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const cached = getCachedItem<NotificationLog[]>(cacheKey);
+    if (cached) return cached;
+  }
+
   const client = getSupabaseClient();
   try {
     const { data, error } = await client
@@ -186,11 +240,15 @@ export async function fetchStudentNotificationLogs(
       .order('created_at', { ascending: false });
 
     if (error || !data) {
-      return [];
+      const cached = getCachedItem<NotificationLog[]>(cacheKey);
+      return cached || [];
     }
 
-    return data as unknown as NotificationLog[];
+    const logs = data as unknown as NotificationLog[];
+    setCachedItem(cacheKey, logs);
+    return logs;
   } catch {
-    return [];
+    const cached = getCachedItem<NotificationLog[]>(cacheKey);
+    return cached || [];
   }
 }

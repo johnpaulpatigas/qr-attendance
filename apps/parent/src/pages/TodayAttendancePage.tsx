@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle, QrCode } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle, QrCode, WifiOff } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, EmptyState } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   fetchTodayAttendance,
   type TodayStudentStatus,
@@ -95,6 +96,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
 export const TodayAttendancePage: React.FC = () => {
   const { activeChild } = useAuth();
+  const isOnline = useNetworkStatus();
   const [status, setStatus] = useState<TodayStudentStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -134,6 +136,14 @@ export const TodayAttendancePage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Offline Alert Banner */}
+      {!isOnline && (
+        <div className="flex items-center gap-3 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-900 text-xs font-medium">
+          <WifiOff className="h-4 w-4 text-amber-600 shrink-0" />
+          <span>You are currently offline. Showing last cached attendance records for your child.</span>
+        </div>
+      )}
+
       {/* Active Child Summary Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
