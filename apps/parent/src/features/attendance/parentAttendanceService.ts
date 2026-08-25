@@ -75,7 +75,21 @@ export async function fetchTodayAttendance(
       .eq('student_id', studentId)
       .eq('attendance_date', targetDate);
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      const cached = getCachedItem<TodayStudentStatus>(cacheKey);
+      if (cached) return cached;
+
+      return {
+        hasScannedToday: false,
+        morningRecord: null,
+        afternoonRecord: null,
+        overallStatus: 'unrecorded',
+        lastRecordedAt: null,
+        recordedByTeacherName: null,
+      };
+    }
+
+    if (!data || data.length === 0) {
       const defaultStatus: TodayStudentStatus = {
         hasScannedToday: false,
         morningRecord: null,

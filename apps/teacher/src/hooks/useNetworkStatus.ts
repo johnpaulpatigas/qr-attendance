@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { getQueuedCount, onQueueChange } from "../features/attendance/offlineQueueService";
+import { useState, useEffect } from 'react';
+import { Network } from '@capacitor/network';
+import { getQueuedCount, onQueueChange } from '../features/attendance/offlineQueueService';
 
 export interface NetworkStatus {
   isOnline: boolean;
@@ -8,25 +9,40 @@ export interface NetworkStatus {
 
 export function useNetworkStatus(): NetworkStatus {
   const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== "undefined" ? navigator.onLine : true
+    typeof navigator !== 'undefined' ? navigator.onLine : true
   );
   const [queuedCount, setQueuedCount] = useState<number>(() => getQueuedCount());
 
   useEffect(() => {
+    // 1. Initial Capacitor network check
+    Network.getStatus()
+      .then((status) => {
+        setIsOnline(status.connected);
+      })
+      .catch(() => {
+        setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+      });
+
+    // 2. Listen to Capacitor native network changes (instant on Android)
+    const handlerPromise = Network.addListener('networkStatusChange', (status) => {
+      setIsOnline(status.connected);
+    });
+
+    // 3. Browser event fallback
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    const unsubscribe = onQueueChange((count) => {
+    const unsubscribeQueue = onQueueChange((count) => {
       setQueuedCount(count);
     });
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      unsubscribe();
+      handlerPromise.then((h) => h.remove?.()).catch(() => {});
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubscribeQueue();
     };
   }, []);
 

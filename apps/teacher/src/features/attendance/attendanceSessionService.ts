@@ -6,6 +6,11 @@ import type {
   ClassSectionWithDetails,
   SessionType,
 } from '@qr-attendance/types';
+import { getCachedClassRoster, getQueuedScans } from './offlineQueueService';
+
+const SECTIONS_CACHE_KEY = 'teacher_cached_sections';
+const SESSION_CACHE_PREFIX = 'teacher_cached_session_';
+const RECORDS_CACHE_PREFIX = 'teacher_cached_records_';
 
 export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
@@ -23,18 +28,33 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
       `)
       .order('grade_level', { ascending: false });
 
-    if (error || !data) {
-      return [];
-    }
+    if (!error && data && data.length > 0) {
+      const sections: ClassSectionWithDetails[] = (data as any[]).map((d) => ({
+        ...d,
+        school_year_name: d.school_years?.name || 'Active SY',
+        student_count: Array.isArray(d.students) ? d.students.length : 0,
+      }));
 
-    return (data as any[]).map((d) => ({
-      ...d,
-      school_year_name: d.school_years?.name || 'Active SY',
-      student_count: Array.isArray(d.students) ? d.students.length : 0,
-    }));
+      try {
+        localStorage.setItem(SECTIONS_CACHE_KEY, JSON.stringify(sections));
+      } catch {
+        // Ignore
+      }
+
+      return sections;
+    }
   } catch {
-    return [];
+    // Network offline fallback
   }
+
+  try {
+    const cached = localStorage.getItem(SECTIONS_CACHE_KEY);
+    if (cached) return JSON.parse(cached) as ClassSectionWithDetails[];
+  } catch {
+    // Ignore
+  }
+
+  return [];
 }
 
 export async function getOrCreateAttendanceSession(
@@ -44,46 +64,82 @@ export async function getOrCreateAttendanceSession(
   teacherId: string
 ): Promise<AttendanceSession> {
   const client = getSupabaseClient();
+  const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}`;
 
-  // Check for existing session
-  const { data: existing, error: findError } = await client
-    .from('attendance_sessions')
-    .select('*')
-    .eq('class_id', classId)
-    .eq('attendance_date', attendanceDate)
-    .eq('session_type', sessionType)
-    .maybeSingle();
+  try {
+    // Check for existing session on DB
+    const { data: existing, error: findError } = await client
+      .from('attendance_sessions')
+      .select('*')
+      .eq('class_id', classId)
+      .eq('attendance_date', attendanceDate)
+      .eq('session_type', sessionType)
+      .maybeSingle();
 
-  if (!findError && existing) {
-    return existing as unknown as AttendanceSession;
+    if (!findError && existing) {
+      const session = existing as unknown as AttendanceSession;
+      localStorage.setItem(cacheKey, JSON.stringify(session));
+      return session;
+    }
+
+    // Create new session in database
+    const newSession = {
+      class_id: classId,
+      teacher_id: teacherId,
+      attendance_date: attendanceDate,
+      session_type: sessionType,
+      started_at: new Date().toISOString(),
+    };
+
+    const { data: created, error: createError } = await (client
+      .from('attendance_sessions') as any)
+      .insert(newSession)
+      .select()
+      .maybeSingle();
+
+    if (!createError && created) {
+      const session = created as unknown as AttendanceSession;
+      localStorage.setItem(cacheKey, JSON.stringify(session));
+      return session;
+    }
+  } catch {
+    // Network offline fallback
   }
 
-  // Create new session in database
-  const newSession = {
+  // Offline fallback: check local cache or construct offline session object
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached) as AttendanceSession;
+  } catch {
+    // Ignore
+  }
+
+  const offlineSession: AttendanceSession = {
+    id: `offline_sess_${classId}_${attendanceDate}_${sessionType}`,
     class_id: classId,
     teacher_id: teacherId,
     attendance_date: attendanceDate,
     session_type: sessionType,
     started_at: new Date().toISOString(),
+    ended_at: null,
+    created_at: new Date().toISOString(),
   };
 
-  const { data: created, error: createError } = await (client
-    .from('attendance_sessions') as any)
-    .insert(newSession)
-    .select()
-    .single();
-
-  if (createError) {
-    throw new Error(createError.message);
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(offlineSession));
+  } catch {
+    // Ignore
   }
 
-  return created as unknown as AttendanceSession;
+  return offlineSession;
 }
 
 export async function fetchSessionRecords(
   sessionId: string
 ): Promise<AttendanceRecordWithStudent[]> {
   const client = getSupabaseClient();
+  const cacheKey = `${RECORDS_CACHE_PREFIX}${sessionId}`;
+
   try {
     const { data, error } = await client
       .from('attendance')
@@ -101,14 +157,27 @@ export async function fetchSessionRecords(
       .eq('attendance_session_id', sessionId)
       .order('recorded_at', { ascending: false });
 
-    if (error || !data) {
-      return [];
-    }
+    if (!error && data) {
+      const records: AttendanceRecordWithStudent[] = (data as any[]).map((d) => ({
+        ...d,
+        student: d.students,
+      }));
 
-    return (data as any[]).map((d) => ({
-      ...d,
-      student: d.students,
-    }));
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(records));
+      } catch {
+        // Ignore
+      }
+
+      return records;
+    }
+  } catch {
+    // Network offline fallback
+  }
+
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    return cached ? (JSON.parse(cached) as AttendanceRecordWithStudent[]) : [];
   } catch {
     return [];
   }
@@ -121,14 +190,31 @@ export async function fetchAttendanceSummary(
   const client = getSupabaseClient();
   const records = await fetchSessionRecords(sessionId);
 
+  // Include any pending offline scans for this session
+  const queuedScans = getQueuedScans().filter(
+    (s) => s.payload.session_id === sessionId || s.payload.class_id === classId
+  );
+
   let present = 0;
   let late = 0;
   let absent = 0;
 
+  const recordedStudentIds = new Set<string>();
+
   records.forEach((r) => {
+    recordedStudentIds.add(r.student_id);
     if (r.status === 'present') present++;
     else if (r.status === 'late') late++;
     else if (r.status === 'absent') absent++;
+  });
+
+  queuedScans.forEach((q) => {
+    const studentId = q.payload.qr_payload;
+    if (!recordedStudentIds.has(studentId)) {
+      recordedStudentIds.add(studentId);
+      if (q.payload.status === 'late') late++;
+      else present++;
+    }
   });
 
   // Query actual student count for class section
@@ -143,7 +229,14 @@ export async function fetchAttendanceSummary(
       total = count;
     }
   } catch {
-    total = records.length;
+    // If offline, get count from cached roster
+    const cachedRoster = getCachedClassRoster(classId);
+    total = cachedRoster.length > 0 ? cachedRoster.length : records.length + queuedScans.length;
+  }
+
+  if (total === 0) {
+    const cachedRoster = getCachedClassRoster(classId);
+    if (cachedRoster.length > 0) total = cachedRoster.length;
   }
 
   const recorded = present + late + absent;

@@ -15,13 +15,71 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const CACHE_PROFILE_KEY = 'teacher_auth_profile';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_PROFILE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const client = getSupabaseClient();
+
+  const handleProfileResolution = async (userId: string, email?: string) => {
+    try {
+      const p = await getCurrentUserProfile(client, userId);
+      if (p && (p.role === 'teacher' || p.role === 'admin')) {
+        setProfile(p);
+        localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(p));
+      } else if (p) {
+        setProfile(null);
+        localStorage.removeItem(CACHE_PROFILE_KEY);
+        await client.auth.signOut();
+      } else {
+        const cached = localStorage.getItem(CACHE_PROFILE_KEY);
+        if (cached) {
+          setProfile(JSON.parse(cached));
+        } else {
+          const fallbackProfile: UserProfile = {
+            id: userId,
+            role: 'teacher',
+            full_name: email?.split('@')[0] || 'Teacher',
+            email: email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setProfile(fallbackProfile);
+          localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(fallbackProfile));
+        }
+      }
+    } catch {
+      // Offline fallback: load from localStorage
+      try {
+        const cached = localStorage.getItem(CACHE_PROFILE_KEY);
+        if (cached) {
+          setProfile(JSON.parse(cached));
+        } else {
+          setProfile({
+            id: userId,
+            role: 'teacher',
+            full_name: email?.split('@')[0] || 'Teacher',
+            email: email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  };
 
   useEffect(() => {
     // Initial session lookup
@@ -29,30 +87,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        getCurrentUserProfile(client, session.user.id).then((p) => {
-          if (p && (p.role === 'teacher' || p.role === 'admin')) {
-            setProfile(p);
-          } else if (p) {
-            // Role not authorized for teacher portal
-            console.warn('Unauthorized role for Teacher Portal:', p.role);
-            setProfile(null);
-            client.auth.signOut();
-          } else {
-            // Fallback development profile if profile row does not exist yet
-            setProfile({
-              id: session.user.id,
-              role: 'teacher',
-              full_name: session.user.email?.split('@')[0] || 'Teacher',
-              email: session.user.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          }
+        handleProfileResolution(session.user.id, session.user.email).finally(() => {
           setIsLoading(false);
         });
       } else {
         setIsLoading(false);
       }
+    }).catch(() => {
+      setIsLoading(false);
     });
 
     // Subscribe to auth changes
@@ -60,24 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const p = await getCurrentUserProfile(client, session.user.id);
-        if (p && (p.role === 'teacher' || p.role === 'admin')) {
-          setProfile(p);
-        } else if (p) {
-          setProfile(null);
-          await client.auth.signOut();
-        } else {
-          setProfile({
-            id: session.user.id,
-            role: 'teacher',
-            full_name: session.user.email?.split('@')[0] || 'Teacher',
-            email: session.user.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
+        await handleProfileResolution(session.user.id, session.user.email);
       } else {
         setProfile(null);
+        localStorage.removeItem(CACHE_PROFILE_KEY);
       }
       setIsLoading(false);
     });

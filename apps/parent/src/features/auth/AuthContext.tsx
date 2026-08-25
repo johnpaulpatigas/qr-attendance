@@ -29,33 +29,71 @@ interface ParentAuthContextType {
 
 const AuthContext = createContext<ParentAuthContextType | undefined>(undefined);
 
+const PARENT_PROFILE_KEY = 'parent_auth_profile';
+const PARENT_CHILDREN_KEY = 'parent_auth_children';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem(PARENT_PROFILE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [session, setSession] = useState<Session | null>(null);
-  const [linkedChildren, setLinkedChildren] = useState<LinkedStudent[]>([]);
-  const [activeChildId, setActiveChildId] = useState<string | null>(null);
+  const [linkedChildren, setLinkedChildren] = useState<LinkedStudent[]>(() => {
+    try {
+      const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activeChildId, setActiveChildId] = useState<string | null>(() => {
+    try {
+      const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
+      if (cached) {
+        const list = JSON.parse(cached);
+        return list[0]?.student_id || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const client = getSupabaseClient();
 
   const loadProfileAndChildren = async (userId: string, email?: string) => {
     try {
-      const p = await getCurrentUserProfile(client, userId);
-      if (p) {
-        setProfile(p);
-      } else {
-        setProfile({
-          id: userId,
-          role: 'parent',
-          full_name: email?.split('@')[0] || 'Parent / Guardian',
-          email: email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+      // 1. Resolve profile
+      try {
+        const p = await getCurrentUserProfile(client, userId);
+        if (p) {
+          setProfile(p);
+          localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(p));
+        } else {
+          const fallbackProfile: UserProfile = {
+            id: userId,
+            role: 'parent',
+            full_name: email?.split('@')[0] || 'Parent / Guardian',
+            email: email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setProfile(fallbackProfile);
+          localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(fallbackProfile));
+        }
+      } catch {
+        // Use cached profile
+        const cached = localStorage.getItem(PARENT_PROFILE_KEY);
+        if (cached) setProfile(JSON.parse(cached));
       }
 
-      // Fetch real linked children from student_parents table
+      // 2. Fetch real linked children from student_parents table
       const { data: parentRecord } = await client
         .from('parents')
         .select('id')
@@ -101,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }));
 
           setLinkedChildren(children);
+          localStorage.setItem(PARENT_CHILDREN_KEY, JSON.stringify(children));
           if (children.length > 0) {
             setActiveChildId((prev) =>
               prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
@@ -108,16 +147,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setActiveChildId(null);
           }
-        } else {
-          setLinkedChildren([]);
-          setActiveChildId(null);
         }
-      } else {
-        setLinkedChildren([]);
-        setActiveChildId(null);
       }
     } catch (err) {
-      console.error('Error loading parent data:', err);
+      console.warn('Network error loading parent data, using cache:', err);
+      try {
+        const cachedChildren = localStorage.getItem(PARENT_CHILDREN_KEY);
+        if (cachedChildren) {
+          const children = JSON.parse(cachedChildren);
+          setLinkedChildren(children);
+          if (children.length > 0) {
+            setActiveChildId((prev) =>
+              prev && children.some((c: any) => c.student_id === prev) ? prev : children[0].student_id
+            );
+          }
+        }
+      } catch {
+        // Ignore
+      }
     }
   };
 
@@ -132,6 +179,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setIsLoading(false);
       }
+    }).catch(() => {
+      setIsLoading(false);
     });
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
@@ -143,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setLinkedChildren([]);
         setActiveChildId(null);
+        localStorage.removeItem(PARENT_PROFILE_KEY);
+        localStorage.removeItem(PARENT_CHILDREN_KEY);
       }
       setIsLoading(false);
     });

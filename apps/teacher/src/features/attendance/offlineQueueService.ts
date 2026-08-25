@@ -63,6 +63,15 @@ export function onQueueChange(callback: (count: number) => void): () => void {
 export function cacheClassRoster(classId: string, students: CachedStudent[]): void {
   try {
     localStorage.setItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`, JSON.stringify(students));
+    // Also keep a master lookup index for instant offline resolution
+    const masterIndexStr = localStorage.getItem('deped_qr_master_students_index');
+    const masterIndex: Record<string, CachedStudent> = masterIndexStr ? JSON.parse(masterIndexStr) : {};
+    students.forEach((s) => {
+      masterIndex[s.qr_identifier] = s;
+      masterIndex[s.id] = s;
+      masterIndex[s.lrn] = s;
+    });
+    localStorage.setItem('deped_qr_master_students_index', JSON.stringify(masterIndex));
   } catch (err) {
     console.warn("Failed to cache class roster:", err);
   }
@@ -81,10 +90,46 @@ export function findCachedStudent(classId: string, rawQrPayload: string): Cached
   const parsed = parseQrPayload(rawQrPayload);
   if (!parsed.success || !parsed.identifier) return null;
 
+  const targetId = parsed.identifier;
+
+  // 1. Search specific class roster
   const roster = getCachedClassRoster(classId);
-  return roster.find(
-    (s) => s.qr_identifier === parsed.identifier || s.id === parsed.identifier || s.lrn === parsed.identifier
-  ) || null;
+  const foundInClass = roster.find(
+    (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
+  );
+  if (foundInClass) return foundInClass;
+
+  // 2. Search master student index
+  try {
+    const masterIndexStr = localStorage.getItem('deped_qr_master_students_index');
+    if (masterIndexStr) {
+      const masterIndex = JSON.parse(masterIndexStr);
+      if (masterIndex[targetId]) return masterIndex[targetId];
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 3. Fallback: Search all localStorage keys starting with deped_qr_roster_cache_
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(ROSTER_CACHE_KEY_PREFIX)) {
+        const listStr = localStorage.getItem(key);
+        if (listStr) {
+          const list = JSON.parse(listStr) as CachedStudent[];
+          const match = list.find(
+            (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
+          );
+          if (match) return match;
+        }
+      }
+    }
+  } catch {
+    // Ignore
+  }
+
+  return null;
 }
 
 export function enqueueScan(
@@ -161,6 +206,37 @@ export async function syncOfflineQueue(
     item.status = "syncing";
 
     try {
+      // 0. Ensure server session ID exists if this was created offline
+      if (!item.payload.session_id || item.payload.session_id.startsWith("offline_sess_")) {
+        try {
+          const { data: serverSession } = await client
+            .from("attendance_sessions")
+            .select("id")
+            .eq("class_id", item.payload.class_id)
+            .eq("attendance_date", item.payload.attendance_date)
+            .eq("session_type", item.payload.session_type)
+            .maybeSingle();
+
+          if (serverSession) {
+            item.payload.session_id = (serverSession as any).id;
+          } else {
+            const { data: newSess } = await (client.from("attendance_sessions") as any)
+              .insert({
+                class_id: item.payload.class_id,
+                teacher_id: item.payload.recorded_by,
+                attendance_date: item.payload.attendance_date,
+                session_type: item.payload.session_type,
+                started_at: item.scanned_at || new Date().toISOString(),
+              })
+              .select("id")
+              .maybeSingle();
+            if (newSess) item.payload.session_id = newSess.id;
+          }
+        } catch {
+          // If network error during session resolution, treat as network pause
+        }
+      }
+
       // 1. Try Edge Function
       const { data, error } = await client.functions.invoke<RecordAttendanceResponse>(
         "record-attendance",

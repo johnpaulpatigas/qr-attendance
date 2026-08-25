@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import type { StudentWithSection } from '@qr-attendance/types';
 import type { CreateStudentInput, UpdateStudentInput } from '@qr-attendance/validation';
+import { cacheClassRoster, getCachedClassRoster } from '../attendance/offlineQueueService';
 
 export interface StudentFilters {
   search?: string;
@@ -8,8 +9,13 @@ export interface StudentFilters {
   gradeLevel?: number;
 }
 
+const STUDENTS_CACHE_PREFIX = 'teacher_cached_students_';
+
 export async function fetchStudents(filters?: StudentFilters): Promise<StudentWithSection[]> {
   const client = getSupabaseClient();
+  const secId = filters?.sectionId;
+  const cacheKey = `${STUDENTS_CACHE_PREFIX}${secId || 'all'}`;
+
   try {
     let query = client
       .from('students')
@@ -24,7 +30,6 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
       `)
       .order('last_name', { ascending: true });
 
-    const secId = filters?.sectionId;
     if (secId && secId !== 'all') {
       query = query.eq('section_id', secId);
     }
@@ -39,18 +44,76 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
     }
 
     const { data, error } = await query;
-    if (error || !data) {
-      return [];
-    }
+    if (!error && data) {
+      const students: StudentWithSection[] = (data as any[]).map((d) => ({
+        ...d,
+        section_name: d.class_sections?.section_name || 'Unassigned',
+        school_year_name: d.school_years?.name || 'Active Year',
+      }));
 
-    return (data as any[]).map((d) => ({
-      ...d,
-      section_name: d.class_sections?.section_name || 'Unassigned',
-      school_year_name: d.school_years?.name || 'Active Year',
-    }));
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(students));
+        if (secId && secId !== 'all') {
+          cacheClassRoster(
+            secId,
+            students.map((s) => ({
+              id: s.id,
+              lrn: s.lrn,
+              first_name: s.first_name,
+              last_name: s.last_name,
+              middle_name: s.middle_name,
+              suffix: s.suffix,
+              qr_identifier: s.qr_identifier,
+              section_id: s.section_id,
+            }))
+          );
+        }
+      } catch {
+        // Ignore
+      }
+
+      return students;
+    }
   } catch {
-    return [];
+    // Network offline fallback
   }
+
+  // Fallback: Read from local cache
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      let list = JSON.parse(cached) as StudentWithSection[];
+      if (filters?.search) {
+        const s = filters.search.toLowerCase();
+        list = list.filter(
+          (st) =>
+            st.first_name.toLowerCase().includes(s) ||
+            st.last_name.toLowerCase().includes(s) ||
+            st.lrn.includes(s)
+        );
+      }
+      return list;
+    }
+  } catch {
+    // Ignore
+  }
+
+  if (secId && secId !== 'all') {
+    const cachedRoster = getCachedClassRoster(secId);
+    return cachedRoster.map((s) => ({
+      ...s,
+      sex: 'MALE' as const,
+      birth_date: '2000-01-01',
+      grade_level: 1,
+      school_year_id: 'default',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      section_name: 'Enrolled',
+      school_year_name: 'Current SY',
+    }));
+  }
+
+  return [];
 }
 
 export async function createStudent(input: CreateStudentInput): Promise<StudentWithSection> {
