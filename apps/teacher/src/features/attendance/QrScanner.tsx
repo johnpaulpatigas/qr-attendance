@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats, CameraDevice } from 'html5-qrcode';
+import type { Html5Qrcode, CameraDevice } from 'html5-qrcode';
 import { CameraOff, AlertCircle, Keyboard } from 'lucide-react';
 import { Button, Input } from '@qr-attendance/ui';
 import { parseQrPayload } from '@qr-attendance/validation';
@@ -136,65 +136,84 @@ export const QrScanner: React.FC<QrScannerProps> = ({ isActive, onScan, disabled
     }
 
     setCameraError(null);
+    let isCancelled = false;
+    let scannerInstance: Html5Qrcode | null = null;
 
-    const html5QrCode = new Html5Qrcode(elementId, {
-      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-      verbose: false,
-    });
-    scannerRef.current = html5QrCode;
+    import('html5-qrcode')
+      .then(({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
+        if (isCancelled) return;
 
-    const qrConfig = {
-      fps: 15,
-      qrbox: { width: 260, height: 260 },
-      aspectRatio: 1.0,
-    };
+        const html5QrCode = new Html5Qrcode(elementId, {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
+        scannerRef.current = html5QrCode;
+        scannerInstance = html5QrCode;
 
-    Html5Qrcode.getCameras()
-      .then((availableCameras) => {
-        if (availableCameras && availableCameras.length > 0) {
-          const mainCamId = getMain1xCameraId(availableCameras);
-          return html5QrCode.start(mainCamId, qrConfig, handleDecoded, undefined);
-        } else {
-          return html5QrCode.start(
-            { facingMode: 'environment' },
-            qrConfig,
-            handleDecoded,
-            undefined
-          );
-        }
-      })
-      .then(() => {
-        setHasPermission(true);
-        setTimeout(() => {
-          enforce1xZoom();
-        }, 300);
-      })
-      .catch((err) => {
-        console.warn('Initial camera start failed, retrying with environment mode...', err);
-        html5QrCode
-          .start({ facingMode: 'environment' }, qrConfig, handleDecoded, undefined)
+        const qrConfig = {
+          fps: 15,
+          qrbox: { width: 260, height: 260 },
+          aspectRatio: 1.0,
+        };
+
+        return Html5Qrcode.getCameras()
+          .then((availableCameras) => {
+            if (isCancelled) return;
+            if (availableCameras && availableCameras.length > 0) {
+              const mainCamId = getMain1xCameraId(availableCameras);
+              return html5QrCode.start(mainCamId, qrConfig, handleDecoded, undefined);
+            } else {
+              return html5QrCode.start(
+                { facingMode: 'environment' },
+                qrConfig,
+                handleDecoded,
+                undefined
+              );
+            }
+          })
           .then(() => {
+            if (isCancelled) return;
             setHasPermission(true);
             setTimeout(() => {
               enforce1xZoom();
             }, 300);
           })
-          .catch((secondErr) => {
-            console.error('Camera stream error:', secondErr);
-            setHasPermission(false);
-            setCameraError(
-              typeof secondErr === 'string'
-                ? secondErr
-                : 'Camera permission denied or camera unavailable.'
-            );
+          .catch((err) => {
+            if (isCancelled) return;
+            console.warn('Initial camera start failed, retrying with environment mode...', err);
+            return html5QrCode
+              .start({ facingMode: 'environment' }, qrConfig, handleDecoded, undefined)
+              .then(() => {
+                if (isCancelled) return;
+                setHasPermission(true);
+                setTimeout(() => {
+                  enforce1xZoom();
+                }, 300);
+              })
+              .catch((secondErr) => {
+                if (isCancelled) return;
+                console.error('Camera stream error:', secondErr);
+                setHasPermission(false);
+                setCameraError(
+                  typeof secondErr === 'string'
+                    ? secondErr
+                    : 'Camera permission denied or camera unavailable.'
+                );
+              });
           });
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        setHasPermission(false);
+        setCameraError(err instanceof Error ? err.message : 'Failed to load QR scanner engine');
       });
 
     return () => {
-      if (html5QrCode.isScanning) {
-        html5QrCode
+      isCancelled = true;
+      if (scannerInstance && scannerInstance.isScanning) {
+        scannerInstance
           .stop()
-          .then(() => html5QrCode.clear())
+          .then(() => scannerInstance?.clear())
           .catch(() => {});
       }
     };
