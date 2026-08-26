@@ -121,12 +121,19 @@ export async function getOrCreateAttendanceSession(
   classId: string,
   attendanceDate: string,
   sessionType: SessionType,
-  teacherId: string,
+  teacherId?: string,
   subjectName?: string | null
 ): Promise<AttendanceSession> {
   const client = getSupabaseClient();
   const subjPart = subjectName ? `_${subjectName.replace(/\s+/g, '_')}` : '';
   const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}${subjPart}`;
+
+  // 1. Resolve authentic teacher ID from session if not provided
+  let resolvedTeacherId = teacherId && teacherId.trim() !== '' ? teacherId.trim() : null;
+  if (!resolvedTeacherId) {
+    const { data: sessionData } = await client.auth.getSession();
+    resolvedTeacherId = sessionData.session?.user?.id || null;
+  }
 
   try {
     let query = client
@@ -150,25 +157,27 @@ export async function getOrCreateAttendanceSession(
       return session;
     }
 
-    const newSession = {
-      class_id: classId,
-      teacher_id: teacherId,
-      attendance_date: attendanceDate,
-      session_type: sessionType,
-      subject_name: subjectName || null,
-      started_at: new Date().toISOString(),
-    };
+    if (resolvedTeacherId) {
+      const newSession = {
+        class_id: classId,
+        teacher_id: resolvedTeacherId,
+        attendance_date: attendanceDate,
+        session_type: sessionType,
+        subject_name: subjectName || null,
+        started_at: new Date().toISOString(),
+      };
 
-    const { data: created, error: createError } = await client
-      .from('attendance_sessions')
-      .insert(newSession)
-      .select()
-      .maybeSingle();
+      const { data: created, error: createError } = await client
+        .from('attendance_sessions')
+        .insert(newSession)
+        .select()
+        .maybeSingle();
 
-    if (!createError && created) {
-      const session = created;
-      localStorage.setItem(cacheKey, JSON.stringify(session));
-      return session;
+      if (!createError && created) {
+        const session = created;
+        localStorage.setItem(cacheKey, JSON.stringify(session));
+        return session;
+      }
     }
   } catch {
     // Network offline fallback
@@ -183,9 +192,12 @@ export async function getOrCreateAttendanceSession(
   }
 
   const offlineSession: AttendanceSession = {
-    id: `offline_sess_${classId}_${attendanceDate}_${sessionType}${subjPart}`,
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : '00000000-0000-0000-0000-000000000000',
     class_id: classId,
-    teacher_id: teacherId,
+    teacher_id: resolvedTeacherId || '',
     attendance_date: attendanceDate,
     session_type: sessionType,
     subject_name: subjectName || null,
@@ -277,6 +289,19 @@ export async function fetchSessionRecords(
 ): Promise<AttendanceRecordWithStudent[]> {
   const client = getSupabaseClient();
   const cacheKey = `${RECORDS_CACHE_PREFIX}${sessionId}`;
+
+  const isValidUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) &&
+    sessionId !== '00000000-0000-0000-0000-000000000000';
+
+  if (!isValidUuid || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? (JSON.parse(cached) as AttendanceRecordWithStudent[]) : [];
+    } catch {
+      return [];
+    }
+  }
 
   try {
     const { data, error } = await client

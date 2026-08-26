@@ -151,7 +151,7 @@ export const AttendancePage: React.FC = () => {
   const initSession = useCallback(async () => {
     if (!selectedClassId) return;
 
-    const teacherId = user?.id || '';
+    const teacherId = user?.id;
     const sess = await getOrCreateAttendanceSession(
       selectedClassId,
       attendanceDate,
@@ -159,6 +159,7 @@ export const AttendancePage: React.FC = () => {
       teacherId,
       selectedSubject || null
     );
+    if (!sess) return;
     setActiveSession(sess);
 
     const [recs, stds] = await Promise.all([
