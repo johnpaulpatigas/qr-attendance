@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Plus, Printer, FileSpreadsheet, QrCode, Filter, X } from 'lucide-react';
 import {
@@ -62,19 +62,22 @@ export const StudentsPage: React.FC = () => {
   useEffect(() => {
     fetchClassSections().then((secs) => {
       setSections(secs);
-      // If a section is in the URL but grade wasn't specified, automatically resolve the section's grade level
-      const currentSectionId =
-        searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId');
-      if (currentSectionId && currentSectionId !== 'all') {
-        const match = secs.find((s) => s.id === currentSectionId);
-        if (match && (!searchParams.get('grade') || searchParams.get('grade') === 'all')) {
-          setGradeFilter(String(match.grade_level));
-        }
-      }
     });
   }, []);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (sections.length === 0) return;
+    const currentSectionId =
+      searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId');
+    if (currentSectionId && currentSectionId !== 'all') {
+      const match = sections.find((s) => s.id === currentSectionId);
+      if (match && (!searchParams.get('grade') || searchParams.get('grade') === 'all')) {
+        setGradeFilter(String(match.grade_level));
+      }
+    }
+  }, [sections, searchParams]);
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     const data = await fetchStudents({
       search,
@@ -83,11 +86,11 @@ export const StudentsPage: React.FC = () => {
     });
     setStudents(data);
     setLoading(false);
-  };
+  }, [search, gradeFilter, sectionFilter]);
 
   useEffect(() => {
     loadData();
-  }, [search, gradeFilter, sectionFilter]);
+  }, [loadData]);
 
   const handleGradeChange = (newGrade: string) => {
     setGradeFilter(newGrade);

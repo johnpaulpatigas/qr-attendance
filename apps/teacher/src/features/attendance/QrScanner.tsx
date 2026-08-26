@@ -198,7 +198,7 @@ export const QrScanner: React.FC<QrScannerProps> = ({ isActive, onScan, disabled
           .catch(() => {});
       }
     };
-  }, [isActive]); // Strictly depends on isActive only to prevent camera reload cycles
+  }, [isActive, handleDecoded]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const client = getSupabaseClient();
 
-  const handleProfileResolution = async (userId: string, email?: string) => {
+  const handleProfileResolution = useCallback(async (userId: string, email?: string) => {
     try {
       const p = await getCurrentUserProfile(client, userId);
       if (p && (p.role === 'teacher' || p.role === 'admin')) {
@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Ignore
       }
     }
-  };
+  }, [client]);
 
   useEffect(() => {
     // Initial session lookup
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [client, isOfflineAuth]);
+  }, [client, isOfflineAuth, handleProfileResolution]);
 
   const signInWithEmail = async (email: string, pass: string): Promise<{ error: Error | null }> => {
     const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;

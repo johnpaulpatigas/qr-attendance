@@ -131,11 +131,8 @@ export const AttendancePage: React.FC = () => {
   useEffect(() => {
     fetchClassSections().then((secs) => {
       setSections(secs);
-      if (secs.length > 0 && !selectedClassId) {
-        setSelectedClassId(secs[0].id);
-        if (secs[0].my_subject) {
-          setSelectedSubject(secs[0].my_subject.split(',')[0].trim());
-        }
+      if (secs.length > 0) {
+        setSelectedClassId((prev) => prev || secs[0].id);
       }
     });
   }, []);
@@ -196,7 +193,7 @@ export const AttendancePage: React.FC = () => {
     initSession();
   }, [initSession]);
 
-  const handleManualSync = async () => {
+  const handleManualSync = useCallback(async () => {
     if (isSyncing || queuedCount === 0) return;
     setIsSyncing(true);
     try {
@@ -221,14 +218,14 @@ export const AttendancePage: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [isSyncing, queuedCount, initSession]);
 
   // Automatically flush offline queue when device reconnects
   useEffect(() => {
     if (isOnline && queuedCount > 0 && !isSyncing) {
       handleManualSync();
     }
-  }, [isOnline, queuedCount]);
+  }, [isOnline, queuedCount, isSyncing, handleManualSync]);
 
   // Handle incoming QR scan
   const handleScan = async (decodedPayload: string) => {

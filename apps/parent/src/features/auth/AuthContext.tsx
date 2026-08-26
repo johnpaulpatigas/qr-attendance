@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const client = getSupabaseClient();
 
-  const loadProfileAndChildren = async (userId: string, email?: string) => {
+  const loadProfileAndChildren = useCallback(async (userId: string, email?: string) => {
     try {
       try {
         const p = await getCurrentUserProfile(client, userId);
@@ -223,7 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Cached read error ignored
       }
     }
-  };
+  }, [client]);
 
   useEffect(() => {
     client.auth
@@ -305,7 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [client, isOfflineAuth]);
+  }, [client, isOfflineAuth, loadProfileAndChildren]);
 
   const signInWithEmail = async (email: string, pass: string): Promise<{ error: Error | null }> => {
     const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;

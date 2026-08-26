@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileSpreadsheet,
   Printer,
@@ -52,13 +52,13 @@ export const ReportsPage: React.FC = () => {
   useEffect(() => {
     fetchClassSections().then((secs) => {
       setSections(secs);
-      if (secs.length > 0 && !selectedClassId) {
-        setSelectedClassId(secs[0].id);
+      if (secs.length > 0) {
+        setSelectedClassId((prev) => prev || secs[0].id);
       }
     });
   }, []);
 
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     if (!selectedClassId) return;
     setLoading(true);
 
@@ -74,11 +74,11 @@ export const ReportsPage: React.FC = () => {
       setDailyData(daily);
     }
     setLoading(false);
-  };
+  }, [activeTab, selectedClassId, selectedMonth, selectedYear, selectedDate]);
 
   useEffect(() => {
     loadReports();
-  }, [activeTab, selectedClassId, selectedMonth, selectedYear, selectedDate]);
+  }, [loadReports]);
 
   const handleExportExcel = () => {
     if (!sf2Data) return;
