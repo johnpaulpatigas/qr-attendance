@@ -400,17 +400,16 @@ export const AttendancePage: React.FC = () => {
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               options={[
-                { value: '', label: '📋 Daily Homeroom / General Attendance' },
-
-                { value: 'Mathematics', label: '📐 Mathematics' },
-                { value: 'Science', label: '🔬 Science' },
-                { value: 'English', label: '📖 English' },
-                { value: 'Filipino', label: '🇵🇭 Filipino' },
-                { value: 'Araling Panlipunan', label: '🌏 Araling Panlipunan' },
-                { value: 'MAPEH', label: '🎨 MAPEH' },
-                { value: 'TLE', label: '⚙️ TLE / TVL' },
-                { value: 'EsP', label: '🤝 Edukasyon sa Pagpapakatao (EsP)' },
-                { value: 'Homeroom Guidance', label: '👥 Homeroom Guidance' },
+                { value: '', label: 'Daily Homeroom / General Attendance' },
+                { value: 'Mathematics', label: 'Mathematics' },
+                { value: 'Science', label: 'Science' },
+                { value: 'English', label: 'English' },
+                { value: 'Filipino', label: 'Filipino' },
+                { value: 'Araling Panlipunan', label: 'Araling Panlipunan (AP)' },
+                { value: 'MAPEH', label: 'MAPEH' },
+                { value: 'TLE', label: 'TLE / TVL' },
+                { value: 'EsP', label: 'Edukasyon sa Pagpapakatao (EsP)' },
+                { value: 'Homeroom Guidance', label: 'Homeroom Guidance' },
               ]}
             />
 
