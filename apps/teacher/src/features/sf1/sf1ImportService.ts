@@ -51,6 +51,9 @@ export async function executeSF1Import(
     throw new Error(`Failed to resolve school year: ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
 
+  const { data: authData } = await client.auth.getUser();
+  const currentUserId = authData.user?.id || null;
+
   const sectionCache = new Map<string, string>();
 
   for (const record of validRecords) {
@@ -78,6 +81,7 @@ export async function executeSF1Import(
               school_year_id: schoolYearId,
               grade_level: grade,
               section_name: sectionName,
+              teacher_id: currentUserId,
             })
             .select()
             .single();
