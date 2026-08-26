@@ -134,10 +134,15 @@ DROP POLICY IF EXISTS "Teachers and admins can insert class sections" ON public.
 DROP POLICY IF EXISTS "Teachers and admins can update class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Teachers and admins can delete class sections" ON public.class_sections;
 DROP POLICY IF EXISTS "Service role full access on class_sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Strict SELECT on class_sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Strict INSERT on class_sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Strict UPDATE on class_sections" ON public.class_sections;
+DROP POLICY IF EXISTS "Strict DELETE on class_sections" ON public.class_sections;
 
 -- SELECT: Teachers see only assigned classes; Parents/Students see only classes of linked children; Admins see all
 CREATE POLICY "Strict SELECT on class_sections"
   ON public.class_sections
+
   FOR SELECT
   TO authenticated
   USING (
@@ -202,9 +207,14 @@ DROP POLICY IF EXISTS "Teachers and admins can insert students" ON public.studen
 DROP POLICY IF EXISTS "Teachers and admins can update students" ON public.students;
 DROP POLICY IF EXISTS "Teachers and admins can delete students" ON public.students;
 DROP POLICY IF EXISTS "Service role full access on students" ON public.students;
+DROP POLICY IF EXISTS "Strict SELECT on students" ON public.students;
+DROP POLICY IF EXISTS "Strict INSERT on students" ON public.students;
+DROP POLICY IF EXISTS "Strict UPDATE on students" ON public.students;
+DROP POLICY IF EXISTS "Strict DELETE on students" ON public.students;
 
 -- SELECT: Teachers see only students in their assigned classes; Parents see only their linked children; Admins see all
 CREATE POLICY "Strict SELECT on students"
+
   ON public.students
   FOR SELECT
   TO authenticated
@@ -293,9 +303,14 @@ DROP POLICY IF EXISTS "Teachers and admins can insert attendance sessions" ON pu
 DROP POLICY IF EXISTS "Teachers and admins can update attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Teachers and admins can delete attendance sessions" ON public.attendance_sessions;
 DROP POLICY IF EXISTS "Service role full access on attendance_sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Strict SELECT on attendance_sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Strict INSERT on attendance_sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Strict UPDATE on attendance_sessions" ON public.attendance_sessions;
+DROP POLICY IF EXISTS "Strict DELETE on attendance_sessions" ON public.attendance_sessions;
 
 -- SELECT: Teachers see only sessions for their classes; Parents see sessions for their children's classes; Admins see all
 CREATE POLICY "Strict SELECT on attendance_sessions"
+
   ON public.attendance_sessions
   FOR SELECT
   TO authenticated
@@ -407,6 +422,10 @@ DROP POLICY IF EXISTS "Teachers and admins can insert attendance" ON public.atte
 DROP POLICY IF EXISTS "Teachers and admins can update attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Teachers and admins can delete attendance" ON public.attendance;
 DROP POLICY IF EXISTS "Service role full access on attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Strict SELECT on attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Strict INSERT on attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Strict UPDATE on attendance" ON public.attendance;
+DROP POLICY IF EXISTS "Strict DELETE on attendance" ON public.attendance;
 
 -- SELECT: Teachers see only attendance for their classes; Parents see only their children's attendance; Admins see all
 CREATE POLICY "Strict SELECT on attendance"
@@ -498,9 +517,12 @@ CREATE POLICY "Service role full access on attendance"
 DROP POLICY IF EXISTS "Authenticated users can view attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Teachers and admins can insert attendance events" ON public.attendance_events;
 DROP POLICY IF EXISTS "Service role full access on attendance_events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Strict SELECT on attendance_events" ON public.attendance_events;
+DROP POLICY IF EXISTS "Strict INSERT on attendance_events" ON public.attendance_events;
 
 -- SELECT: Teachers see only events for students in their assigned classes; Parents see events for linked children; Admins see all
 CREATE POLICY "Strict SELECT on attendance_events"
+
   ON public.attendance_events
   FOR SELECT
   TO authenticated
@@ -541,6 +563,9 @@ DROP POLICY IF EXISTS "Authenticated users can view parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can insert parents" ON public.parents;
 DROP POLICY IF EXISTS "Authenticated users can update parents" ON public.parents;
 DROP POLICY IF EXISTS "Service role full access on parents" ON public.parents;
+DROP POLICY IF EXISTS "Strict SELECT on parents" ON public.parents;
+DROP POLICY IF EXISTS "Strict INSERT on parents" ON public.parents;
+DROP POLICY IF EXISTS "Strict UPDATE on parents" ON public.parents;
 
 -- SELECT on parents: Only own parent record, or parents of students in assigned class, or admin
 CREATE POLICY "Strict SELECT on parents"
@@ -596,9 +621,14 @@ DROP POLICY IF EXISTS "Authenticated users can insert student parent links" ON p
 DROP POLICY IF EXISTS "Authenticated users can update student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Authenticated users can delete student parent links" ON public.student_parents;
 DROP POLICY IF EXISTS "Service role full access on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict SELECT on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict INSERT on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict UPDATE on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict DELETE on student_parents" ON public.student_parents;
 
 -- SELECT on student_parents: Only own links, or links for students in assigned classes, or admin
 CREATE POLICY "Strict SELECT on student_parents"
+
   ON public.student_parents
   FOR SELECT
   TO authenticated
