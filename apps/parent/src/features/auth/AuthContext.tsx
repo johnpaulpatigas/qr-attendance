@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { getSupabaseClient, getCurrentUserProfile } from '@qr-attendance/supabase';
+import {
+  getSupabaseClient,
+  getCurrentUserProfile,
+  saveOfflineAuthCredentials,
+  verifyOfflineAuthCredentials,
+  getStoredOfflineUser,
+  clearOfflineAuthSession,
+} from '@qr-attendance/supabase';
 import type { UserProfile, LinkedStudent } from '@qr-attendance/types';
 
 export interface SignUpParentParams {
@@ -18,6 +25,7 @@ interface ParentAuthContextType {
   role: 'parent' | 'student' | null;
   linkedChildren: LinkedStudent[];
   activeChild: LinkedStudent | null;
+  isOfflineAuth: boolean;
   setActiveChildId: (studentId: string) => void;
   isLoading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
@@ -31,10 +39,29 @@ const AuthContext = createContext<ParentAuthContextType | undefined>(undefined);
 
 const PARENT_PROFILE_KEY = 'parent_auth_profile';
 const PARENT_CHILDREN_KEY = 'parent_auth_children';
+const STORAGE_PREFIX = 'parent';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+    if (offlineUser) {
+      return {
+        id: offlineUser.userId,
+        email: offlineUser.email,
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+      } as User;
+    }
+    return null;
+  });
+
   const [profile, setProfile] = useState<UserProfile | null>(() => {
+    const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+    if (offlineUser) {
+      return offlineUser.profile;
+    }
     try {
       const cached = localStorage.getItem(PARENT_PROFILE_KEY);
       return cached ? JSON.parse(cached) : null;
@@ -42,7 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
   });
+
   const [session, setSession] = useState<Session | null>(null);
+  const [isOfflineAuth, setIsOfflineAuth] = useState(false);
   const [linkedChildren, setLinkedChildren] = useState<LinkedStudent[]>(() => {
     try {
       const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
@@ -51,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return [];
     }
   });
+
   const [activeChildId, setActiveChildId] = useState<string | null>(() => {
     try {
       const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
@@ -63,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
   });
+
   const [isLoading, setIsLoading] = useState(true);
 
   const client = getSupabaseClient();
@@ -183,30 +214,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     client.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setSession(session);
+        setUser(session.user);
+        setIsOfflineAuth(false);
         loadProfileAndChildren(session.user.id, session.user.email).finally(() => {
           setIsLoading(false);
         });
       } else {
+        const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+        if (offlineUser) {
+          setUser({
+            id: offlineUser.userId,
+            email: offlineUser.email,
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+          } as User);
+          setProfile(offlineUser.profile);
+          setIsOfflineAuth(true);
+        }
         setIsLoading(false);
       }
     }).catch(() => {
+      const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+      if (offlineUser) {
+        setUser({
+          id: offlineUser.userId,
+          email: offlineUser.email,
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as User);
+        setProfile(offlineUser.profile);
+        setIsOfflineAuth(true);
+      }
       setIsLoading(false);
     });
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setSession(session);
+        setUser(session.user);
+        setIsOfflineAuth(false);
         await loadProfileAndChildren(session.user.id, session.user.email);
-      } else {
-        setProfile(null);
-        setLinkedChildren([]);
-        setActiveChildId(null);
-        localStorage.removeItem(PARENT_PROFILE_KEY);
-        localStorage.removeItem(PARENT_CHILDREN_KEY);
+      } else if (!isOfflineAuth) {
+        const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+        if (offlineUser && (typeof navigator !== 'undefined' && !navigator.onLine)) {
+          setUser({
+            id: offlineUser.userId,
+            email: offlineUser.email,
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+          } as User);
+          setProfile(offlineUser.profile);
+          setIsOfflineAuth(true);
+        } else {
+          setProfile(null);
+          setLinkedChildren([]);
+          setActiveChildId(null);
+          localStorage.removeItem(PARENT_PROFILE_KEY);
+          localStorage.removeItem(PARENT_CHILDREN_KEY);
+        }
       }
       setIsLoading(false);
     });
@@ -214,18 +287,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [client]);
+  }, [client, isOfflineAuth]);
 
   const signInWithEmail = async (email: string, pass: string): Promise<{ error: Error | null }> => {
+    const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // 1. Direct offline verification if network is disconnected
+    if (isDeviceOffline) {
+      const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
+      if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
+        const syntheticUser = {
+          id: offlineRes.userId,
+          email: email.trim().toLowerCase(),
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as User;
+
+        setUser(syntheticUser);
+        setProfile(offlineRes.profile);
+        setIsOfflineAuth(true);
+        return { error: null };
+      }
+      return { error: new Error(offlineRes.error || 'Failed to authenticate offline.') };
+    }
+
+    // 2. Online verification with Supabase Auth
     try {
-      const { error } = await client.auth.signInWithPassword({
+      const { data, error } = await client.auth.signInWithPassword({
         email: email.trim(),
         password: pass,
       });
 
-      if (error) return { error };
+      if (error) {
+        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+          const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
+          if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
+            setUser({
+              id: offlineRes.userId,
+              email: email.trim().toLowerCase(),
+              app_metadata: {},
+              user_metadata: {},
+              aud: 'authenticated',
+              created_at: new Date().toISOString(),
+            } as User);
+            setProfile(offlineRes.profile);
+            setIsOfflineAuth(true);
+            return { error: null };
+          }
+        }
+        return { error };
+      }
+
+      if (data.user) {
+        const resolvedProfile: UserProfile = {
+          id: data.user.id,
+          role: 'parent',
+          full_name: email.split('@')[0] || 'Parent / Guardian',
+          email: email.trim(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        await saveOfflineAuthCredentials(
+          STORAGE_PREFIX,
+          email,
+          pass,
+          resolvedProfile,
+          data.user.id
+        );
+        setIsOfflineAuth(false);
+      }
+
       return { error: null };
     } catch (err: unknown) {
+      const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
+      if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
+        setUser({
+          id: offlineRes.userId,
+          email: email.trim().toLowerCase(),
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as User);
+        setProfile(offlineRes.profile);
+        setIsOfflineAuth(true);
+        return { error: null };
+      }
       return { error: err instanceof Error ? err : new Error('An unexpected error occurred') };
     }
   };
@@ -376,12 +526,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    clearOfflineAuthSession(STORAGE_PREFIX);
     await client.auth.signOut();
     setUser(null);
     setProfile(null);
     setSession(null);
     setLinkedChildren([]);
     setActiveChildId(null);
+    setIsOfflineAuth(false);
   };
 
   const resetPassword = async (email: string): Promise<{ error: Error | null }> => {
@@ -406,6 +558,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: (profile?.role as 'parent' | 'student') || 'parent',
         linkedChildren,
         activeChild,
+        isOfflineAuth,
         setActiveChildId,
         isLoading,
         signInWithEmail,
@@ -427,3 +580,4 @@ export const useAuth = (): ParentAuthContextType => {
   }
   return context;
 };
+

@@ -194,11 +194,18 @@ export const LoginPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {typeof navigator !== 'undefined' && !navigator.onLine && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span><strong>Offline Mode:</strong> Sign in with the account previously used on this device.</span>
+              </div>
+            )}
             {error && (
               <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 mb-4">
                 {error}
               </div>
             )}
+
             {successMessage && (
               <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700 mb-4">
                 {successMessage}

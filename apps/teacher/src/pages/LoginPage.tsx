@@ -99,6 +99,12 @@ export const LoginPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {typeof navigator !== 'undefined' && !navigator.onLine && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span><strong>Offline Mode:</strong> Sign in with the credentials previously used on this device.</span>
+              </div>
+            )}
             {isResetMode ? (
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 {error && (
@@ -111,6 +117,7 @@ export const LoginPage: React.FC = () => {
                     {successMessage}
                   </div>
                 )}
+
                 <Input
                   label="MNHS / DepEd Email"
                   type="email"
