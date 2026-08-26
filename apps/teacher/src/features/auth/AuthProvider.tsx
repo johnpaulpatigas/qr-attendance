@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
@@ -46,11 +46,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isOfflineAuth, setIsOfflineAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const lastResolvedUserIdRef = useRef<string | null>(null);
 
   const client = getSupabaseClient();
 
   const handleProfileResolution = useCallback(
     async (userId: string, email?: string) => {
+      if (lastResolvedUserIdRef.current === userId) {
+        return;
+      }
+      lastResolvedUserIdRef.current = userId;
       try {
         const p = await getCurrentUserProfile(client, userId);
         if (p && (p.role === 'teacher' || p.role === 'admin')) {
@@ -302,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    lastResolvedUserIdRef.current = null;
     clearOfflineAuthSession(STORAGE_PREFIX);
     await client.auth.signOut();
     setUser(null);

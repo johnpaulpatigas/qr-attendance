@@ -15,8 +15,8 @@ const RECORDS_CACHE_PREFIX = 'teacher_cached_records_';
 
 export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
-  const { data: authData } = await client.auth.getUser();
-  const currentUserId = authData.user?.id;
+  const { data: sessionData } = await client.auth.getSession();
+  const currentUserId = sessionData.session?.user?.id;
   const userCacheKey = currentUserId
     ? `${SECTIONS_CACHE_KEY}_${currentUserId}`
     : SECTIONS_CACHE_KEY;
@@ -338,10 +338,11 @@ export async function fetchSessionRecords(
 
 export async function fetchAttendanceSummary(
   sessionId: string,
-  classId: string
+  classId: string,
+  existingRecords?: AttendanceRecordWithStudent[]
 ): Promise<AttendanceSummary> {
   const client = getSupabaseClient();
-  const records = await fetchSessionRecords(sessionId);
+  const records = existingRecords ?? (await fetchSessionRecords(sessionId));
 
   // Include any pending offline scans for this session
   const queuedScans = getQueuedScans().filter(

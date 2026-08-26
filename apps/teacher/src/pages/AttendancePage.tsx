@@ -161,11 +161,11 @@ export const AttendancePage: React.FC = () => {
     );
     setActiveSession(sess);
 
-    const [summ, recs, stds] = await Promise.all([
-      fetchAttendanceSummary(sess.id, selectedClassId),
+    const [recs, stds] = await Promise.all([
       fetchSessionRecords(sess.id),
       fetchStudents({ sectionId: selectedClassId }),
     ]);
+    const summ = await fetchAttendanceSummary(sess.id, selectedClassId, recs);
 
     setSummary(summ);
     setRecentRecords(recs);

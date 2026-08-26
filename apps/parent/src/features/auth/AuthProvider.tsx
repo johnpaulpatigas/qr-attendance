@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
@@ -69,11 +69,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const lastResolvedUserIdRef = useRef<string | null>(null);
 
   const client = getSupabaseClient();
 
   const loadProfileAndChildren = useCallback(
-    async (userId: string, email?: string) => {
+    async (userId: string, email?: string, force = false) => {
+      if (!force && lastResolvedUserIdRef.current === userId) {
+        return;
+      }
+      lastResolvedUserIdRef.current = userId;
       try {
         try {
           const p = await getCurrentUserProfile(client, userId);
@@ -465,7 +470,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
         const res = rpcRes as { success: boolean; message: string };
         if (res.success) {
-          await loadProfileAndChildren(user.id, user.email);
+          await loadProfileAndChildren(user.id, user.email, true);
         }
         return res;
       }
@@ -515,7 +520,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (linkErr) throw new Error(linkErr.message);
 
-      await loadProfileAndChildren(user.id, user.email);
+      await loadProfileAndChildren(user.id, user.email, true);
       const studentName = `${student.first_name} ${student.last_name}`;
       return {
         success: true,
@@ -530,6 +535,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    lastResolvedUserIdRef.current = null;
     clearOfflineAuthSession(STORAGE_PREFIX);
     await client.auth.signOut();
     setUser(null);

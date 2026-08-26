@@ -121,14 +121,12 @@ export const DashboardPage: React.FC = () => {
         let typedAttRecords: DashboardAttRow[] = [];
 
         if (mySectionIds.length > 0) {
-          let studentQuery = client.from('students').select('id, section_id');
           if (selectedClassId !== 'all') {
-            studentQuery = studentQuery.eq('section_id', selectedClassId);
+            totalEnrolled =
+              mappedClasses.find((c) => c.id === selectedClassId)?.student_count || 0;
           } else {
-            studentQuery = studentQuery.in('section_id', mySectionIds);
+            totalEnrolled = mappedClasses.reduce((sum, c) => sum + c.student_count, 0);
           }
-          const { data: enrolledStudents } = await studentQuery;
-          totalEnrolled = enrolledStudents?.length || 0;
 
           const todayStr = getUtc8DateString();
           let attendanceQuery = client
