@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Input, Select } from '@qr-attendance/ui';
-import { createStudentSchema, formatGradeSection } from '@qr-attendance/validation';
+import { createStudentSchema, cleanSectionName } from '@qr-attendance/validation';
 import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { createStudent } from './studentService';
@@ -232,12 +232,13 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
               availableSections.length > 0
                 ? availableSections.map((s) => ({
                     value: s.id,
-                    label: formatGradeSection(s.grade_level, s.section_name),
+                    label: cleanSectionName(s.section_name) || s.section_name,
                   }))
                 : [{ value: '', label: `No Grade ${gradeLevel} sections available` }]
             }
             helperText={availableSections.length === 0 ? `No sections registered for Grade ${gradeLevel} yet.` : undefined}
           />
+
         </div>
 
 

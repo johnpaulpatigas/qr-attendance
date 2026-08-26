@@ -142,14 +142,16 @@ export const ClassesPage: React.FC = () => {
         }
       }
 
+      const cleanName = cleanSectionName(sectionName) || sectionName.trim();
       const { error: insertErr } = await client.from('class_sections').insert({
         school_year_id: syId || '',
         grade_level: Number(gradeLevel),
-        section_name: sectionName.trim(),
+        section_name: cleanName,
         room_number: roomNumber.trim() || null,
         teacher_id: user?.id || null,
         adviser_id: user?.id || null,
       });
+
 
       if (insertErr) {
         throw new Error(insertErr.message);
@@ -394,11 +396,12 @@ export const ClassesPage: React.FC = () => {
 
           <Input
             label="Section Name"
-            placeholder="e.g. 10-SSC, Section A, Rizal, STEM 1"
+            placeholder="e.g. SSC, Rizal, Emerald, STEM A"
             value={sectionName}
             onChange={(e) => setSectionName(e.target.value)}
             required
           />
+
 
           <Input
             label="Room Number (Optional)"

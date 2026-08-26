@@ -20,7 +20,7 @@ import {
   EmptyState,
 } from '@qr-attendance/ui';
 import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
-import { formatGradeSection } from '@qr-attendance/validation';
+import { formatGradeSection, cleanSectionName } from '@qr-attendance/validation';
 import { fetchStudents } from '../features/students/studentService';
 import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { StudentQrModal } from '../features/qr/StudentQrModal';
@@ -217,10 +217,11 @@ export const StudentsPage: React.FC = () => {
                 { value: 'all', label: gradeFilter !== 'all' ? `All Grade ${gradeFilter} Sections` : 'All Sections' },
                 ...availableSections.map((s) => ({
                   value: s.id,
-                  label: formatGradeSection(s.grade_level, s.section_name),
+                  label: gradeFilter !== 'all' ? cleanSectionName(s.section_name) : formatGradeSection(s.grade_level, s.section_name),
                 })),
               ]}
             />
+
           </div>
 
           {/* Active Filter Indicator */}
