@@ -1,18 +1,33 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { TeacherLayout } from '../../components/layout/TeacherLayout';
 import { ProtectedRoute } from '../../features/auth/ProtectedRoute';
-import { DashboardPage } from '../../pages/DashboardPage';
-import { AttendancePage } from '../../pages/AttendancePage';
-import { StudentsPage } from '../../pages/StudentsPage';
-import { SF1ImportPage } from '../../pages/SF1ImportPage';
-import { ClassesPage } from '../../pages/ClassesPage';
-import { ReportsPage } from '../../pages/ReportsPage';
-import { LoginPage } from '../../pages/LoginPage';
+import { LoadingState, ErrorBoundary } from '@qr-attendance/ui';
+
+const DashboardPage = lazy(() => import('../../pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const AttendancePage = lazy(() => import('../../pages/AttendancePage').then((m) => ({ default: m.AttendancePage })));
+const StudentsPage = lazy(() => import('../../pages/StudentsPage').then((m) => ({ default: m.StudentsPage })));
+const SF1ImportPage = lazy(() => import('../../pages/SF1ImportPage').then((m) => ({ default: m.SF1ImportPage })));
+const ClassesPage = lazy(() => import('../../pages/ClassesPage').then((m) => ({ default: m.ClassesPage })));
+const ReportsPage = lazy(() => import('../../pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const LoginPage = lazy(() => import('../../pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+
+const SuspendedRoute = ({ children }: { children: React.ReactNode }) => (
+  <ErrorBoundary>
+    <Suspense fallback={<div className="p-12"><LoadingState message="Loading module..." /></div>}>
+      {children}
+    </Suspense>
+  </ErrorBoundary>
+);
 
 export const router = createBrowserRouter([
   {
     path: '/login',
-    element: <LoginPage />,
+    element: (
+      <SuspendedRoute>
+        <LoginPage />
+      </SuspendedRoute>
+    ),
   },
   {
     path: '/',
@@ -24,28 +39,53 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: (
+          <SuspendedRoute>
+            <DashboardPage />
+          </SuspendedRoute>
+        ),
       },
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: (
+          <SuspendedRoute>
+            <AttendancePage />
+          </SuspendedRoute>
+        ),
       },
       {
         path: 'students',
-        element: <StudentsPage />,
+        element: (
+          <SuspendedRoute>
+            <StudentsPage />
+          </SuspendedRoute>
+        ),
       },
       {
         path: 'students/import-sf1',
-        element: <SF1ImportPage />,
+        element: (
+          <SuspendedRoute>
+            <SF1ImportPage />
+          </SuspendedRoute>
+        ),
       },
       {
         path: 'classes',
-        element: <ClassesPage />,
+        element: (
+          <SuspendedRoute>
+            <ClassesPage />
+          </SuspendedRoute>
+        ),
       },
       {
         path: 'reports',
-        element: <ReportsPage />,
+        element: (
+          <SuspendedRoute>
+            <ReportsPage />
+          </SuspendedRoute>
+        ),
       },
     ],
   },
 ]);
+

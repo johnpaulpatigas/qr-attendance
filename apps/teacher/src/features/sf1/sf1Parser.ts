@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { parseFlexibleDate } from '@qr-attendance/validation';
 
 export interface RawSF1Record {
   lrn: string;
@@ -89,8 +90,16 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
     // Clean non-numeric characters from LRN
     lrnValue = lrnValue.replace(/\D/g, '');
 
-    // Skip empty or non-data lines (e.g. summary/notes lines in DepEd SF1 footers)
-    if (!lrnValue || lrnValue.length < 6) {
+    // Skip empty rows, header repeats, or footer summary notes in DepEd SF1
+    const rowText = rowArray.map((c) => String(c ?? '')).join(' ').toUpperCase();
+    if (
+      !lrnValue ||
+      lrnValue.length < 6 ||
+      rowText.includes('TOTAL MALE') ||
+      rowText.includes('TOTAL FEMALE') ||
+      rowText.includes('PREPARED BY:') ||
+      rowText.includes('CERTIFIED CORRECT:')
+    ) {
       continue;
     }
 
@@ -121,27 +130,20 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
     }
 
     // Extract Sex
-    const sexRaw = String(colSex ? rowObj[colSex] || '' : 'MALE').trim();
+    const sexRaw = String(colSex ? rowObj[colSex] || '' : '').trim();
 
-    // Extract Birth Date
-    let birthDate = '2008-01-01';
-    if (colBirthDate && rowObj[colBirthDate]) {
-      const val = rowObj[colBirthDate];
-      if (val instanceof Date) {
-        birthDate = val.toISOString().slice(0, 10);
-      } else {
-        const parsed = Date.parse(String(val));
-        if (!isNaN(parsed)) {
-          birthDate = new Date(parsed).toISOString().slice(0, 10);
-        } else {
-          birthDate = String(val).trim();
-        }
-      }
+    // Extract Birth Date using flexible date parser
+    let birthDate = '';
+    if (colBirthDate && rowObj[colBirthDate] !== undefined && rowObj[colBirthDate] !== null) {
+      const rawDateVal = rowObj[colBirthDate];
+      const parsedRes = parseFlexibleDate(rawDateVal);
+      birthDate = parsedRes.dateString || String(rawDateVal).trim();
     }
 
     // Extract Grade Level & Section
-    const gradeVal = Number(colGrade ? rowObj[colGrade] : 12) || 12;
-    const sectionVal = String(colSection ? rowObj[colSection] || 'STEM A' : 'STEM A').trim();
+    const gradeRaw = colGrade ? rowObj[colGrade] : null;
+    const gradeVal = gradeRaw !== null && gradeRaw !== undefined && gradeRaw !== '' ? Number(gradeRaw) : 0;
+    const sectionVal = String(colSection ? rowObj[colSection] || '' : '').trim();
     const syVal = String(colSchoolYear ? rowObj[colSchoolYear] || '2026-2027' : '2026-2027').trim();
 
     records.push({
@@ -166,9 +168,10 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
     detectedHeaders: {
       lrn: colLrn || 'Auto-Detected',
       name: colFullName || (colLastName && colFirstName ? `${colLastName}, ${colFirstName}` : 'Auto-Detected'),
-      sex: colSex || 'Defaulted',
-      birthDate: colBirthDate || 'Defaulted',
-      section: colSection || 'Defaulted',
+      sex: colSex || 'Auto-Detected',
+      birthDate: colBirthDate || 'Auto-Detected',
+      section: colSection || 'Auto-Detected',
     },
   };
 }
+
