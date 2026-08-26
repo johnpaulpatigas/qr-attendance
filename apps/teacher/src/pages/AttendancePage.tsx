@@ -132,7 +132,9 @@ export const AttendancePage: React.FC = () => {
     fetchClassSections().then((secs) => {
       setSections(secs);
       if (secs.length > 0) {
-        setSelectedClassId((prev) => prev || secs[0].id);
+        setSelectedClassId((prev) => (secs.some((s) => s.id === prev) ? prev : secs[0].id));
+      } else {
+        setSelectedClassId('');
       }
     });
   }, []);
@@ -149,9 +151,14 @@ export const AttendancePage: React.FC = () => {
 
   // Initialize active session and load students when section/date/sessionType/subject changes
   const initSession = useCallback(async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !user?.id) {
+      setActiveSession(null);
+      setRecentRecords([]);
+      setStudentsInClass([]);
+      return;
+    }
 
-    const teacherId = user?.id;
+    const teacherId = user.id;
     const sess = await getOrCreateAttendanceSession(
       selectedClassId,
       attendanceDate,
@@ -159,7 +166,10 @@ export const AttendancePage: React.FC = () => {
       teacherId,
       selectedSubject || null
     );
-    if (!sess) return;
+    if (!sess) {
+      setActiveSession(null);
+      return;
+    }
     setActiveSession(sess);
 
     const [recs, stds] = await Promise.all([
@@ -188,7 +198,7 @@ export const AttendancePage: React.FC = () => {
         }))
       );
     }
-  }, [selectedClassId, attendanceDate, sessionType, selectedSubject, user?.id]);
+  }, [selectedClassId, attendanceDate, sessionType, selectedSubject, user]);
 
   useEffect(() => {
     initSession();

@@ -44,7 +44,12 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
       )
       .order('grade_level', { ascending: false });
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
+      if (data.length === 0) {
+        localStorage.removeItem(userCacheKey);
+        return [];
+      }
+
       interface SectionJoinRow {
         id: string;
         grade_level: number;
@@ -123,7 +128,8 @@ export async function getOrCreateAttendanceSession(
   sessionType: SessionType,
   teacherId?: string,
   subjectName?: string | null
-): Promise<AttendanceSession> {
+): Promise<AttendanceSession | null> {
+  if (!classId) return null;
   const client = getSupabaseClient();
   const subjPart = subjectName ? `_${subjectName.replace(/\s+/g, '_')}` : '';
   const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}${subjPart}`;
@@ -173,7 +179,12 @@ export async function getOrCreateAttendanceSession(
         .select()
         .maybeSingle();
 
-      if (!createError && created) {
+      if (createError) {
+        if (createError.code === '23503') {
+          console.warn(`Class section ${classId} does not exist in database.`);
+          return null;
+        }
+      } else if (created) {
         const session = created;
         localStorage.setItem(cacheKey, JSON.stringify(session));
         return session;
