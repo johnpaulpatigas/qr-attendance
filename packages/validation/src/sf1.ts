@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { lrnRegex } from './lrn';
+import { parseFlexibleDate } from './date';
 import type { SF1ParsedStudent } from '@qr-attendance/types';
 
 export const rawSf1RowSchema = z.object({
@@ -18,19 +19,38 @@ export const rawSf1RowSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .refine((v) => v === 'MALE' || v === 'FEMALE' || v === 'M' || v === 'F', {
-      message: 'Sex must be Male or Female',
-    })
-    .transform((v) => (v.startsWith('M') ? ('MALE' as const) : ('FEMALE' as const))),
-  birth_date: z
-    .string()
-    .trim()
     .refine(
-      (v) => !isNaN(Date.parse(v)) || /^\d{4}-\d{2}-\d{2}$/.test(v),
+      (v) =>
+        v === 'MALE' ||
+        v === 'FEMALE' ||
+        v === 'M' ||
+        v === 'F' ||
+        v === 'LALAKI' ||
+        v === 'BABAE' ||
+        v === 'BOY' ||
+        v === 'GIRL',
       {
-        message: 'Invalid birth date format',
+        message: 'Sex must be Male or Female',
       }
-    ),
+    )
+    .transform((v) => {
+      const upper = v.toUpperCase();
+      if (upper === 'FEMALE' || upper === 'F' || upper === 'BABAE' || upper === 'GIRL') {
+        return 'FEMALE' as const;
+      }
+      return 'MALE' as const;
+    }),
+  birth_date: z.unknown().transform((v, ctx) => {
+    const res = parseFlexibleDate(v);
+    if (!res.success || !res.dateString) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: res.error || 'Invalid birth date format (e.g. YYYY-MM-DD or MM/DD/YYYY)',
+      });
+      return z.NEVER;
+    }
+    return res.dateString;
+  }),
   grade_level: z.coerce.number().int().min(1).max(12),
   section_name: z.string().trim().min(1, 'Section name is required'),
   school_year: z.string().trim().min(1, 'School year is required'),
@@ -41,13 +61,17 @@ export function validateSf1Row(row: Record<string, unknown>): SF1ParsedStudent {
 
   if (!result.success) {
     const errorMessages = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`);
+    const rawSex = String(row.sex || '').toUpperCase();
+    const isFemale =
+      rawSex.startsWith('F') || rawSex.startsWith('B') || rawSex.includes('GIRL');
+
     return {
-      lrn: String(row.lrn || ''),
+      lrn: String(row.lrn || '').replace(/\D/g, ''),
       last_name: String(row.last_name || ''),
       first_name: String(row.first_name || ''),
       middle_name: row.middle_name ? String(row.middle_name) : null,
       suffix: row.suffix ? String(row.suffix) : null,
-      sex: String(row.sex || '').toUpperCase().startsWith('F') ? 'FEMALE' : 'MALE',
+      sex: isFemale ? 'FEMALE' : 'MALE',
       birth_date: String(row.birth_date || ''),
       grade_level: Number(row.grade_level) || 0,
       section_name: String(row.section_name || ''),
@@ -73,3 +97,4 @@ export function validateSf1Row(row: Record<string, unknown>): SF1ParsedStudent {
     errors: [],
   };
 }
+

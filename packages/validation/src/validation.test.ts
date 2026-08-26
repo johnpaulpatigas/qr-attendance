@@ -112,7 +112,51 @@ describe('SF1 Row Validator', () => {
     expect(result.errors.some((e) => e.includes('Last name is required'))).toBe(true);
     expect(result.errors.some((e) => e.includes('First name is required'))).toBe(true);
   });
+
+  it('accepts multi-format sex codes (Lalaki, Babae, M, F) and normalizes properly', () => {
+    const maleRes = validateSf1Row({
+      lrn: '108234981236',
+      last_name: 'Santos',
+      first_name: 'Pedro',
+      sex: 'Lalaki',
+      birth_date: '2008-01-15',
+      grade_level: 10,
+      section_name: 'Rizal',
+      school_year: '2026-2027',
+    });
+    expect(maleRes.isValid).toBe(true);
+    expect(maleRes.sex).toBe('MALE');
+
+    const femaleRes = validateSf1Row({
+      lrn: '108234981237',
+      last_name: 'Reyes',
+      first_name: 'Ana',
+      sex: 'Babae',
+      birth_date: '2008-03-20',
+      grade_level: 10,
+      section_name: 'Rizal',
+      school_year: '2026-2027',
+    });
+    expect(femaleRes.isValid).toBe(true);
+    expect(femaleRes.sex).toBe('FEMALE');
+  });
+
+  it('accepts Excel numeric serial numbers for birth date in SF1 row', () => {
+    const res = validateSf1Row({
+      lrn: '108234981238',
+      last_name: 'Garcia',
+      first_name: 'Jose',
+      sex: 'M',
+      birth_date: 39448, // 2008-01-01 in Excel serial format
+      grade_level: 11,
+      section_name: 'HumSS A',
+      school_year: '2026-2027',
+    });
+    expect(res.isValid).toBe(true);
+    expect(res.birth_date).toBe('2008-01-01');
+  });
 });
+
 
 describe('Student Creation Schema', () => {
   it('validates a complete student creation payload', () => {
