@@ -348,7 +348,10 @@ export const StudentsPage: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onStudentCreated={handleStudentCreated}
+        initialGradeLevel={gradeFilter !== 'all' ? gradeFilter : undefined}
+        initialSectionId={sectionFilter !== 'all' ? sectionFilter : undefined}
       />
     </div>
   );
 };
+

@@ -10,12 +10,16 @@ export interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStudentCreated: (newStudent: StudentWithSection) => void;
+  initialGradeLevel?: string;
+  initialSectionId?: string;
 }
 
 export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   isOpen,
   onClose,
   onStudentCreated,
+  initialGradeLevel,
+  initialSectionId,
 }) => {
   const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
   const [lrn, setLrn] = useState('');
@@ -25,8 +29,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const [suffix, setSuffix] = useState('');
   const [sex, setSex] = useState<'MALE' | 'FEMALE'>('MALE');
   const [birthDate, setBirthDate] = useState('2008-01-01');
-  const [gradeLevel, setGradeLevel] = useState('10');
-  const [sectionId, setSectionId] = useState('');
+  const [gradeLevel, setGradeLevel] = useState(initialGradeLevel || '10');
+  const [sectionId, setSectionId] = useState(initialSectionId || '');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,13 +38,47 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
     if (isOpen) {
       fetchClassSections().then((secs) => {
         setSections(secs);
-        if (secs.length > 0) {
-          setSectionId(secs[0].id);
-          setGradeLevel(String(secs[0].grade_level));
+
+        let targetGrade = initialGradeLevel || '10';
+        let targetSecId = initialSectionId || '';
+
+        if (targetSecId) {
+          const found = secs.find((s) => s.id === targetSecId);
+          if (found) {
+            targetGrade = String(found.grade_level);
+          } else {
+            targetSecId = '';
+          }
         }
+
+        if (!targetSecId) {
+          const matching = secs.filter((s) => String(s.grade_level) === targetGrade);
+          if (matching.length > 0) {
+            targetSecId = matching[0].id;
+          } else if (secs.length > 0) {
+            targetGrade = String(secs[0].grade_level);
+            targetSecId = secs[0].id;
+          }
+        }
+
+        setGradeLevel(targetGrade);
+        setSectionId(targetSecId);
       });
     }
-  }, [isOpen]);
+  }, [isOpen, initialGradeLevel, initialSectionId]);
+
+  const handleGradeChange = (newGrade: string) => {
+    setGradeLevel(newGrade);
+    const matching = sections.filter((s) => String(s.grade_level) === newGrade);
+    if (matching.length > 0) {
+      if (!matching.some((s) => s.id === sectionId)) {
+        setSectionId(matching[0].id);
+      }
+    } else {
+      setSectionId('');
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +133,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       setIsLoading(false);
     }
   };
+
+  const availableSections = sections.filter((s) => String(s.grade_level) === gradeLevel);
 
   return (
     <Modal
@@ -174,7 +214,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
           <Select
             label="Grade Level"
             value={gradeLevel}
-            onChange={(e) => setGradeLevel(e.target.value)}
+            onChange={(e) => handleGradeChange(e.target.value)}
             options={[
               { value: '7', label: 'Grade 7' },
               { value: '8', label: 'Grade 8' },
@@ -187,22 +227,19 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
           <Select
             label="Class Section"
             value={sectionId}
-            onChange={(e) => {
-              setSectionId(e.target.value);
-              const found = sections.find((s) => s.id === e.target.value);
-              if (found) setGradeLevel(String(found.grade_level));
-            }}
+            onChange={(e) => setSectionId(e.target.value)}
             options={
-              sections.length > 0
-                ? sections.map((s) => ({
+              availableSections.length > 0
+                ? availableSections.map((s) => ({
                     value: s.id,
                     label: formatGradeSection(s.grade_level, s.section_name),
                   }))
-                : [{ value: '', label: 'No sections registered yet' }]
+                : [{ value: '', label: `No Grade ${gradeLevel} sections available` }]
             }
-
+            helperText={availableSections.length === 0 ? `No sections registered for Grade ${gradeLevel} yet.` : undefined}
           />
         </div>
+
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <Button type="button" variant="outline" onClick={onClose}>
