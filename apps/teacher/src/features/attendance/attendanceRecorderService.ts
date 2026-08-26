@@ -95,7 +95,6 @@ export async function submitAttendanceScan(
   const client = getSupabaseClient();
 
   try {
-    // 1. Attempt invoking Supabase Edge Function
     const { data, error } = await client.functions.invoke<RecordAttendanceResponse>(
       'record-attendance',
       {
@@ -107,11 +106,10 @@ export async function submitAttendanceScan(
       return data;
     }
   } catch {
-    // Fall back to direct database insertion
+    // Fall back to direct database execution if edge function is unavailable
   }
 
   try {
-    // 2. Query real student from database
     const { data: studentData, error: studentError } = await client
       .from('students')
       .select('id, lrn, first_name, last_name, middle_name, suffix, section_id')
@@ -137,7 +135,6 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 3. Check for existing attendance in this session or on this date/type
     const { data: existingAttendance } = await client
       .from('attendance')
       .select('*')
@@ -146,35 +143,32 @@ export async function submitAttendanceScan(
       .maybeSingle();
 
     if (existingAttendance) {
-      const existing = existingAttendance as any;
-      const timeStr = new Date(existing.recorded_at).toLocaleTimeString([], {
+      const timeStr = new Date(existingAttendance.recorded_at).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
       });
       return {
         success: false,
         status: 'already_recorded',
-        message: `${student.first_name} ${student.last_name} was already marked ${existing.status.toUpperCase()} at ${timeStr}.`,
+        message: `${student.first_name} ${student.last_name} was already marked ${existingAttendance.status.toUpperCase()} at ${timeStr}.`,
         student,
-        attendance: existing,
+        attendance: existingAttendance,
       };
     }
 
-    // 4. Resolve authenticated teacher ID for recorded_by
     let teacherId = payload.recorded_by;
     if (!teacherId) {
       const { data: { user } } = await client.auth.getUser();
       teacherId = user?.id;
     }
 
-    // If teacherId is still not found, query session owner
     if (!teacherId) {
       const { data: sessionData } = await client
         .from('attendance_sessions')
         .select('teacher_id')
         .eq('id', payload.session_id)
         .maybeSingle();
-      teacherId = (sessionData as any)?.teacher_id;
+      teacherId = sessionData?.teacher_id || undefined;
     }
 
     if (!teacherId) {
@@ -185,13 +179,12 @@ export async function submitAttendanceScan(
       };
     }
 
-    // 5. Determine status based on explicit payload or date/session cutoff
     const scanTime = new Date();
     const finalStatus: AttendanceStatus =
       payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
 
-    // 6. Insert attendance record into Supabase with valid recorded_by
-    const { data: inserted, error: insertError } = await (client.from('attendance') as any)
+    const { data: inserted, error: insertError } = await client
+      .from('attendance')
       .insert({
         student_id: student.id,
         class_id: student.section_id,
@@ -218,9 +211,8 @@ export async function submitAttendanceScan(
       throw new Error(insertError.message);
     }
 
-    // 7. Log audit event
     if (inserted?.id) {
-      await (client.from('attendance_events') as any).insert({
+      await client.from('attendance_events').insert({
         attendance_id: inserted.id,
         student_id: student.id,
         teacher_id: teacherId,
@@ -247,12 +239,13 @@ export async function submitAttendanceScan(
       },
       attendance: inserted,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorObj = err as { message?: string; name?: string };
     const isNetworkError =
       (typeof navigator !== 'undefined' && !navigator.onLine) ||
-      err?.message?.includes('Failed to fetch') ||
-      err?.message?.includes('NetworkError') ||
-      err?.name === 'TypeError';
+      errorObj?.message?.includes('Failed to fetch') ||
+      errorObj?.message?.includes('NetworkError') ||
+      errorObj?.name === 'TypeError';
 
     if (isNetworkError) {
       const cachedStudent = findCachedStudent(payload.class_id, payload.qr_payload);
@@ -286,7 +279,7 @@ export async function submitAttendanceScan(
     return {
       success: false,
       status: 'error',
-      message: err?.message || 'Failed to record attendance scan.',
+      message: errorObj?.message || 'Failed to record attendance scan.',
     };
   }
 }

@@ -8,11 +8,12 @@ export interface SchoolYear {
 }
 
 export interface ClassSection {
-  id: string; // UUID
-  grade_level: number; // e.g. 7, 8, 9, 10, 11, 12
-  section_name: string; // e.g. 'Rizal', 'STEM-A'
-  school_year_id: string; // References school_years.id
-  teacher_id: string; // References profiles.id (teacher)
+  id: string;
+  grade_level: number;
+  section_name: string;
+  room_number?: string | null;
+  school_year_id: string;
+  teacher_id: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -22,3 +23,4 @@ export interface ClassSectionWithDetails extends ClassSection {
   teacher_name?: string;
   student_count?: number;
 }
+

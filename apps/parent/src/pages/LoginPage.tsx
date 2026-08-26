@@ -9,11 +9,9 @@ import { useAppBackButton } from '../hooks/useAppBackButton';
 export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
   
-  // Sign In fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Sign Up fields
   const [fullName, setFullName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');

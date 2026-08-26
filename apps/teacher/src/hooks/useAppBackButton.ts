@@ -20,12 +20,10 @@ export function useAppBackButton(options?: UseAppBackButtonOptions) {
     const setupListener = async () => {
       try {
         listenerHandle = await App.addListener('backButton', async ({ canGoBack }) => {
-          // 1. Custom component callback (e.g. stop active scanner or dismiss custom view)
           if (optionsRef.current?.onCustomBack && optionsRef.current.onCustomBack()) {
             return;
           }
 
-          // 2. Check for open dialogs / modals / overlays in the DOM
           const openModalCloseBtn = document.querySelector<HTMLButtonElement>(
             '[role="dialog"] button[aria-label="Close dialog"], [role="dialog"] button[data-dismiss="modal"]'
           );
@@ -40,7 +38,6 @@ export function useAppBackButton(options?: UseAppBackButtonOptions) {
             return;
           }
 
-          // 3. Navigation: If not on root or login route, navigate back or to root
           const isRootRoute = location.pathname === '/' || location.pathname === '/login';
 
           if (!isRootRoute) {
@@ -52,7 +49,6 @@ export function useAppBackButton(options?: UseAppBackButtonOptions) {
             return;
           }
 
-          // 4. On root route: Double-tap back within 2000ms to exit
           const now = Date.now();
           if (now - lastBackPressRef.current < 2000) {
             await App.exitApp();
@@ -65,12 +61,12 @@ export function useAppBackButton(options?: UseAppBackButtonOptions) {
                 position: 'bottom',
               });
             } catch {
-              // Ignore if toast plugin not supported in browser environment
+              // Toast not supported in web context
             }
           }
         });
       } catch {
-        // App plugin not available in pure browser runtime
+        // App plugin not active in browser runtime
       }
     };
 

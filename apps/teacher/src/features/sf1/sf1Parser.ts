@@ -36,34 +36,30 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
 
-  // Convert worksheet to raw array of rows
-  const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, blankrows: false });
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, blankrows: false });
 
   if (rawRows.length === 0) {
     throw new Error('The uploaded spreadsheet is empty.');
   }
 
-  // Find the header row (typically row with "LRN" or "Learner")
   let headerRowIndex = -1;
   let headers: string[] = [];
 
   for (let r = 0; r < Math.min(rawRows.length, 15); r++) {
     const row = rawRows[r] || [];
-    const rowStr = row.map((cell) => String(cell || '')).join(' ').toUpperCase();
+    const rowStr = row.map((cell) => String(cell ?? '')).join(' ').toUpperCase();
     if (rowStr.includes('LRN') || rowStr.includes('LEARNER') || (rowStr.includes('NAME') && rowStr.includes('SEX'))) {
       headerRowIndex = r;
-      headers = row.map((cell) => String(cell || '').trim());
+      headers = row.map((cell) => String(cell ?? '').trim());
       break;
     }
   }
 
   if (headerRowIndex === -1) {
-    // Default to the very first non-empty row as headers
     headerRowIndex = 0;
-    headers = (rawRows[0] || []).map((cell) => String(cell || '').trim());
+    headers = (rawRows[0] || []).map((cell) => String(cell ?? '').trim());
   }
 
-  // Detect column mapping
   const colLrn = findHeaderMatch(headers, ['lrn', 'learner reference', 'reference number', 'learner no']);
   const colLastName = findHeaderMatch(headers, ['last name', 'surname', 'family name', 'apelyido']);
   const colFirstName = findHeaderMatch(headers, ['first name', 'given name', 'pangalan']);
@@ -78,21 +74,18 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
 
   const records: RawSF1Record[] = [];
 
-  // Parse data rows starting after headerRowIndex
   for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
     const rowArray = rawRows[i] || [];
     if (!rowArray || rowArray.length === 0) continue;
 
-    // Create an object keyed by header names
-    const rowObj: Record<string, any> = {};
+    const rowObj: Record<string, unknown> = {};
     headers.forEach((h, colIdx) => {
       if (h) {
         rowObj[h] = rowArray[colIdx];
       }
     });
 
-    // Extract LRN
-    let lrnValue = String(colLrn ? rowObj[colLrn] || '' : rowArray[0] || '').trim();
+    let lrnValue = String(colLrn ? rowObj[colLrn] ?? '' : rowArray[0] ?? '').trim();
     // Clean non-numeric characters from LRN
     lrnValue = lrnValue.replace(/\D/g, '');
 

@@ -102,14 +102,19 @@ export async function fetchTodayAttendance(
       return defaultStatus;
     }
 
-    const records = (data as any[]).map((r) => ({
+    interface AttendanceJoinRow extends AttendanceRecord {
+      profiles?: {
+        full_name?: string;
+      } | null;
+    }
+
+    const records: AttendanceRecordWithTeacher[] = (data as unknown as AttendanceJoinRow[]).map((r) => ({
       ...r,
       teacher_name: r.profiles?.full_name || 'Class Adviser',
-    })) as AttendanceRecordWithTeacher[];
+    }));
 
     const morning = records.find((r) => r.attendance_type === 'morning') || null;
     const afternoon = records.find((r) => r.attendance_type === 'afternoon') || null;
-    // The latest record is considered primary for overall badge
     const primary = afternoon || morning;
 
     const result: TodayStudentStatus = {

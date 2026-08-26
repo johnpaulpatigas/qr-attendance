@@ -1,9 +1,3 @@
-// ==============================================================================
-// Supabase Edge Function: send-fcm-notification
-// ==============================================================================
-// Dispatches push notifications to registered parent and student device tokens
-// and logs delivery records into notification_logs.
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.4';
 
@@ -20,7 +14,6 @@ interface SendFcmRequest {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -41,7 +34,6 @@ serve(async (req) => {
       );
     }
 
-    // 1. Fetch Student Details
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, first_name, last_name, lrn')
@@ -61,7 +53,6 @@ serve(async (req) => {
       minute: '2-digit',
     });
 
-    // 2. Build Title & Body
     let title = 'Attendance Update';
     let bodyText = `${studentFullName} was marked ${status.toUpperCase()} at ${timeFormatted}.`;
     let notifType = 'attendance_present';
@@ -76,23 +67,21 @@ serve(async (req) => {
       notifType = 'attendance_absent';
     }
 
-    // 3. Find Linked Parents
     const { data: parentLinks } = await supabase
       .from('student_parents')
-      .select('parent_id, parents(user_id)')
+      .select('parent_id, parents(profile_id)')
       .eq('student_id', student_id);
 
     const recipientProfileIds: string[] = [];
 
     if (parentLinks && Array.isArray(parentLinks)) {
-      parentLinks.forEach((link: any) => {
-        if (link.parents?.user_id) {
-          recipientProfileIds.push(link.parents.user_id);
+      parentLinks.forEach((link: { parents?: { profile_id?: string } | null }) => {
+        if (link.parents?.profile_id) {
+          recipientProfileIds.push(link.parents.profile_id);
         }
       });
     }
 
-    // 4. Query Active Device Tokens for parents or student
     let tokenQuery = supabase
       .from('device_tokens')
       .select('profile_id, fcm_token')
@@ -114,7 +103,6 @@ serve(async (req) => {
     if (tokens && tokens.length > 0) {
       for (const tokenItem of tokens) {
         try {
-          // If FCM_SERVER_KEY is configured in Supabase Secrets, dispatch to Google FCM endpoint
           if (fcmServerKey) {
             const fcmResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
               method: 'POST',
@@ -143,7 +131,6 @@ serve(async (req) => {
             }
           }
 
-          // 5. Log Success in notification_logs
           await supabase.from('notification_logs').insert({
             recipient_profile_id: tokenItem.profile_id,
             student_id: student_id,
@@ -157,7 +144,6 @@ serve(async (req) => {
           sentCount++;
         } catch (dispatchErr: unknown) {
           failedCount++;
-          // Log Failure in notification_logs
           await supabase.from('notification_logs').insert({
             recipient_profile_id: tokenItem.profile_id,
             student_id: student_id,

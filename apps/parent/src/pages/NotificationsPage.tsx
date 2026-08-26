@@ -3,13 +3,14 @@ import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-re
 import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, Button } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
 import { fetchStudentNotificationLogs } from '../features/attendance/parentAttendanceService';
+import { requestPushPermissionAndRegister } from '../features/notifications/fcmService';
 import type { NotificationLog } from '@qr-attendance/types';
 
 export const NotificationsPage: React.FC = () => {
-  const { activeChild } = useAuth();
+  const { user, activeChild } = useAuth();
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeChild) return;
@@ -21,12 +22,12 @@ export const NotificationsPage: React.FC = () => {
   }, [activeChild]);
 
   const requestNotificationPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        setPushEnabled(true);
-        alert('Push notifications enabled for your linked student!');
-      }
+    if (!user) return;
+    const token = await requestPushPermissionAndRegister(user.id, activeChild?.student_id);
+    if (token) {
+      setPushStatusMessage('Push notifications enabled for this device.');
+    } else {
+      setPushStatusMessage('Push notifications are not supported or were denied.');
     }
   };
 
@@ -45,7 +46,7 @@ export const NotificationsPage: React.FC = () => {
             </strong>.
           </p>
         </div>
-        {!pushEnabled && (
+        <div>
           <Button
             size="sm"
             variant="primary"
@@ -54,7 +55,10 @@ export const NotificationsPage: React.FC = () => {
           >
             Enable Device Push Alerts
           </Button>
-        )}
+          {pushStatusMessage && (
+            <p className="mt-1 text-xs text-slate-500 text-right">{pushStatusMessage}</p>
+          )}
+        </div>
       </div>
 
       {/* Push Status Banner */}

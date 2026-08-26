@@ -59,8 +59,22 @@ export const ClassesPage: React.FC = () => {
         console.error('Error fetching classes:', error.message);
         setClasses([]);
       } else {
-        const mapped: ClassSectionItem[] = (data || []).map((d: any) => ({
-          ...d,
+        interface ClassSectionJoinRow {
+          id: string;
+          grade_level: number;
+          section_name: string;
+          room_number: string | null;
+          school_year_id: string;
+          school_years?: { name?: string } | null;
+          students?: { id: string }[] | null;
+        }
+
+        const mapped: ClassSectionItem[] = (data as unknown as ClassSectionJoinRow[] || []).map((d) => ({
+          id: d.id,
+          grade_level: d.grade_level,
+          section_name: d.section_name,
+          room_number: d.room_number,
+          school_year_id: d.school_year_id,
           school_year_name: d.school_years?.name || 'Active Year',
           student_count: Array.isArray(d.students) ? d.students.length : 0,
         }));
@@ -89,7 +103,6 @@ export const ClassesPage: React.FC = () => {
     const client = getSupabaseClient();
 
     try {
-      // Find or create active school year
       let syId: string | null = null;
       const { data: activeSy } = await client
         .from('school_years')
@@ -98,7 +111,7 @@ export const ClassesPage: React.FC = () => {
         .maybeSingle();
 
       if (activeSy) {
-        syId = (activeSy as any).id;
+        syId = activeSy.id;
       } else {
         const { data: firstSy } = await client
           .from('school_years')
@@ -107,10 +120,10 @@ export const ClassesPage: React.FC = () => {
           .maybeSingle();
 
         if (firstSy) {
-          syId = (firstSy as any).id;
+          syId = firstSy.id;
         } else {
-          // Insert a school year
-          const { data: newSy, error: syErr } = await (client.from('school_years') as any)
+          const { data: newSy, error: syErr } = await client
+            .from('school_years')
             .insert({
               name: '2026-2027',
               start_date: '2026-08-01',
@@ -125,8 +138,8 @@ export const ClassesPage: React.FC = () => {
         }
       }
 
-      const { error: insertErr } = await (client.from('class_sections') as any).insert({
-        school_year_id: syId,
+      const { error: insertErr } = await client.from('class_sections').insert({
+        school_year_id: syId || '',
         grade_level: Number(gradeLevel),
         section_name: sectionName.trim(),
         room_number: roomNumber.trim() || null,
@@ -141,8 +154,8 @@ export const ClassesPage: React.FC = () => {
       setSectionName('');
       setRoomNumber('');
       loadClasses();
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to create class section.');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create class section.');
     } finally {
       setCreating(false);
     }

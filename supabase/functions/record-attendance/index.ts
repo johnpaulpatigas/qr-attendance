@@ -1,9 +1,3 @@
-// ==============================================================================
-// Supabase Edge Function: record-attendance
-// ==============================================================================
-// Enforces server-side authentication, teacher authorization, enrollment check,
-// duplicate protection, attendance persistence, and audit logging.
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.4';
 
@@ -23,7 +17,6 @@ interface RecordAttendancePayload {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -42,7 +35,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Authenticate Teacher via JWT
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
@@ -53,7 +45,6 @@ serve(async (req) => {
       );
     }
 
-    // 2. Validate Teacher Role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, full_name')
@@ -74,7 +65,6 @@ serve(async (req) => {
     const body: RecordAttendancePayload = await req.json();
     const { qr_payload, class_id, session_id, attendance_date, session_type, status = 'present' } = body;
 
-    // 3. Validate Teacher Class Assignment
     if (profile.role !== 'admin') {
       const { data: classSection, error: classError } = await supabase
         .from('class_sections')
@@ -94,7 +84,6 @@ serve(async (req) => {
       }
     }
 
-    // 4. Parse QR Payload Format
     const QR_PREFIX = 'ATTENDANCE:';
     if (!qr_payload || !qr_payload.startsWith(QR_PREFIX)) {
       return new Response(
@@ -111,7 +100,6 @@ serve(async (req) => {
       );
     }
 
-    // 5. Resolve QR identifier to Student in database
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, lrn, first_name, last_name, middle_name, suffix, section_id')
@@ -125,7 +113,6 @@ serve(async (req) => {
       );
     }
 
-    // 6. Verify Enrollment in selected Class
     if (student.section_id !== class_id) {
       return new Response(
         JSON.stringify({
@@ -145,7 +132,6 @@ serve(async (req) => {
       );
     }
 
-    // 7. Check Existing Attendance (Duplicate Prevention & Idempotency)
     const { data: existingAttendance } = await supabase
       .from('attendance')
       .select('*')
@@ -175,7 +161,6 @@ serve(async (req) => {
       );
     }
 
-    // 8. Create Attendance Record
     const newAttendance = {
       student_id: student.id,
       class_id: class_id,
@@ -201,7 +186,6 @@ serve(async (req) => {
       );
     }
 
-    // 9. Create Audit Event
     await supabase.from('attendance_events').insert({
       attendance_id: attendanceRecord.id,
       student_id: student.id,
@@ -215,7 +199,6 @@ serve(async (req) => {
       },
     });
 
-    // 10. Trigger FCM push notification to linked parents
     try {
       supabase.functions.invoke('send-fcm-notification', {
         body: {
@@ -226,7 +209,7 @@ serve(async (req) => {
         },
       }).catch((e: Error) => console.warn('Background FCM dispatch non-blocking error:', e));
     } catch {
-      // Non-blocking for instant attendance response
+      // Non-blocking notification dispatch
     }
 
     const recordedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

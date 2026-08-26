@@ -20,44 +20,26 @@ export interface SupabaseConfig {
   supabaseAnonKey?: string;
 }
 
-function getSupabaseUrl(configUrl?: string): string {
-  if (configUrl) return configUrl;
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) {
-      return import.meta.env.VITE_SUPABASE_URL;
-    }
-  } catch {
-    // Ignore environment error
+function getEnvVar(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const val = import.meta.env[key];
+    if (typeof val === 'string' && val) return val;
   }
-  try {
-    const g = globalThis as any;
-    if (g.process?.env?.VITE_SUPABASE_URL) {
-      return g.process.env.VITE_SUPABASE_URL;
-    }
-  } catch {
-    // Ignore process error
+  if (typeof process !== 'undefined' && process.env) {
+    const val = process.env[key];
+    if (typeof val === 'string' && val) return val;
   }
   return '';
 }
 
+function getSupabaseUrl(configUrl?: string): string {
+  if (configUrl) return configUrl;
+  return getEnvVar('VITE_SUPABASE_URL');
+}
+
 function getSupabaseAnonKey(configKey?: string): string {
   if (configKey) return configKey;
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-      return import.meta.env.VITE_SUPABASE_ANON_KEY;
-    }
-  } catch {
-    // Ignore environment error
-  }
-  try {
-    const g = globalThis as any;
-    if (g.process?.env?.VITE_SUPABASE_ANON_KEY) {
-      return g.process.env.VITE_SUPABASE_ANON_KEY;
-    }
-  } catch {
-    // Ignore process error
-  }
-  return '';
+  return getEnvVar('VITE_SUPABASE_ANON_KEY');
 }
 
 export function createSupabaseClient(config?: SupabaseConfig): TypedSupabaseClient {

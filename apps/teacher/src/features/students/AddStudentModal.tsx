@@ -53,14 +53,13 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       return;
     }
 
-    // Resolve active school year
     let syId = '';
     const selectedSec = sections.find((s) => s.id === sectionId);
     if (selectedSec?.school_year_id) {
       syId = selectedSec.school_year_id;
     } else {
       const { data: sy } = await client.from('school_years').select('id').limit(1).maybeSingle();
-      syId = (sy as any)?.id || crypto.randomUUID();
+      syId = sy?.id || crypto.randomUUID();
     }
 
     const inputData = {

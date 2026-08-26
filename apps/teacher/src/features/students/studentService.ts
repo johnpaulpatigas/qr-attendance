@@ -45,8 +45,33 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
 
     const { data, error } = await query;
     if (!error && data) {
-      const students: StudentWithSection[] = (data as any[]).map((d) => ({
+      interface StudentJoinRow {
+        id: string;
+        lrn: string;
+        first_name: string;
+        last_name: string;
+        middle_name: string | null;
+        suffix: string | null;
+        sex: 'MALE' | 'FEMALE';
+        birth_date: string;
+        grade_level: number;
+        section_id: string;
+        school_year_id: string;
+        qr_identifier: string;
+        created_at: string;
+        updated_at: string;
+        class_sections?: {
+          section_name?: string;
+        } | null;
+        school_years?: {
+          name?: string;
+        } | null;
+      }
+
+      const students: StudentWithSection[] = (data as unknown as StudentJoinRow[]).map((d) => ({
         ...d,
+        created_at: d.created_at || new Date().toISOString(),
+        updated_at: d.updated_at || new Date().toISOString(),
         section_name: d.class_sections?.section_name || 'Unassigned',
         school_year_name: d.school_years?.name || 'Active Year',
       }));
@@ -69,16 +94,15 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
           );
         }
       } catch {
-        // Ignore
+        // Storage write ignored
       }
 
       return students;
     }
   } catch {
-    // Network offline fallback
+    // Fall back to local storage cache if offline
   }
 
-  // Fallback: Read from local cache
   try {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -95,7 +119,7 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
       return list;
     }
   } catch {
-    // Ignore
+    // Storage read ignored
   }
 
   if (secId && secId !== 'all') {
@@ -134,7 +158,8 @@ export async function createStudent(input: CreateStudentInput): Promise<StudentW
     qr_identifier: qrIdentifier,
   };
 
-  const { data, error } = await (client.from('students') as any)
+  const { data, error } = await client
+    .from('students')
     .insert(newRecord)
     .select(`
       *,
@@ -147,20 +172,42 @@ export async function createStudent(input: CreateStudentInput): Promise<StudentW
     `)
     .single();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to create student');
   }
 
+  interface CreatedStudentJoinRow {
+    id: string;
+    lrn: string;
+    first_name: string;
+    last_name: string;
+    middle_name: string | null;
+    suffix: string | null;
+    sex: 'MALE' | 'FEMALE';
+    birth_date: string;
+    grade_level: number;
+    section_id: string;
+    school_year_id: string;
+    qr_identifier: string;
+    created_at: string;
+    updated_at: string;
+    class_sections?: { section_name?: string } | null;
+    school_years?: { name?: string } | null;
+  }
+
+  const typedData = data as unknown as CreatedStudentJoinRow;
+
   return {
-    ...data,
-    section_name: data.class_sections?.section_name,
-    school_year_name: data.school_years?.name,
-  } as StudentWithSection;
+    ...typedData,
+    section_name: typedData.class_sections?.section_name,
+    school_year_name: typedData.school_years?.name,
+  };
 }
 
 export async function updateStudent(id: string, input: UpdateStudentInput): Promise<void> {
   const client = getSupabaseClient();
-  const { error } = await (client.from('students') as any)
+  const { error } = await client
+    .from('students')
     .update(input)
     .eq('id', id);
 
@@ -172,7 +219,8 @@ export async function updateStudent(id: string, input: UpdateStudentInput): Prom
 export async function regenerateStudentQrIdentifier(id: string): Promise<string> {
   const client = getSupabaseClient();
   const newQr = crypto.randomUUID();
-  const { error } = await (client.from('students') as any)
+  const { error } = await client
+    .from('students')
     .update({ qr_identifier: newQr, updated_at: new Date().toISOString() })
     .eq('id', id);
 

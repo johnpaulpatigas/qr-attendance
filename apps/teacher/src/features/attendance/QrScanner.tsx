@@ -71,14 +71,12 @@ export const QrScanner: React.FC<QrScannerProps> = ({
     if (backCameras.length === 0) return cameras[0].id;
     if (backCameras.length === 1) return backCameras[0].id;
 
-    // 1. Look for explicit main / primary / 1x label
     const explicitMain = backCameras.find((c) => {
       const l = c.label.toLowerCase();
       return l.includes('main') || l.includes('primary') || l.includes('standard') || l.includes('1x');
     });
     if (explicitMain) return explicitMain.id;
 
-    // 2. Filter out any lens with ultra, 0.5, super-wide, macro
     const nonUltraBack = backCameras.filter((c) => {
       const l = c.label.toLowerCase();
       return !l.includes('ultra') && !l.includes('0.5') && !l.includes('wide-angle') && !l.includes('macro');
@@ -86,41 +84,40 @@ export const QrScanner: React.FC<QrScannerProps> = ({
 
     if (nonUltraBack.length === 1) return nonUltraBack[0].id;
 
-    // 3. On Android multi-camera arrays (e.g. camera2 0 = 0.5x, camera2 2 = 1x main)
     const cam2 = backCameras.find((c) => c.label.toLowerCase().includes('camera2 2'));
     if (cam2) return cam2.id;
 
     const cam1Back = backCameras.find((c) => c.label.toLowerCase().includes('camera2 1') && !c.label.toLowerCase().includes('front'));
     if (cam1Back) return cam1Back.id;
 
-    // 4. If nonUltraBack has candidates, pick the last non-ultra camera
     if (nonUltraBack.length > 0) return nonUltraBack[nonUltraBack.length - 1].id;
 
-    // 5. Default to the second back camera (index 1) to avoid camera2 0 ultrawide
     return backCameras[1]?.id || backCameras[0].id;
   };
 
-  // Automatically lock video track strictly to 1.0x standard zoom
   const enforce1xZoom = async () => {
     try {
       const videoEl = document.querySelector(`#${elementId} video`) as HTMLVideoElement;
       if (videoEl && videoEl.srcObject) {
         const stream = videoEl.srcObject as MediaStream;
         const track = stream.getVideoTracks()[0];
-        if (track && track.getCapabilities) {
-          const caps = track.getCapabilities() as any;
+        if (track && typeof track.getCapabilities === 'function') {
+          interface ZoomCapabilities extends MediaTrackCapabilities {
+            zoom?: { min?: number; max?: number };
+          }
+          const caps = track.getCapabilities() as ZoomCapabilities;
           if (caps && caps.zoom) {
             const min = caps.zoom.min || 1;
             const targetZoom = Math.max(1.0, min);
 
-            await (track as any).applyConstraints({
-              advanced: [{ zoom: targetZoom }],
+            await track.applyConstraints({
+              advanced: [{ zoom: targetZoom } as MediaTrackConstraintSet],
             });
           }
         }
       }
     } catch {
-      // Ignore if browser doesn't support track constraint
+      // Browser constraint not supported
     }
   };
 

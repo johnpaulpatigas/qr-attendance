@@ -2,6 +2,7 @@ import { getSupabaseClient } from '@qr-attendance/supabase';
 import type {
   AttendanceSession,
   AttendanceSummary,
+  AttendanceRecord,
   AttendanceRecordWithStudent,
   ClassSectionWithDetails,
   SessionType,
@@ -29,8 +30,28 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
       .order('grade_level', { ascending: false });
 
     if (!error && data && data.length > 0) {
-      const sections: ClassSectionWithDetails[] = (data as any[]).map((d) => ({
-        ...d,
+      interface SectionJoinRow {
+        id: string;
+        grade_level: number;
+        section_name: string;
+        room_number: string | null;
+        school_year_id: string;
+        teacher_id: string | null;
+        created_at: string;
+        updated_at: string;
+        school_years?: { name: string } | null;
+        students?: { id: string }[] | null;
+      }
+
+      const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map((d) => ({
+        id: d.id,
+        grade_level: d.grade_level,
+        section_name: d.section_name,
+        room_number: d.room_number,
+        school_year_id: d.school_year_id,
+        teacher_id: d.teacher_id,
+        created_at: d.created_at,
+        updated_at: d.updated_at,
         school_year_name: d.school_years?.name || 'Active SY',
         student_count: Array.isArray(d.students) ? d.students.length : 0,
       }));
@@ -38,20 +59,20 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
       try {
         localStorage.setItem(SECTIONS_CACHE_KEY, JSON.stringify(sections));
       } catch {
-        // Ignore
+        // Storage write ignored
       }
 
       return sections;
     }
   } catch {
-    // Network offline fallback
+    // Fall back to local storage cache if offline
   }
 
   try {
     const cached = localStorage.getItem(SECTIONS_CACHE_KEY);
     if (cached) return JSON.parse(cached) as ClassSectionWithDetails[];
   } catch {
-    // Ignore
+    // Storage read ignored
   }
 
   return [];
@@ -67,7 +88,6 @@ export async function getOrCreateAttendanceSession(
   const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}`;
 
   try {
-    // Check for existing session on DB
     const { data: existing, error: findError } = await client
       .from('attendance_sessions')
       .select('*')
@@ -77,12 +97,11 @@ export async function getOrCreateAttendanceSession(
       .maybeSingle();
 
     if (!findError && existing) {
-      const session = existing as unknown as AttendanceSession;
+      const session = existing;
       localStorage.setItem(cacheKey, JSON.stringify(session));
       return session;
     }
 
-    // Create new session in database
     const newSession = {
       class_id: classId,
       teacher_id: teacherId,
@@ -91,14 +110,14 @@ export async function getOrCreateAttendanceSession(
       started_at: new Date().toISOString(),
     };
 
-    const { data: created, error: createError } = await (client
-      .from('attendance_sessions') as any)
+    const { data: created, error: createError } = await client
+      .from('attendance_sessions')
       .insert(newSession)
       .select()
       .maybeSingle();
 
     if (!createError && created) {
-      const session = created as unknown as AttendanceSession;
+      const session = created;
       localStorage.setItem(cacheKey, JSON.stringify(session));
       return session;
     }
@@ -158,21 +177,32 @@ export async function fetchSessionRecords(
       .order('recorded_at', { ascending: false });
 
     if (!error && data) {
-      const records: AttendanceRecordWithStudent[] = (data as any[]).map((d) => ({
+      interface AttendanceRecordJoinRow extends AttendanceRecord {
+        students?: {
+          id: string;
+          lrn: string;
+          first_name: string;
+          last_name: string;
+          middle_name: string | null;
+          suffix: string | null;
+        } | null;
+      }
+
+      const records: AttendanceRecordWithStudent[] = (data as unknown as AttendanceRecordJoinRow[]).map((d) => ({
         ...d,
-        student: d.students,
+        student: d.students || undefined,
       }));
 
       try {
         localStorage.setItem(cacheKey, JSON.stringify(records));
       } catch {
-        // Ignore
+        // Storage write ignored
       }
 
       return records;
     }
   } catch {
-    // Network offline fallback
+    // Fall back to local storage cache if offline
   }
 
   try {

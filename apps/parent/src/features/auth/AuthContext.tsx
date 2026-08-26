@@ -69,7 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProfileAndChildren = async (userId: string, email?: string) => {
     try {
-      // 1. Resolve profile
       try {
         const p = await getCurrentUserProfile(client, userId);
         if (p) {
@@ -88,12 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(fallbackProfile));
         }
       } catch {
-        // Use cached profile
         const cached = localStorage.getItem(PARENT_PROFILE_KEY);
         if (cached) setProfile(JSON.parse(cached));
       }
 
-      // 2. Fetch real linked children from student_parents table
       const { data: parentRecord } = await client
         .from('parents')
         .select('id')
@@ -101,7 +98,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (parentRecord) {
-        const parentId = (parentRecord as any).id;
         const { data: relations } = await client
           .from('student_parents')
           .select(`
@@ -120,12 +116,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               )
             )
           `)
-          .eq('parent_id', parentId);
+          .eq('parent_id', parentRecord.id);
 
         if (relations && relations.length > 0) {
-          const children: LinkedStudent[] = (relations as any[])
-            .filter((rel: any) => rel.students)
-            .map((rel: any) => ({
+          interface StudentParentJoinRow {
+            relationship: string;
+            is_primary: boolean;
+            students: {
+              id: string;
+              lrn: string;
+              first_name: string;
+              last_name: string;
+              middle_name: string | null;
+              suffix: string | null;
+              grade_level: number;
+              class_sections?: {
+                section_name: string;
+              } | null;
+            } | null;
+          }
+
+          const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
+            .filter((rel): rel is StudentParentJoinRow & { students: NonNullable<StudentParentJoinRow['students']> } => Boolean(rel.students))
+            .map((rel) => ({
               student_id: rel.students.id,
               lrn: rel.students.lrn,
               first_name: rel.students.first_name,
@@ -154,16 +167,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const cachedChildren = localStorage.getItem(PARENT_CHILDREN_KEY);
         if (cachedChildren) {
-          const children = JSON.parse(cachedChildren);
+          const children = JSON.parse(cachedChildren) as LinkedStudent[];
           setLinkedChildren(children);
           if (children.length > 0) {
             setActiveChildId((prev) =>
-              prev && children.some((c: any) => c.student_id === prev) ? prev : children[0].student_id
+              prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
             );
           }
         }
       } catch {
-        // Ignore
+        // Cached read error ignored
       }
     }
   };
@@ -223,12 +236,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const trimmedLrn = params.studentLrn.trim();
 
-      // 1. Check student via public RPC
       try {
-        const { data: verifyRes, error: verifyErr } = await (client as any).rpc(
-          'verify_student_lrn',
-          { target_lrn: trimmedLrn }
-        );
+        const { data: verifyRes, error: verifyErr } = await client.rpc('verify_student_lrn', {
+          target_lrn: trimmedLrn,
+        });
         if (!verifyErr && verifyRes && verifyRes.exists === false) {
           return {
             error: new Error(
@@ -237,10 +248,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         }
       } catch {
-        // Fall back gracefully
+        // Continue if verification RPC is unreachable
       }
 
-      // 2. Register user in Supabase Auth with student_lrn metadata for atomic trigger execution
       const { data: authData, error: signUpError } = await client.auth.signUp({
         email: params.email.trim(),
         password: params.password,
@@ -256,7 +266,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (signUpError) return { error: signUpError };
 
-      // 3. If session is not automatically created (e.g. Supabase requires sign-in), attempt sign-in
       if (!authData.session) {
         const { data: signInData, error: signInErr } = await client.auth.signInWithPassword({
           email: params.email.trim(),
@@ -267,7 +276,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await loadProfileAndChildren(signInData.user.id, params.email.trim());
           return { error: null, emailConfirmationRequired: false };
         } else if (signInErr) {
-          // If email confirmation is required by Supabase project settings
           return { error: null, emailConfirmationRequired: true };
         }
       }
@@ -295,8 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const trimmedLrn = studentLrn.trim();
 
-      // Attempt RPC
-      const { data: rpcRes, error: rpcErr } = await (client as any).rpc('link_student_to_parent', {
+      const { data: rpcRes, error: rpcErr } = await client.rpc('link_student_to_parent', {
         target_lrn: trimmedLrn,
         relation_name: relationship,
       });
@@ -305,12 +312,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const res = rpcRes as { success: boolean; message: string };
         if (res.success) {
           await loadProfileAndChildren(user.id, user.email);
-          return res;
         }
         return res;
       }
 
-      // Direct fallback
       const { data: student, error: studentError } = await client
         .from('students')
         .select('id, first_name, last_name')
@@ -332,9 +337,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (existingParent) {
-        parentId = (existingParent as any).id;
+        parentId = existingParent.id;
       } else {
-        const { data: newParent, error: parentErr } = await (client.from('parents') as any)
+        const { data: newParent, error: parentErr } = await client
+          .from('parents')
           .insert({ profile_id: user.id })
           .select('id')
           .single();
@@ -343,9 +349,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         parentId = newParent.id;
       }
 
-      await (client.from('student_parents') as any).upsert(
+      const { error: linkErr } = await client.from('student_parents').upsert(
         {
-          student_id: (student as any).id,
+          student_id: student.id,
           parent_id: parentId,
           relationship,
           is_primary: true,
@@ -353,16 +359,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         { onConflict: 'student_id,parent_id' }
       );
 
+      if (linkErr) throw new Error(linkErr.message);
+
       await loadProfileAndChildren(user.id, user.email);
-      const studentName = `${(student as any).first_name} ${(student as any).last_name}`;
+      const studentName = `${student.first_name} ${student.last_name}`;
       return {
         success: true,
         message: `Student ${studentName} successfully linked to your account.`,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         success: false,
-        message: err?.message || 'Failed to link student record.',
+        message: err instanceof Error ? err.message : 'Failed to link student record.',
       };
     }
   };

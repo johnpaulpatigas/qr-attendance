@@ -46,7 +46,6 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
       const client = getSupabaseClient();
       const studentId = selectedStudentId || students[0]?.id;
 
-      // Upsert attendance record
       const attendanceData = {
         student_id: studentId,
         class_id: classId,
@@ -54,13 +53,14 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         attendance_date: attendanceDate,
         attendance_type: sessionType,
         status: status,
-        recorded_by: user?.id || null,
-        source: 'manual',
+        recorded_by: user?.id || '',
+        source: 'manual' as const,
         notes: reason.trim(),
         recorded_at: new Date().toISOString(),
       };
 
-      const { data: record, error: attError } = await (client.from('attendance') as any)
+      const { data: record, error: attError } = await client
+        .from('attendance')
         .upsert(attendanceData, { onConflict: 'student_id,attendance_session_id' })
         .select()
         .single();
@@ -69,9 +69,8 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         throw new Error(attError.message);
       }
 
-      // Record Audit Event
       if (record?.id) {
-        await (client.from('attendance_events') as any).insert({
+        await client.from('attendance_events').insert({
           attendance_id: record.id,
           student_id: studentId,
           teacher_id: user?.id || null,
@@ -88,8 +87,8 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
       onRecordUpdated();
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update attendance record.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update attendance record.');
     } finally {
       setIsLoading(false);
     }

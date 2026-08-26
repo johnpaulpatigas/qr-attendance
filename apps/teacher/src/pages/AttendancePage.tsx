@@ -47,12 +47,13 @@ import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceMo
 import { useAuth } from '../features/auth/AuthContext';
 import { getUtc8DateString } from '@qr-attendance/validation';
 
-// Synthesize pleasant success / warning audio chime via Web Audio API
 function playScanTone(type: 'success' | 'duplicate' | 'error') {
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -199,11 +200,11 @@ export const AttendancePage: React.FC = () => {
           message: `Synced ${syncResult.synced} scan(s) successfully (${syncResult.duplicates} already up to date).`,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFeedback({
         type: 'error',
         title: 'Sync Incomplete',
-        message: err?.message || 'Failed to sync all queued scans. Will retry automatically.',
+        message: err instanceof Error ? err.message : 'Failed to sync all queued scans. Will retry automatically.',
       });
     } finally {
       setIsSyncing(false);

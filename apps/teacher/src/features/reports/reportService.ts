@@ -74,7 +74,7 @@ export async function fetchDailyReport(
 
     const attMap = new Map<string, AttendanceRecord>();
     if (attendance && Array.isArray(attendance)) {
-      attendance.forEach((a: any) => {
+      attendance.forEach((a) => {
         attMap.set(a.student_id, a);
       });
     }
@@ -104,17 +104,15 @@ export async function generateSF2Report(
 ): Promise<SF2ReportData> {
   const client = getSupabaseClient();
 
-  // Determine weekdays in month
   const daysInMonth = new Date(year, month, 0).getDate();
   const schoolDays: number[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const dayOfWeek = new Date(year, month - 1, d).getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Exclude Sun (0) and Sat (6)
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       schoolDays.push(d);
     }
   }
 
-  // Fetch real students from database for class
   let students: StudentWithSection[] = [];
   let sectionName = 'Unassigned';
   let gradeLevel = 10;
@@ -137,7 +135,31 @@ export async function generateSF2Report(
       .order('last_name', { ascending: true });
 
     if (!error && data && data.length > 0) {
-      students = (data as any[]).map((d) => ({
+      interface SF2StudentJoinRow {
+        id: string;
+        lrn: string;
+        first_name: string;
+        last_name: string;
+        middle_name: string | null;
+        suffix: string | null;
+        sex: 'MALE' | 'FEMALE';
+        birth_date: string;
+        grade_level: number;
+        section_id: string;
+        school_year_id: string;
+        qr_identifier: string;
+        created_at: string;
+        updated_at: string;
+        class_sections?: {
+          section_name?: string;
+          grade_level?: number;
+        } | null;
+        school_years?: {
+          name?: string;
+        } | null;
+      }
+
+      students = (data as unknown as SF2StudentJoinRow[]).map((d) => ({
         ...d,
         section_name: d.class_sections?.section_name || 'Section',
         school_year_name: d.school_years?.name || '2026-2027',
@@ -150,7 +172,6 @@ export async function generateSF2Report(
     console.warn('Could not fetch students for SF2:', err);
   }
 
-  // Fetch real attendance records for the entire month
   const startStr = `${year}-${String(month).padStart(2, '0')}-01`;
   const endStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
@@ -164,9 +185,11 @@ export async function generateSF2Report(
       .lte('attendance_date', endStr);
 
     if (attData && Array.isArray(attData)) {
-      attData.forEach((a: any) => {
+      attData.forEach((a) => {
         const day = Number(a.attendance_date.split('-')[2]);
-        attKeyMap.set(`${a.student_id}_${day}`, a.status);
+        if (a.status === 'present' || a.status === 'late' || a.status === 'absent') {
+          attKeyMap.set(`${a.student_id}_${day}`, a.status);
+        }
       });
     }
   } catch (err) {

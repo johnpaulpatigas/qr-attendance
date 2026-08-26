@@ -206,7 +206,6 @@ export async function syncOfflineQueue(
     item.status = "syncing";
 
     try {
-      // 0. Ensure server session ID exists if this was created offline
       if (!item.payload.session_id || item.payload.session_id.startsWith("offline_sess_")) {
         try {
           const { data: serverSession } = await client
@@ -218,12 +217,13 @@ export async function syncOfflineQueue(
             .maybeSingle();
 
           if (serverSession) {
-            item.payload.session_id = (serverSession as any).id;
+            item.payload.session_id = serverSession.id;
           } else {
-            const { data: newSess } = await (client.from("attendance_sessions") as any)
+            const { data: newSess } = await client
+              .from("attendance_sessions")
               .insert({
                 class_id: item.payload.class_id,
-                teacher_id: item.payload.recorded_by,
+                teacher_id: item.payload.recorded_by || '',
                 attendance_date: item.payload.attendance_date,
                 session_type: item.payload.session_type,
                 started_at: item.scanned_at || new Date().toISOString(),
@@ -233,11 +233,10 @@ export async function syncOfflineQueue(
             if (newSess) item.payload.session_id = newSess.id;
           }
         } catch {
-          // If network error during session resolution, treat as network pause
+          // Session resolution network error
         }
       }
 
-      // 1. Try Edge Function
       const { data, error } = await client.functions.invoke<RecordAttendanceResponse>(
         "record-attendance",
         { body: item.payload }
@@ -257,7 +256,6 @@ export async function syncOfflineQueue(
           continue;
         }
       } else {
-        // Fallback: Check if record is already on DB or try direct insertion
         const parsedQr = parseQrPayload(item.payload.qr_payload);
         if (parsedQr.success && parsedQr.identifier) {
           const { data: studentData } = await client
@@ -268,14 +266,14 @@ export async function syncOfflineQueue(
 
           const student = studentData as { id: string; section_id: string } | null;
           if (student) {
-            const { error: insertError } = await (client.from("attendance") as any).insert({
+            const { error: insertError } = await client.from("attendance").insert({
               student_id: student.id,
               class_id: item.payload.class_id || student.section_id,
               attendance_session_id: item.payload.session_id,
               attendance_date: item.payload.attendance_date,
               attendance_type: item.payload.session_type,
               status: item.payload.status || "present",
-              recorded_by: item.payload.recorded_by,
+              recorded_by: item.payload.recorded_by || '',
               recorded_at: item.scanned_at,
               source: "qr_scan",
             });
@@ -296,11 +294,12 @@ export async function syncOfflineQueue(
       if (onProgress) {
         onProgress(summary.synced + summary.duplicates + summary.failed, summary.total);
       }
-    } catch (syncErr: any) {
+    } catch (syncErr: unknown) {
+      const errObj = syncErr as { message?: string };
       const isNetworkError =
         (typeof navigator !== "undefined" && !navigator.onLine) ||
-        syncErr?.message?.includes("Failed to fetch") ||
-        syncErr?.message?.includes("NetworkError");
+        errObj?.message?.includes("Failed to fetch") ||
+        errObj?.message?.includes("NetworkError");
 
       if (isNetworkError) {
         item.status = "pending";
@@ -309,12 +308,13 @@ export async function syncOfflineQueue(
         break;
       }
 
+      const msg = errObj?.message || "Sync failed";
       item.status = "failed";
       item.retry_count = (item.retry_count || 0) + 1;
-      item.last_error = syncErr?.message || "Sync failed";
+      item.last_error = msg;
       remainingQueue.push(item);
       summary.failed++;
-      summary.errors.push(`${item.student_name || "Student"}: ${syncErr?.message || "Sync failed"}`);
+      summary.errors.push(`${item.student_name || "Student"}: ${msg}`);
     }
   }
 

@@ -70,7 +70,15 @@ export const DashboardPage: React.FC = () => {
           `)
           .order('grade_level', { ascending: true });
 
-        const mappedClasses: DashboardClass[] = (sectionData || []).map((s: any) => ({
+        interface SectionJoinRow {
+          id: string;
+          grade_level: number;
+          section_name: string;
+          room_number: string | null;
+          students?: { id: string }[] | null;
+        }
+
+        const mappedClasses: DashboardClass[] = ((sectionData as unknown as SectionJoinRow[]) || []).map((s) => ({
           id: s.id,
           grade_level: s.grade_level,
           section_name: s.section_name,
@@ -80,7 +88,6 @@ export const DashboardPage: React.FC = () => {
 
         setClasses(mappedClasses);
 
-        // 2. Fetch today's total enrolled students
         let studentQuery = client.from('students').select('id, section_id');
         if (selectedClassId !== 'all') {
           studentQuery = studentQuery.eq('section_id', selectedClassId);
@@ -88,7 +95,6 @@ export const DashboardPage: React.FC = () => {
         const { data: enrolledStudents } = await studentQuery;
         const totalEnrolled = enrolledStudents?.length || 0;
 
-        // 3. Fetch today's attendance records (UTC+8)
         const todayStr = getUtc8DateString();
         let attendanceQuery = client
           .from('attendance')
@@ -113,17 +119,30 @@ export const DashboardPage: React.FC = () => {
 
         const { data: attRecords } = await attendanceQuery;
 
+        interface DashboardAttRow {
+          id: string;
+          student_id: string;
+          status: 'present' | 'late' | 'absent' | 'excused';
+          recorded_at: string;
+          class_id: string;
+          students?: {
+            first_name: string;
+            last_name: string;
+            lrn: string;
+          } | null;
+        }
+
+        const typedAttRecords = (attRecords as unknown as DashboardAttRow[]) || [];
+
         let present = 0;
         let late = 0;
         let absent = 0;
 
-        if (attRecords && Array.isArray(attRecords)) {
-          attRecords.forEach((r: any) => {
-            if (r.status === 'present') present++;
-            else if (r.status === 'late') late++;
-            else if (r.status === 'absent') absent++;
-          });
-        }
+        typedAttRecords.forEach((r) => {
+          if (r.status === 'present') present++;
+          else if (r.status === 'late') late++;
+          else if (r.status === 'absent') absent++;
+        });
 
         const recordedCount = present + late + absent;
         const unrecorded = Math.max(0, totalEnrolled - recordedCount);
@@ -138,9 +157,8 @@ export const DashboardPage: React.FC = () => {
           attendanceRate: rate,
         });
 
-        // 4. Map Recent Scans
-        if (attRecords && Array.isArray(attRecords)) {
-          const scans: RecentScan[] = attRecords.slice(0, 5).map((r: any) => ({
+        if (typedAttRecords.length > 0) {
+          const scans: RecentScan[] = typedAttRecords.slice(0, 5).map((r) => ({
             id: r.id,
             student_name: r.students ? `${r.students.first_name} ${r.students.last_name}` : 'Student',
             lrn: r.students?.lrn || '',

@@ -14,7 +14,6 @@ export function useNetworkStatus(): NetworkStatus {
   const [queuedCount, setQueuedCount] = useState<number>(() => getQueuedCount());
 
   useEffect(() => {
-    // 1. Initial Capacitor network check
     Network.getStatus()
       .then((status) => {
         setIsOnline(status.connected);
@@ -23,12 +22,10 @@ export function useNetworkStatus(): NetworkStatus {
         setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
       });
 
-    // 2. Listen to Capacitor native network changes (instant on Android)
     const handlerPromise = Network.addListener('networkStatusChange', (status) => {
       setIsOnline(status.connected);
     });
 
-    // 3. Browser event fallback
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);

@@ -1,17 +1,3 @@
-import {
-  UserProfile,
-  Student,
-  Parent,
-  StudentParent,
-  SchoolYear,
-  ClassSection,
-  AttendanceSession,
-  AttendanceRecord,
-  AttendanceEvent,
-  DeviceToken,
-  NotificationLog,
-} from '@qr-attendance/types';
-
 export type Json =
   | string
   | number
@@ -20,105 +6,465 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: UserProfile;
-        Insert: Omit<UserProfile, 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          role: 'teacher' | 'admin' | 'parent' | 'student';
+          full_name: string;
+          email?: string;
+          avatar_url?: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          role: 'teacher' | 'admin' | 'parent' | 'student';
+          full_name: string;
+          email?: string;
+          avatar_url?: string;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<UserProfile, 'id'>>;
+        Update: {
+          id?: string;
+          role?: 'teacher' | 'admin' | 'parent' | 'student';
+          full_name?: string;
+          email?: string;
+          avatar_url?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       students: {
-        Row: Student;
-        Insert: Omit<Student, 'id' | 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          lrn: string;
+          last_name: string;
+          first_name: string;
+          middle_name: string | null;
+          suffix: string | null;
+          sex: 'MALE' | 'FEMALE';
+          birth_date: string;
+          grade_level: number;
+          section_id: string;
+          school_year_id: string;
+          qr_identifier: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
           id?: string;
+          lrn: string;
+          last_name: string;
+          first_name: string;
+          middle_name?: string | null;
+          suffix?: string | null;
+          sex: 'MALE' | 'FEMALE';
+          birth_date: string;
+          grade_level: number;
+          section_id: string;
+          school_year_id: string;
+          qr_identifier?: string;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<Student, 'id'>>;
+        Update: {
+          id?: string;
+          lrn?: string;
+          last_name?: string;
+          first_name?: string;
+          middle_name?: string | null;
+          suffix?: string | null;
+          sex?: 'MALE' | 'FEMALE';
+          birth_date?: string;
+          grade_level?: number;
+          section_id?: string;
+          school_year_id?: string;
+          qr_identifier?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       parents: {
-        Row: Parent;
-        Insert: Omit<Parent, 'id' | 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          profile_id: string;
+          contact_information: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
           id?: string;
+          profile_id: string;
+          contact_information?: Json;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<Parent, 'id'>>;
+        Update: {
+          id?: string;
+          profile_id?: string;
+          contact_information?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       student_parents: {
-        Row: StudentParent;
-        Insert: StudentParent;
-        Update: Partial<StudentParent>;
+        Row: {
+          student_id: string;
+          parent_id: string;
+          relationship: string;
+          is_primary: boolean;
+          created_at: string;
+        };
+        Insert: {
+          student_id: string;
+          parent_id: string;
+          relationship?: string;
+          is_primary?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          student_id?: string;
+          parent_id?: string;
+          relationship?: string;
+          is_primary?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       school_years: {
-        Row: SchoolYear;
-        Insert: Omit<SchoolYear, 'id' | 'created_at'> & {
+        Row: {
+          id: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
           id?: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          is_active?: boolean;
           created_at?: string;
         };
-        Update: Partial<Omit<SchoolYear, 'id'>>;
+        Update: {
+          id?: string;
+          name?: string;
+          start_date?: string;
+          end_date?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       class_sections: {
-        Row: ClassSection;
-        Insert: Omit<ClassSection, 'id' | 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          grade_level: number;
+          section_name: string;
+          room_number: string | null;
+          school_year_id: string;
+          teacher_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
           id?: string;
+          grade_level: number;
+          section_name: string;
+          room_number?: string | null;
+          school_year_id: string;
+          teacher_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<ClassSection, 'id'>>;
+        Update: {
+          id?: string;
+          grade_level?: number;
+          section_name?: string;
+          room_number?: string | null;
+          school_year_id?: string;
+          teacher_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       attendance_sessions: {
-        Row: AttendanceSession;
-        Insert: Omit<AttendanceSession, 'id' | 'created_at'> & {
+        Row: {
+          id: string;
+          class_id: string;
+          teacher_id: string;
+          attendance_date: string;
+          session_type: 'morning' | 'afternoon';
+          started_at: string;
+          ended_at: string | null;
+          created_at: string;
+        };
+        Insert: {
           id?: string;
+          class_id: string;
+          teacher_id: string;
+          attendance_date: string;
+          session_type: 'morning' | 'afternoon';
+          started_at?: string;
+          ended_at?: string | null;
           created_at?: string;
         };
-        Update: Partial<Omit<AttendanceSession, 'id'>>;
+        Update: {
+          id?: string;
+          class_id?: string;
+          teacher_id?: string;
+          attendance_date?: string;
+          session_type?: 'morning' | 'afternoon';
+          started_at?: string;
+          ended_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       attendance: {
-        Row: AttendanceRecord;
-        Insert: Omit<AttendanceRecord, 'id' | 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          student_id: string;
+          class_id: string;
+          attendance_session_id: string;
+          attendance_date: string;
+          attendance_type: 'morning' | 'afternoon';
+          status: 'present' | 'late' | 'absent' | 'excused';
+          recorded_at: string;
+          recorded_by: string;
+          source: 'qr_scan' | 'manual' | 'import' | 'correction';
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
           id?: string;
+          student_id: string;
+          class_id: string;
+          attendance_session_id: string;
+          attendance_date: string;
+          attendance_type: 'morning' | 'afternoon';
+          status: 'present' | 'late' | 'absent' | 'excused';
+          recorded_at?: string;
+          recorded_by: string;
+          source?: 'qr_scan' | 'manual' | 'import' | 'correction';
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<AttendanceRecord, 'id'>>;
+        Update: {
+          id?: string;
+          student_id?: string;
+          class_id?: string;
+          attendance_session_id?: string;
+          attendance_date?: string;
+          attendance_type?: 'morning' | 'afternoon';
+          status?: 'present' | 'late' | 'absent' | 'excused';
+          recorded_at?: string;
+          recorded_by?: string;
+          source?: 'qr_scan' | 'manual' | 'import' | 'correction';
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       attendance_events: {
-        Row: AttendanceEvent;
-        Insert: Omit<AttendanceEvent, 'id' | 'timestamp'> & {
-          id?: string;
-          timestamp?: string;
+        Row: {
+          id: string;
+          attendance_id: string;
+          student_id: string;
+          teacher_id: string | null;
+          event_type:
+            | 'scanned'
+            | 'marked_present'
+            | 'marked_late'
+            | 'marked_absent'
+            | 'marked_excused'
+            | 'corrected'
+            | 'deleted';
+          timestamp: string;
+          metadata: Json;
         };
-        Update: Partial<Omit<AttendanceEvent, 'id'>>;
+        Insert: {
+          id?: string;
+          attendance_id: string;
+          student_id: string;
+          teacher_id: string | null;
+          event_type:
+            | 'scanned'
+            | 'marked_present'
+            | 'marked_late'
+            | 'marked_absent'
+            | 'marked_excused'
+            | 'corrected'
+            | 'deleted';
+          timestamp?: string;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          attendance_id?: string;
+          student_id?: string;
+          teacher_id?: string | null;
+          event_type?:
+            | 'scanned'
+            | 'marked_present'
+            | 'marked_late'
+            | 'marked_absent'
+            | 'marked_excused'
+            | 'corrected'
+            | 'deleted';
+          timestamp?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
       };
       device_tokens: {
-        Row: DeviceToken;
-        Insert: Omit<DeviceToken, 'id' | 'created_at' | 'updated_at'> & {
+        Row: {
+          id: string;
+          profile_id: string;
+          student_id: string | null;
+          parent_id: string | null;
+          fcm_token: string;
+          platform: 'web' | 'android' | 'ios';
+          device_name: string | null;
+          is_active: boolean;
+          last_seen_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
           id?: string;
+          profile_id: string;
+          student_id?: string | null;
+          parent_id?: string | null;
+          fcm_token: string;
+          platform?: 'web' | 'android' | 'ios';
+          device_name?: string | null;
+          is_active?: boolean;
+          last_seen_at?: string;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Omit<DeviceToken, 'id'>>;
+        Update: {
+          id?: string;
+          profile_id?: string;
+          student_id?: string | null;
+          parent_id?: string | null;
+          fcm_token?: string;
+          platform?: 'web' | 'android' | 'ios';
+          device_name?: string | null;
+          is_active?: boolean;
+          last_seen_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       notification_logs: {
-        Row: NotificationLog;
-        Insert: Omit<NotificationLog, 'id' | 'created_at'> & {
+        Row: {
+          id: string;
+          recipient_profile_id: string;
+          student_id: string;
+          attendance_id: string | null;
+          notification_type:
+            | 'attendance_present'
+            | 'attendance_late'
+            | 'attendance_absent'
+            | 'general';
+          status: 'pending' | 'sent' | 'failed';
+          fcm_token: string | null;
+          error_message: string | null;
+          sent_at: string | null;
+          created_at: string;
+        };
+        Insert: {
           id?: string;
+          recipient_profile_id: string;
+          student_id: string;
+          attendance_id?: string | null;
+          notification_type:
+            | 'attendance_present'
+            | 'attendance_late'
+            | 'attendance_absent'
+            | 'general';
+          status?: 'pending' | 'sent' | 'failed';
+          fcm_token?: string | null;
+          error_message?: string | null;
+          sent_at?: string | null;
           created_at?: string;
         };
-        Update: Partial<Omit<NotificationLog, 'id'>>;
+        Update: {
+          id?: string;
+          recipient_profile_id?: string;
+          student_id?: string;
+          attendance_id?: string | null;
+          notification_type?:
+            | 'attendance_present'
+            | 'attendance_late'
+            | 'attendance_absent'
+            | 'general';
+          status?: 'pending' | 'sent' | 'failed';
+          fcm_token?: string | null;
+          error_message?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      verify_student_lrn: {
+        Args: {
+          target_lrn: string;
+        };
+        Returns: {
+          exists: boolean;
+          student_name?: string;
+          grade_level?: number;
+          section_name?: string;
+        };
+      };
+      link_student_to_parent: {
+        Args: {
+          target_lrn: string;
+          relation_name?: string;
+        };
+        Returns: {
+          success: boolean;
+          message: string;
+          student_id?: string;
+          student_name?: string;
+        };
+      };
+      is_parent_of_student: {
+        Args: {
+          target_student_id: string;
+        };
+        Returns: boolean;
+      };
+      is_teacher: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
     };
     Enums: {
       user_role: 'teacher' | 'admin' | 'parent' | 'student';
@@ -132,4 +478,4 @@ export interface Database {
         | 'general';
     };
   };
-}
+};

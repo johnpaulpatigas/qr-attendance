@@ -15,8 +15,8 @@ export async function registerDeviceToken(params: RegisterTokenParams): Promise<
     const tokenRecord = {
       profile_id: params.profileId,
       fcm_token: params.fcmToken,
-      platform: params.platform || 'web',
-      device_name: params.deviceName || navigator.userAgent.slice(0, 80),
+      platform: params.platform || ('web' as const),
+      device_name: params.deviceName || (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 80) : 'Browser'),
       student_id: params.studentId || null,
       parent_id: params.parentId || null,
       is_active: true,
@@ -24,12 +24,12 @@ export async function registerDeviceToken(params: RegisterTokenParams): Promise<
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await (client.from('device_tokens') as any).upsert(tokenRecord, {
+    const { error } = await client.from('device_tokens').upsert(tokenRecord, {
       onConflict: 'fcm_token',
     });
 
     if (error) {
-      console.warn('Could not register device token in Supabase (offline/local mode):', error.message);
+      console.warn('Could not register device token in Supabase:', error.message);
       return false;
     }
     return true;
@@ -42,7 +42,8 @@ export async function registerDeviceToken(params: RegisterTokenParams): Promise<
 export async function deactivateDeviceToken(fcmToken: string): Promise<void> {
   const client = getSupabaseClient();
   try {
-    await (client.from('device_tokens') as any)
+    await client
+      .from('device_tokens')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('fcm_token', fcmToken);
   } catch (err) {
@@ -54,20 +55,19 @@ export async function requestPushPermissionAndRegister(
   profileId: string,
   studentId?: string
 ): Promise<string | null> {
-  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-    console.warn('Push notifications are not supported in this browser.');
+  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    console.warn('Push notifications are not supported in this browser environment.');
     return null;
   }
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    console.warn('Push notification permission denied.');
+    console.warn('Push notification permission was not granted.');
     return null;
   }
 
   try {
     await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    // Simulated/Web push token identifier
     const clientToken = `web-push-${profileId.slice(0, 8)}-${Date.now()}`;
 
     await registerDeviceToken({

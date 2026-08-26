@@ -12,7 +12,6 @@ export async function executeSF1Import(
   let updatedCount = 0;
   const errors: Array<{ row: number; lrn?: string; message: string }> = [];
 
-  // 1. Resolve or create active school year
   let schoolYearId: string;
   try {
     const { data: activeSy } = await client
@@ -22,7 +21,7 @@ export async function executeSF1Import(
       .maybeSingle();
 
     if (activeSy) {
-      schoolYearId = (activeSy as any).id;
+      schoolYearId = activeSy.id;
     } else {
       const { data: firstSy } = await client
         .from('school_years')
@@ -31,9 +30,10 @@ export async function executeSF1Import(
         .maybeSingle();
 
       if (firstSy) {
-        schoolYearId = (firstSy as any).id;
+        schoolYearId = firstSy.id;
       } else {
-        const { data: newSy, error: syErr } = await (client.from('school_years') as any)
+        const { data: newSy, error: syErr } = await client
+          .from('school_years')
           .insert({
             name: '2026-2027',
             start_date: '2026-08-01',
@@ -47,12 +47,11 @@ export async function executeSF1Import(
         schoolYearId = newSy.id;
       }
     }
-  } catch (err: any) {
-    throw new Error(`Failed to resolve school year: ${err.message}`);
+  } catch (err: unknown) {
+    throw new Error(`Failed to resolve school year: ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
 
-  // 2. Cache or create class sections
-  const sectionCache = new Map<string, string>(); // `${gradeLevel}_${sectionName}` -> sectionId
+  const sectionCache = new Map<string, string>();
 
   for (const record of validRecords) {
     try {
@@ -62,7 +61,6 @@ export async function executeSF1Import(
 
       let sectionId = sectionCache.get(cacheKey);
       if (!sectionId) {
-        // Query database for section
         const { data: existingSec } = await client
           .from('class_sections')
           .select('id')
@@ -72,10 +70,10 @@ export async function executeSF1Import(
           .maybeSingle();
 
         if (existingSec) {
-          sectionId = (existingSec as any).id;
+          sectionId = existingSec.id;
         } else {
-          // Create section
-          const { data: createdSec, error: secErr } = await (client.from('class_sections') as any)
+          const { data: createdSec, error: secErr } = await client
+            .from('class_sections')
             .insert({
               school_year_id: schoolYearId,
               grade_level: grade,
@@ -90,7 +88,6 @@ export async function executeSF1Import(
         sectionCache.set(cacheKey, sectionId as string);
       }
 
-      // Check if student exists
       const { data: existingStudent } = await client
         .from('students')
         .select('id, qr_identifier')
@@ -103,24 +100,26 @@ export async function executeSF1Import(
         first_name: record.data.first_name,
         middle_name: record.data.middle_name || null,
         suffix: record.data.suffix || null,
-        sex: record.data.sex,
+        sex: record.data.sex as 'MALE' | 'FEMALE',
         birth_date: record.data.birth_date,
         grade_level: grade,
         section_id: sectionId,
         school_year_id: schoolYearId,
-        qr_identifier: (existingStudent as any)?.qr_identifier || crypto.randomUUID(),
+        qr_identifier: existingStudent?.qr_identifier || crypto.randomUUID(),
         updated_at: new Date().toISOString(),
       };
 
       if (existingStudent) {
-        const { error: updateErr } = await (client.from('students') as any)
+        const { error: updateErr } = await client
+          .from('students')
           .update(studentData)
-          .eq('id', (existingStudent as any).id);
+          .eq('id', existingStudent.id);
 
         if (updateErr) throw new Error(updateErr.message);
         updatedCount++;
       } else {
-        const { error: insertErr } = await (client.from('students') as any)
+        const { error: insertErr } = await client
+          .from('students')
           .insert(studentData);
 
         if (insertErr) throw new Error(insertErr.message);

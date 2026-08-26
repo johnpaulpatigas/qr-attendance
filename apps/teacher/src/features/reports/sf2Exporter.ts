@@ -4,10 +4,8 @@ import type { SF2ReportData } from './reportService';
 export function exportSF2ToExcel(report: SF2ReportData) {
   const wb = XLSX.utils.book_new();
 
-  // Build rows array
-  const rows: any[][] = [];
+  const rows: (string | number)[][] = [];
 
-  // Header
   rows.push(['School Form 2 (SF2) Daily Attendance Report of Learners']);
   rows.push([`School Name: ${report.schoolName}`, '', `School ID: ${report.schoolId}`, '', `District: ${report.district}`]);
   rows.push([`Division: ${report.division}`, '', `Region: ${report.region}`, '', `School Year: ${report.schoolYear}`]);
