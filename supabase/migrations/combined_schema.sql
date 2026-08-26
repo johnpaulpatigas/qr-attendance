@@ -1264,3 +1264,215 @@ CREATE POLICY "Service role full access on section_subject_teachers"
   ON public.section_subject_teachers FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
+-- ------------------------------------------------------------------------------
+-- Migration 08: Fix RLS Infinite Recursion & Security Definer Optimization
+-- ------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = (SELECT auth.uid()) AND role = 'admin'
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_teacher()
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = (SELECT auth.uid()) AND (role = 'teacher' OR role = 'admin')
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_teacher() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_my_parent_id()
+RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT id FROM public.parents
+  WHERE profile_id = (SELECT auth.uid())
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_my_parent_id() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_teacher_of_class(target_class_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.class_sections
+      WHERE id = target_class_id
+        AND (
+          teacher_id = (SELECT auth.uid())
+          OR adviser_id = (SELECT auth.uid())
+          OR (teacher_id IS NULL AND adviser_id IS NULL)
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.section_subject_teachers
+      WHERE class_id = target_class_id AND teacher_id = (SELECT auth.uid())
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_adviser_of_class(target_class_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.class_sections
+      WHERE id = target_class_id
+        AND (
+          teacher_id = (SELECT auth.uid())
+          OR adviser_id = (SELECT auth.uid())
+          OR (teacher_id IS NULL AND adviser_id IS NULL)
+        )
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_adviser_of_class(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_parent_of_student(target_student_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.student_parents sp
+    JOIN public.parents p ON sp.parent_id = p.id
+    WHERE sp.student_id = target_student_id
+      AND p.profile_id = (SELECT auth.uid())
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_parent_of_student(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_parent_of_class(target_class_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.students s
+    JOIN public.student_parents sp ON s.id = sp.student_id
+    JOIN public.parents p ON sp.parent_id = p.id
+    WHERE s.section_id = target_class_id
+      AND p.profile_id = (SELECT auth.uid())
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_parent_of_class(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_teacher_of_student(target_student_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.students s
+      WHERE s.id = target_student_id
+        AND public.is_teacher_of_class(s.section_id)
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_student(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_teacher_of_parent(target_parent_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.student_parents sp
+      JOIN public.students s ON sp.student_id = s.id
+      WHERE sp.parent_id = target_parent_id
+        AND public.is_teacher_of_class(s.section_id)
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_parent(UUID) TO authenticated;
+
+-- Policies for parents
+DROP POLICY IF EXISTS "Strict SELECT on parents" ON public.parents;
+CREATE POLICY "Strict SELECT on parents"
+  ON public.parents FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR profile_id = (SELECT auth.uid())
+    OR public.is_teacher_of_parent(parents.id)
+  );
+
+-- Policies for student_parents
+DROP POLICY IF EXISTS "Strict SELECT on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict INSERT on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict UPDATE on student_parents" ON public.student_parents;
+DROP POLICY IF EXISTS "Strict DELETE on student_parents" ON public.student_parents;
+
+CREATE POLICY "Strict SELECT on student_parents"
+  ON public.student_parents FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR parent_id = public.get_my_parent_id()
+    OR public.is_teacher_of_student(student_parents.student_id)
+  );
+
+CREATE POLICY "Strict INSERT on student_parents"
+  ON public.student_parents FOR INSERT TO authenticated
+  WITH CHECK (
+    public.is_admin()
+    OR parent_id = public.get_my_parent_id()
+    OR public.is_teacher_of_student(student_parents.student_id)
+  );
+
+CREATE POLICY "Strict UPDATE on student_parents"
+  ON public.student_parents FOR UPDATE TO authenticated
+  USING (
+    public.is_admin()
+    OR parent_id = public.get_my_parent_id()
+    OR public.is_teacher_of_student(student_parents.student_id)
+  )
+  WITH CHECK (
+    public.is_admin()
+    OR parent_id = public.get_my_parent_id()
+    OR public.is_teacher_of_student(student_parents.student_id)
+  );
+
+CREATE POLICY "Strict DELETE on student_parents"
+  ON public.student_parents FOR DELETE TO authenticated
+  USING (
+    public.is_admin()
+    OR parent_id = public.get_my_parent_id()
+    OR public.is_teacher_of_student(student_parents.student_id)
+  );
+
+-- Policies for class_sections
+DROP POLICY IF EXISTS "Strict SELECT on class_sections" ON public.class_sections;
+CREATE POLICY "Strict SELECT on class_sections"
+  ON public.class_sections FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR public.is_teacher_of_class(id)
+    OR public.is_parent_of_class(id)
+  );
+
+-- Policies for attendance_sessions
+DROP POLICY IF EXISTS "Strict SELECT on attendance_sessions" ON public.attendance_sessions;
+CREATE POLICY "Strict SELECT on attendance_sessions"
+  ON public.attendance_sessions FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR teacher_id = (SELECT auth.uid())
+    OR public.is_teacher_of_class(attendance_sessions.class_id)
+    OR public.is_parent_of_class(attendance_sessions.class_id)
+  );
+
+-- Policies for attendance
+DROP POLICY IF EXISTS "Strict SELECT on attendance" ON public.attendance;
+CREATE POLICY "Strict SELECT on attendance"
+  ON public.attendance FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR recorded_by = (SELECT auth.uid())
+    OR public.is_teacher_of_class(attendance.class_id)
+    OR public.is_parent_of_student(attendance.student_id)
+  );
+
