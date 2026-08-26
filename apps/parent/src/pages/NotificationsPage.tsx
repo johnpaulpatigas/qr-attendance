@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck, BellOff } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -8,10 +8,12 @@ import {
   Badge,
   LoadingState,
   Button,
+  EmptyState,
 } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth';
 import { fetchStudentNotificationLogs } from '../features/attendance/parentAttendanceService';
 import { requestPushPermissionAndRegister } from '../features/notifications/fcmService';
+import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 import type { NotificationLog } from '@qr-attendance/types';
 
 export const NotificationsPage: React.FC = () => {
@@ -19,9 +21,13 @@ export const NotificationsPage: React.FC = () => {
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!activeChild) return;
+    if (!activeChild) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchStudentNotificationLogs(activeChild.student_id).then((res) => {
       setLogs(res);
@@ -39,7 +45,22 @@ export const NotificationsPage: React.FC = () => {
     }
   };
 
-  if (!activeChild) return null;
+  if (!activeChild) {
+    return (
+      <div className="mx-auto max-w-4xl py-8">
+        <EmptyState
+          icon={<BellOff className="h-6 w-6" />}
+          title="No Student Linked for Notifications"
+          description="Link your child's 12-digit Learner Reference Number (LRN) to receive real-time push alerts and view delivery logs when they scan at school."
+          action={{
+            label: 'Link Student by LRN',
+            onClick: () => setIsLinkModalOpen(true),
+          }}
+        />
+        <LinkStudentModal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Calendar } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -12,18 +13,24 @@ import {
   TableRow,
   TableCell,
   LoadingState,
+  EmptyState,
 } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth';
 import { fetchAttendanceHistory } from '../features/attendance/parentAttendanceService';
+import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 import type { AttendanceRecord } from '@qr-attendance/types';
 
 export const AttendanceHistoryPage: React.FC = () => {
   const { activeChild } = useAuth();
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!activeChild) return;
+    if (!activeChild) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchAttendanceHistory(activeChild.student_id).then((records) => {
       setHistory(records);
@@ -31,7 +38,22 @@ export const AttendanceHistoryPage: React.FC = () => {
     });
   }, [activeChild]);
 
-  if (!activeChild) return null;
+  if (!activeChild) {
+    return (
+      <div className="mx-auto max-w-4xl py-8">
+        <EmptyState
+          icon={<Calendar className="h-6 w-6" />}
+          title="No Student Linked for History"
+          description="Link your child's 12-digit Learner Reference Number (LRN) to view their historical attendance records, daily logs, and timestamps."
+          action={{
+            label: 'Link Student by LRN',
+            onClick: () => setIsLinkModalOpen(true),
+          }}
+        />
+        <LinkStudentModal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

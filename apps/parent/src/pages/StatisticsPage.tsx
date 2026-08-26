@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, LoadingState, Badge } from '@qr-attendance/ui';
+import { Card, CardHeader, CardTitle, CardContent, LoadingState, Badge, EmptyState } from '@qr-attendance/ui';
 import { formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth';
 import {
   fetchStudentStatistics,
   type StudentAttendanceMetrics,
 } from '../features/attendance/parentAttendanceService';
-import { CheckCircle2, Clock, XCircle, Award } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Award, BarChart3 } from 'lucide-react';
+import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 
 export const StatisticsPage: React.FC = () => {
   const { activeChild } = useAuth();
   const [metrics, setMetrics] = useState<StudentAttendanceMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!activeChild) return;
+    if (!activeChild) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchStudentStatistics(activeChild.student_id).then((res) => {
       setMetrics(res);
@@ -22,7 +27,22 @@ export const StatisticsPage: React.FC = () => {
     });
   }, [activeChild]);
 
-  if (!activeChild) return null;
+  if (!activeChild) {
+    return (
+      <div className="mx-auto max-w-4xl py-8">
+        <EmptyState
+          icon={<BarChart3 className="h-6 w-6" />}
+          title="No Student Linked for Statistics"
+          description="Link your child's 12-digit Learner Reference Number (LRN) to view their attendance percentage, punctuality metrics, and monthly analytics."
+          action={{
+            label: 'Link Student by LRN',
+            onClick: () => setIsLinkModalOpen(true),
+          }}
+        />
+        <LinkStudentModal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} />
+      </div>
+    );
+  }
 
   const childName = `${activeChild.first_name} ${activeChild.last_name}`;
 
