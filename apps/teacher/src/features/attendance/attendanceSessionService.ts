@@ -15,6 +15,10 @@ const RECORDS_CACHE_PREFIX = 'teacher_cached_records_';
 
 export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
+  const { data: authData } = await client.auth.getUser();
+  const currentUserId = authData.user?.id;
+  const userCacheKey = currentUserId ? `${SECTIONS_CACHE_KEY}_${currentUserId}` : SECTIONS_CACHE_KEY;
+
   try {
     const { data, error } = await client
       .from('class_sections')
@@ -25,6 +29,13 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
         ),
         students (
           id
+        ),
+        section_subject_teachers (
+          id,
+          class_id,
+          subject_name,
+          teacher_id,
+          schedule_time
         )
       `)
       .order('grade_level', { ascending: false });
@@ -37,27 +48,49 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
         room_number: string | null;
         school_year_id: string;
         teacher_id: string | null;
+        adviser_id?: string | null;
         created_at: string;
         updated_at: string;
         school_years?: { name: string } | null;
         students?: { id: string }[] | null;
+        section_subject_teachers?: {
+          id: string;
+          class_id: string;
+          subject_name: string;
+          teacher_id: string;
+          schedule_time?: string | null;
+        }[] | null;
       }
 
-      const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map((d) => ({
-        id: d.id,
-        grade_level: d.grade_level,
-        section_name: d.section_name,
-        room_number: d.room_number,
-        school_year_id: d.school_year_id,
-        teacher_id: d.teacher_id,
-        created_at: d.created_at,
-        updated_at: d.updated_at,
-        school_year_name: d.school_years?.name || 'Active SY',
-        student_count: Array.isArray(d.students) ? d.students.length : 0,
-      }));
+      const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map((d) => {
+        const isAdviser = Boolean(
+          currentUserId && (d.adviser_id === currentUserId || d.teacher_id === currentUserId)
+        );
+        const mySubjectAssignments = (d.section_subject_teachers || []).filter(
+          (st) => st.teacher_id === currentUserId
+        );
+        const isSubjectTeacher = mySubjectAssignments.length > 0;
+
+        return {
+          id: d.id,
+          grade_level: d.grade_level,
+          section_name: d.section_name,
+          room_number: d.room_number,
+          school_year_id: d.school_year_id,
+          teacher_id: d.teacher_id,
+          adviser_id: d.adviser_id || d.teacher_id,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+          school_year_name: d.school_years?.name || 'Active SY',
+          student_count: Array.isArray(d.students) ? d.students.length : 0,
+          subject_teachers: d.section_subject_teachers || [],
+          my_role: isAdviser ? 'adviser' : isSubjectTeacher ? 'subject_teacher' : undefined,
+          my_subject: mySubjectAssignments.map((st) => st.subject_name).join(', ') || undefined,
+        };
+      });
 
       try {
-        localStorage.setItem(SECTIONS_CACHE_KEY, JSON.stringify(sections));
+        localStorage.setItem(userCacheKey, JSON.stringify(sections));
       } catch {
         // Storage write ignored
       }
@@ -69,7 +102,7 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   }
 
   try {
-    const cached = localStorage.getItem(SECTIONS_CACHE_KEY);
+    const cached = localStorage.getItem(userCacheKey);
     if (cached) return JSON.parse(cached) as ClassSectionWithDetails[];
   } catch {
     // Storage read ignored
@@ -82,19 +115,28 @@ export async function getOrCreateAttendanceSession(
   classId: string,
   attendanceDate: string,
   sessionType: SessionType,
-  teacherId: string
+  teacherId: string,
+  subjectName?: string | null
 ): Promise<AttendanceSession> {
   const client = getSupabaseClient();
-  const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}`;
+  const subjPart = subjectName ? `_${subjectName.replace(/\s+/g, '_')}` : '';
+  const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}${subjPart}`;
 
   try {
-    const { data: existing, error: findError } = await client
+    let query = client
       .from('attendance_sessions')
       .select('*')
       .eq('class_id', classId)
       .eq('attendance_date', attendanceDate)
-      .eq('session_type', sessionType)
-      .maybeSingle();
+      .eq('session_type', sessionType);
+
+    if (subjectName) {
+      query = query.eq('subject_name', subjectName);
+    } else {
+      query = query.is('subject_name', null);
+    }
+
+    const { data: existing, error: findError } = await query.maybeSingle();
 
     if (!findError && existing) {
       const session = existing;
@@ -107,6 +149,7 @@ export async function getOrCreateAttendanceSession(
       teacher_id: teacherId,
       attendance_date: attendanceDate,
       session_type: sessionType,
+      subject_name: subjectName || null,
       started_at: new Date().toISOString(),
     };
 
@@ -134,11 +177,12 @@ export async function getOrCreateAttendanceSession(
   }
 
   const offlineSession: AttendanceSession = {
-    id: `offline_sess_${classId}_${attendanceDate}_${sessionType}`,
+    id: `offline_sess_${classId}_${attendanceDate}_${sessionType}${subjPart}`,
     class_id: classId,
     teacher_id: teacherId,
     attendance_date: attendanceDate,
     session_type: sessionType,
+    subject_name: subjectName || null,
     started_at: new Date().toISOString(),
     ended_at: null,
     created_at: new Date().toISOString(),
@@ -151,6 +195,69 @@ export async function getOrCreateAttendanceSession(
   }
 
   return offlineSession;
+}
+
+export async function assignSubjectTeacher(
+  classId: string,
+  subjectName: string,
+  teacherId: string,
+  scheduleTime?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  try {
+    const { error } = await client.from('section_subject_teachers').upsert(
+      {
+        class_id: classId,
+        subject_name: subjectName.trim(),
+        teacher_id: teacherId,
+        schedule_time: scheduleTime?.trim() || null,
+      },
+      { onConflict: 'class_id,subject_name,teacher_id' }
+    );
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to assign subject teacher' };
+  }
+}
+
+export async function removeSubjectTeacher(
+  assignmentId: string
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  try {
+    const { error } = await client
+      .from('section_subject_teachers')
+      .delete()
+      .eq('id', assignmentId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to remove subject teacher' };
+  }
+}
+
+export async function claimClassSection(
+  classId: string
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  const { data: authData } = await client.auth.getUser();
+  const userId = authData.user?.id;
+  if (!userId) return { success: false, error: 'User not authenticated' };
+
+  try {
+    const { error } = await client
+      .from('class_sections')
+      .update({ adviser_id: userId, teacher_id: userId })
+      .eq('id', classId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to claim section' };
+  }
 }
 
 export async function fetchSessionRecords(

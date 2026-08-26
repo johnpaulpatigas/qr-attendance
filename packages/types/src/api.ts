@@ -6,6 +6,7 @@ export interface RecordAttendancePayload {
   session_id: string;
   attendance_date: string;
   session_type: SessionType;
+  subject_name?: string | null;
   status?: AttendanceStatus; // Defaults to 'present' or calculated based on time
   recorded_by?: string;
   client_event_id?: string; // Idempotency key

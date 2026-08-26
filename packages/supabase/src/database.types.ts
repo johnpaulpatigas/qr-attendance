@@ -173,6 +173,7 @@ export type Database = {
           room_number: string | null;
           school_year_id: string;
           teacher_id: string | null;
+          adviser_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -183,6 +184,7 @@ export type Database = {
           room_number?: string | null;
           school_year_id: string;
           teacher_id?: string | null;
+          adviser_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -193,6 +195,37 @@ export type Database = {
           room_number?: string | null;
           school_year_id?: string;
           teacher_id?: string | null;
+          adviser_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      section_subject_teachers: {
+        Row: {
+          id: string;
+          class_id: string;
+          subject_name: string;
+          teacher_id: string;
+          schedule_time: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          class_id: string;
+          subject_name: string;
+          teacher_id: string;
+          schedule_time?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          class_id?: string;
+          subject_name?: string;
+          teacher_id?: string;
+          schedule_time?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -205,6 +238,7 @@ export type Database = {
           teacher_id: string;
           attendance_date: string;
           session_type: 'morning' | 'afternoon';
+          subject_name: string | null;
           started_at: string;
           ended_at: string | null;
           created_at: string;
@@ -215,6 +249,7 @@ export type Database = {
           teacher_id: string;
           attendance_date: string;
           session_type: 'morning' | 'afternoon';
+          subject_name?: string | null;
           started_at?: string;
           ended_at?: string | null;
           created_at?: string;
@@ -225,6 +260,7 @@ export type Database = {
           teacher_id?: string;
           attendance_date?: string;
           session_type?: 'morning' | 'afternoon';
+          subject_name?: string | null;
           started_at?: string;
           ended_at?: string | null;
           created_at?: string;
@@ -239,6 +275,7 @@ export type Database = {
           attendance_session_id: string;
           attendance_date: string;
           attendance_type: 'morning' | 'afternoon';
+          subject_name: string | null;
           status: 'present' | 'late' | 'absent' | 'excused';
           recorded_at: string;
           recorded_by: string;
@@ -254,6 +291,7 @@ export type Database = {
           attendance_session_id: string;
           attendance_date: string;
           attendance_type: 'morning' | 'afternoon';
+          subject_name?: string | null;
           status: 'present' | 'late' | 'absent' | 'excused';
           recorded_at?: string;
           recorded_by: string;
@@ -269,6 +307,7 @@ export type Database = {
           attendance_session_id?: string;
           attendance_date?: string;
           attendance_type?: 'morning' | 'afternoon';
+          subject_name?: string | null;
           status?: 'present' | 'late' | 'absent' | 'excused';
           recorded_at?: string;
           recorded_by?: string;

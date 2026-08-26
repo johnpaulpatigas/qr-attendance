@@ -63,16 +63,37 @@ serve(async (req) => {
     }
 
     const body: RecordAttendancePayload = await req.json();
-    const { qr_payload, class_id, session_id, attendance_date, session_type, status = 'present' } = body;
+    const { qr_payload, class_id, session_id, attendance_date, session_type, status = 'present', subject_name } = body;
 
     if (profile.role !== 'admin') {
       const { data: classSection, error: classError } = await supabase
         .from('class_sections')
-        .select('id, teacher_id')
+        .select('id, teacher_id, adviser_id')
         .eq('id', class_id)
         .single();
 
-      if (classError || !classSection || classSection.teacher_id !== user.id) {
+      const isAdviser = Boolean(
+        classSection && (
+          classSection.teacher_id === user.id ||
+          classSection.adviser_id === user.id ||
+          (!classSection.teacher_id && !classSection.adviser_id)
+        )
+      );
+
+      let isSubjectTeacher = false;
+      if (!isAdviser) {
+        const { data: subjectAssignment } = await supabase
+          .from('section_subject_teachers')
+          .select('id')
+          .eq('class_id', class_id)
+          .eq('teacher_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        isSubjectTeacher = Boolean(subjectAssignment);
+      }
+
+      if (classError || (!isAdviser && !isSubjectTeacher)) {
         return new Response(
           JSON.stringify({
             success: false,
@@ -108,17 +129,26 @@ serve(async (req) => {
 
     if (studentError || !student) {
       return new Response(
-        JSON.stringify({ success: false, status: 'invalid_qr', message: 'Student QR code not found.' }),
+        JSON.stringify({ success: false, status: 'invalid_qr', message: 'Student QR code not found in database.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (student.section_id !== class_id) {
+      const { data: actualSec } = await supabase
+        .from('class_sections')
+        .select('grade_level, section_name')
+        .eq('id', student.section_id)
+        .maybeSingle();
+
+      const actualSecName = actualSec ? `Grade ${actualSec.grade_level} - ${actualSec.section_name}` : 'another class section';
+      const studentFullName = `${student.first_name} ${student.last_name}`.trim();
+
       return new Response(
         JSON.stringify({
           success: false,
           status: 'not_enrolled',
-          message: 'This student does not belong to the selected class.',
+          message: `Student Not Enrolled: ${studentFullName} is enrolled in ${actualSecName}.`,
           student: {
             id: student.id,
             lrn: student.lrn,
@@ -167,6 +197,7 @@ serve(async (req) => {
       attendance_session_id: session_id,
       attendance_date: attendance_date,
       attendance_type: session_type,
+      subject_name: subject_name || null,
       status: status,
       recorded_by: user.id,
       source: 'qr_scan',

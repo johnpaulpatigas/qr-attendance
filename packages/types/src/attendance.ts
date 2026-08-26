@@ -16,6 +16,7 @@ export interface AttendanceSession {
   teacher_id: string; // References profiles.id
   attendance_date: string; // YYYY-MM-DD
   session_type: SessionType;
+  subject_name?: string | null; // e.g. 'Mathematics', 'Science', or null for Daily Homeroom
   started_at: string;
   ended_at: string | null;
   created_at: string;
@@ -32,6 +33,7 @@ export interface AttendanceRecord {
   recorded_at: string;
   recorded_by: string; // References profiles.id (teacher/admin)
   source: AttendanceSource;
+  subject_name?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

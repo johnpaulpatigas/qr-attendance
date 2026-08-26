@@ -95,6 +95,8 @@ export const AttendancePage: React.FC = () => {
   const [sessionType, setSessionType] = useState<SessionType>('morning');
   const [attendanceDate, setAttendanceDate] = useState(getUtc8DateString());
 
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [summary, setSummary] = useState<AttendanceSummary>({
     total_students: 0,
@@ -138,11 +140,24 @@ export const AttendancePage: React.FC = () => {
       setSections(secs);
       if (secs.length > 0 && !selectedClassId) {
         setSelectedClassId(secs[0].id);
+        if (secs[0].my_subject) {
+          setSelectedSubject(secs[0].my_subject.split(',')[0].trim());
+        }
       }
     });
   }, []);
 
-  // Initialize active session and load students when section/date/sessionType changes
+  // Update default subject when selected class changes
+  useEffect(() => {
+    const activeSec = sections.find((s) => s.id === selectedClassId);
+    if (activeSec?.my_subject) {
+      setSelectedSubject(activeSec.my_subject.split(',')[0].trim());
+    } else if (activeSec?.my_role === 'adviser') {
+      setSelectedSubject('');
+    }
+  }, [selectedClassId, sections]);
+
+  // Initialize active session and load students when section/date/sessionType/subject changes
   const initSession = useCallback(async () => {
     if (!selectedClassId) return;
 
@@ -151,7 +166,8 @@ export const AttendancePage: React.FC = () => {
       selectedClassId,
       attendanceDate,
       sessionType,
-      teacherId
+      teacherId,
+      selectedSubject || null
     );
     setActiveSession(sess);
 
@@ -181,7 +197,7 @@ export const AttendancePage: React.FC = () => {
         }))
       );
     }
-  }, [selectedClassId, attendanceDate, sessionType, user?.id]);
+  }, [selectedClassId, attendanceDate, sessionType, selectedSubject, user?.id]);
 
   useEffect(() => {
     initSession();
@@ -228,6 +244,7 @@ export const AttendancePage: React.FC = () => {
       session_id: activeSession.id,
       attendance_date: attendanceDate,
       session_type: sessionType,
+      subject_name: selectedSubject || null,
       recorded_by: user?.id,
     });
 
@@ -348,7 +365,7 @@ export const AttendancePage: React.FC = () => {
       {/* Class & Session Controls Bar */}
       <Card>
         <CardContent className="p-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Select
               label="Select Class / Section"
               value={selectedClassId}
@@ -357,10 +374,28 @@ export const AttendancePage: React.FC = () => {
                 sections.length > 0
                   ? sections.map((s) => ({
                       value: s.id,
-                      label: `Grade ${s.grade_level} — ${s.section_name}`,
+                      label: `Grade ${s.grade_level} — ${s.section_name}${s.my_role === 'adviser' ? ' (Adviser)' : s.my_subject ? ` (${s.my_subject})` : ''}`,
                     }))
                   : [{ value: '', label: 'No sections registered yet' }]
               }
+            />
+
+            <Select
+              label="Subject / Attendance Mode"
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              options={[
+                { value: '', label: '📋 Daily Homeroom (DepEd SF2)' },
+                { value: 'Mathematics', label: '📐 Mathematics' },
+                { value: 'Science', label: '🔬 Science' },
+                { value: 'English', label: '📖 English' },
+                { value: 'Filipino', label: '🇵🇭 Filipino' },
+                { value: 'Araling Panlipunan', label: '🌏 Araling Panlipunan' },
+                { value: 'MAPEH', label: '🎨 MAPEH' },
+                { value: 'TLE', label: '⚙️ TLE / TVL' },
+                { value: 'EsP', label: '🤝 Edukasyon sa Pagpapakatao (EsP)' },
+                { value: 'Homeroom Guidance', label: '👥 Homeroom Guidance' },
+              ]}
             />
 
             <Select

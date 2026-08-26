@@ -14,6 +14,7 @@ export const recordAttendanceRequestSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
   session_type: sessionTypeSchema,
+  subject_name: z.string().trim().max(100).optional().nullable(),
   status: attendanceStatusSchema.optional().default('present'),
   client_event_id: z.string().trim().uuid().optional(),
 });
@@ -27,6 +28,7 @@ export const createAttendanceSessionSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
   session_type: sessionTypeSchema,
+  subject_name: z.string().trim().max(100).optional().nullable(),
 });
 
 export type CreateAttendanceSessionInput = z.infer<typeof createAttendanceSessionSchema>;
@@ -38,3 +40,12 @@ export const manualAttendanceCorrectionSchema = z.object({
 });
 
 export type ManualAttendanceCorrectionInput = z.infer<typeof manualAttendanceCorrectionSchema>;
+
+export const assignSubjectTeacherSchema = z.object({
+  class_id: z.string().uuid('Valid Class ID is required'),
+  subject_name: z.string().trim().min(2, 'Subject name must be at least 2 characters').max(100),
+  teacher_id: z.string().uuid('Valid Teacher ID is required'),
+  schedule_time: z.string().trim().max(100).optional().nullable(),
+});
+
+export type AssignSubjectTeacherInput = z.infer<typeof assignSubjectTeacherSchema>;

@@ -88,43 +88,13 @@ export const DashboardPage: React.FC = () => {
 
         setClasses(mappedClasses);
 
-        let studentQuery = client.from('students').select('id, section_id');
-        if (selectedClassId !== 'all') {
-          studentQuery = studentQuery.eq('section_id', selectedClassId);
-        }
-        const { data: enrolledStudents } = await studentQuery;
-        const totalEnrolled = enrolledStudents?.length || 0;
-
-        const todayStr = getUtc8DateString();
-        let attendanceQuery = client
-          .from('attendance')
-          .select(`
-            id,
-            student_id,
-            status,
-            recorded_at,
-            class_id,
-            students (
-              first_name,
-              last_name,
-              lrn
-            )
-          `)
-          .eq('attendance_date', todayStr)
-          .order('recorded_at', { ascending: false });
-
-        if (selectedClassId !== 'all') {
-          attendanceQuery = attendanceQuery.eq('class_id', selectedClassId);
-        }
-
-        const { data: attRecords } = await attendanceQuery;
-
         interface DashboardAttRow {
           id: string;
           student_id: string;
           status: 'present' | 'late' | 'absent' | 'excused';
           recorded_at: string;
           class_id: string;
+          subject_name?: string | null;
           students?: {
             first_name: string;
             last_name: string;
@@ -132,7 +102,48 @@ export const DashboardPage: React.FC = () => {
           } | null;
         }
 
-        const typedAttRecords = (attRecords as unknown as DashboardAttRow[]) || [];
+        const mySectionIds = mappedClasses.map((c) => c.id);
+        let totalEnrolled = 0;
+        let typedAttRecords: DashboardAttRow[] = [];
+
+        if (mySectionIds.length > 0) {
+          let studentQuery = client.from('students').select('id, section_id');
+          if (selectedClassId !== 'all') {
+            studentQuery = studentQuery.eq('section_id', selectedClassId);
+          } else {
+            studentQuery = studentQuery.in('section_id', mySectionIds);
+          }
+          const { data: enrolledStudents } = await studentQuery;
+          totalEnrolled = enrolledStudents?.length || 0;
+
+          const todayStr = getUtc8DateString();
+          let attendanceQuery = client
+            .from('attendance')
+            .select(`
+              id,
+              student_id,
+              status,
+              recorded_at,
+              class_id,
+              subject_name,
+              students (
+                first_name,
+                last_name,
+                lrn
+              )
+            `)
+            .eq('attendance_date', todayStr)
+            .order('recorded_at', { ascending: false });
+
+          if (selectedClassId !== 'all') {
+            attendanceQuery = attendanceQuery.eq('class_id', selectedClassId);
+          } else {
+            attendanceQuery = attendanceQuery.in('class_id', mySectionIds);
+          }
+
+          const { data: attRecords } = await attendanceQuery;
+          typedAttRecords = (attRecords as unknown as DashboardAttRow[]) || [];
+        }
 
         let present = 0;
         let late = 0;

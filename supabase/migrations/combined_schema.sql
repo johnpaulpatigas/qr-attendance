@@ -1150,3 +1150,117 @@ CREATE POLICY "Service role full access on notification_logs"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
+-- ==============================================================================
+-- 7. High School Multi-Subject Teachers & Section Subject Assignments
+-- ==============================================================================
+ALTER TABLE public.class_sections ADD COLUMN IF NOT EXISTS adviser_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.attendance_sessions ADD COLUMN IF NOT EXISTS subject_name VARCHAR(100);
+ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS subject_name VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS public.section_subject_teachers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID NOT NULL REFERENCES public.class_sections(id) ON DELETE CASCADE,
+  subject_name VARCHAR(100) NOT NULL,
+  teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  schedule_time TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_section_subject_teacher UNIQUE (class_id, subject_name, teacher_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_section_subject_teachers_class ON public.section_subject_teachers(class_id);
+CREATE INDEX IF NOT EXISTS idx_section_subject_teachers_teacher ON public.section_subject_teachers(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_section_subject_teachers_subject ON public.section_subject_teachers(subject_name);
+CREATE INDEX IF NOT EXISTS idx_attendance_sessions_subject ON public.attendance_sessions(class_id, attendance_date, subject_name);
+CREATE INDEX IF NOT EXISTS idx_attendance_subject ON public.attendance(student_id, attendance_date, subject_name);
+
+ALTER TABLE public.section_subject_teachers ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.is_teacher_of_class(target_class_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.class_sections
+      WHERE id = target_class_id
+        AND (
+          teacher_id = (SELECT auth.uid())
+          OR adviser_id = (SELECT auth.uid())
+          OR (teacher_id IS NULL AND adviser_id IS NULL)
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.section_subject_teachers
+      WHERE class_id = target_class_id AND teacher_id = (SELECT auth.uid())
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_teacher_of_class(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.is_adviser_of_class(target_class_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SET search_path = public AS $$
+  SELECT (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.class_sections
+      WHERE id = target_class_id
+        AND (
+          teacher_id = (SELECT auth.uid())
+          OR adviser_id = (SELECT auth.uid())
+          OR (teacher_id IS NULL AND adviser_id IS NULL)
+        )
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_adviser_of_class(UUID) TO authenticated;
+
+DROP POLICY IF EXISTS "Strict SELECT on section_subject_teachers" ON public.section_subject_teachers;
+DROP POLICY IF EXISTS "Strict INSERT on section_subject_teachers" ON public.section_subject_teachers;
+DROP POLICY IF EXISTS "Strict UPDATE on section_subject_teachers" ON public.section_subject_teachers;
+DROP POLICY IF EXISTS "Strict DELETE on section_subject_teachers" ON public.section_subject_teachers;
+DROP POLICY IF EXISTS "Service role full access on section_subject_teachers" ON public.section_subject_teachers;
+
+CREATE POLICY "Strict SELECT on section_subject_teachers"
+  ON public.section_subject_teachers FOR SELECT TO authenticated
+  USING (
+    public.is_admin()
+    OR teacher_id = (SELECT auth.uid())
+    OR public.is_teacher_of_class(class_id)
+  );
+
+CREATE POLICY "Strict INSERT on section_subject_teachers"
+  ON public.section_subject_teachers FOR INSERT TO authenticated
+  WITH CHECK (
+    public.is_admin()
+    OR public.is_adviser_of_class(class_id)
+    OR teacher_id = (SELECT auth.uid())
+  );
+
+CREATE POLICY "Strict UPDATE on section_subject_teachers"
+  ON public.section_subject_teachers FOR UPDATE TO authenticated
+  USING (
+    public.is_admin()
+    OR public.is_adviser_of_class(class_id)
+    OR teacher_id = (SELECT auth.uid())
+  )
+  WITH CHECK (
+    public.is_admin()
+    OR public.is_adviser_of_class(class_id)
+    OR teacher_id = (SELECT auth.uid())
+  );
+
+CREATE POLICY "Strict DELETE on section_subject_teachers"
+  ON public.section_subject_teachers FOR DELETE TO authenticated
+  USING (
+    public.is_admin()
+    OR public.is_adviser_of_class(class_id)
+    OR teacher_id = (SELECT auth.uid())
+  );
+
+CREATE POLICY "Service role full access on section_subject_teachers"
+  ON public.section_subject_teachers FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+

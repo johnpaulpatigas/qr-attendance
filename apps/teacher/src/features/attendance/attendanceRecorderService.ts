@@ -191,6 +191,7 @@ export async function submitAttendanceScan(
         attendance_session_id: payload.session_id,
         attendance_date: payload.attendance_date,
         attendance_type: payload.session_type,
+        subject_name: payload.subject_name || null,
         status: finalStatus,
         recorded_by: teacherId,
         recorded_at: scanTime.toISOString(),
