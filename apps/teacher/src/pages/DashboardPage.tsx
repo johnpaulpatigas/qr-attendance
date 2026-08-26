@@ -23,6 +23,8 @@ import {
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { getUtc8DateString, formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
+import { fetchClassSections } from '../features/attendance/attendanceSessionService';
+import { getQueuedScans } from '../features/attendance/offlineQueueService';
 
 interface DashboardClass {
   id: string;
@@ -197,7 +199,55 @@ export const DashboardPage: React.FC = () => {
           setRecentScans([]);
         }
       } catch (err) {
-        console.error('Error loading dashboard data:', err);
+        console.warn('Operating in offline mode or error loading dashboard data:', err);
+        const cachedSections = await fetchClassSections();
+        const mappedClasses: DashboardClass[] = cachedSections.map((s) => ({
+          id: s.id,
+          grade_level: s.grade_level,
+          section_name: s.section_name,
+          room_number: s.room_number ?? null,
+          student_count: s.student_count || 0,
+        }));
+
+        setClasses(mappedClasses);
+
+        const queued = getQueuedScans();
+        const queuedToday = queued.filter((q) => {
+          if (selectedClassId !== 'all' && q.payload.class_id !== selectedClassId) return false;
+          return true;
+        });
+
+        let totalEnrolled = mappedClasses.reduce((acc, c) => acc + c.student_count, 0);
+        if (selectedClassId !== 'all') {
+          const matched = mappedClasses.find((c) => c.id === selectedClassId);
+          totalEnrolled = matched ? matched.student_count : 0;
+        }
+
+        const present = queuedToday.filter((q) => q.payload.status === 'present').length;
+        const late = queuedToday.filter((q) => q.payload.status === 'late').length;
+        const absent = queuedToday.filter((q) => q.payload.status === 'absent').length;
+        const recordedCount = present + late + absent;
+        const unrecorded = Math.max(0, totalEnrolled - recordedCount);
+        const rate = totalEnrolled > 0 ? Math.round(((present + late) / totalEnrolled) * 100) : 0;
+
+        setMetrics({
+          totalEnrolled,
+          present,
+          late,
+          absent,
+          unrecorded,
+          attendanceRate: rate,
+        });
+
+        setRecentScans(
+          queuedToday.slice(0, 5).map((q) => ({
+            id: q.id,
+            student_name: q.student_name || 'Student',
+            lrn: q.student_lrn || '',
+            status: (q.payload.status as 'present' | 'late' | 'absent' | 'excused') || 'present',
+            recorded_at: q.scanned_at,
+          }))
+        );
       } finally {
         setLoading(false);
       }

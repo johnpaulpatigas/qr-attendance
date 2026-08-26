@@ -8,9 +8,12 @@ export interface RecordAttendancePayload {
   session_type: SessionType;
   subject_name?: string | null;
   status?: AttendanceStatus; // Defaults to 'present' or calculated based on time
+  source?: import('./attendance').AttendanceSource;
+  notes?: string | null;
   recorded_by?: string;
   client_event_id?: string; // Idempotency key
 }
+
 
 export interface RecordAttendanceResponse {
   success: boolean;

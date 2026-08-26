@@ -3,6 +3,7 @@ import { Modal, Button, Select, Input } from '@qr-attendance/ui';
 import type { AttendanceStatus, SessionType, StudentWithSection } from '@qr-attendance/types';
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { useAuth } from '../auth/AuthContext';
+import { enqueueScan } from './offlineQueueService';
 
 export interface ManualAttendanceModalProps {
   isOpen: boolean;
@@ -91,8 +92,41 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
       onRecordUpdated();
       onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update attendance record.');
+    } catch {
+      // Offline fallback: Queue manual attendance update locally
+      try {
+        const studentId = selectedStudentId || students[0]?.id;
+        const targetStudent = students.find((s) => s.id === studentId);
+        enqueueScan(
+          {
+            qr_payload: targetStudent?.qr_identifier || `ATTENDANCE:${studentId}`,
+            class_id: classId,
+            session_id: sessionId,
+            attendance_date: attendanceDate,
+            session_type: sessionType,
+            status: status,
+            source: 'manual',
+            notes: reason.trim(),
+            client_event_id:
+              typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `manual_${Date.now()}`,
+          },
+          {
+            name: targetStudent
+              ? `${targetStudent.first_name} ${targetStudent.last_name}`
+              : undefined,
+            lrn: targetStudent?.lrn,
+          }
+        );
+
+        onRecordUpdated();
+        onClose();
+      } catch (innerErr: unknown) {
+        setError(
+          innerErr instanceof Error ? innerErr.message : 'Failed to update attendance record.'
+        );
+      }
     } finally {
       setIsLoading(false);
     }
