@@ -2,6 +2,56 @@
 @source '../../../../packages/ui';
 @source '../**';
 
+/* ------------------------------------------------------------------------- */
+/* Disable WebView / Browser Scrollbars & Overscroll Bounce                  */
+/* ------------------------------------------------------------------------- */
+
+html,
+body,
+#root {
+  /* Prevent browser/webview pull-to-refresh and rubber-band bounce */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+
+  /* Disable tap highlight on Android/iOS WebView */
+  -webkit-tap-highlight-color: transparent;
+
+  /* Prevent horizontal unwanted overflow */
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbars globally across all modern & legacy browser engines */
+html,
+body,
+* {
+  /* Firefox, Chrome/Edge 121+ standard CSS */
+  scrollbar-width: none;
+  /* Legacy IE / Edge */
+  -ms-overflow-style: none;
+}
+
+/* Chrome, Safari, Android WebView, iOS WKWebView, Opera */
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Utility class for any scrollable sub-containers */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 body {
   background-color: #f8fafc;
   color: #0f172a;
