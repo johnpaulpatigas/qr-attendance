@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Input, Select } from '@qr-attendance/ui';
 import { Hash, HeartHandshake } from 'lucide-react';
-import { useAuth } from '../../features/auth/AuthContext';
+import { useAuth } from '../../features/auth';
 
 export interface LinkStudentModalProps {
   isOpen: boolean;

@@ -13,7 +13,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { Button, Badge } from '@qr-attendance/ui';
-import { useAuth } from '../../features/auth/AuthContext';
+import { useAuth } from '../../features/auth';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useAppBackButton } from '../../hooks/useAppBackButton';
 import { LinkStudentModal } from './LinkStudentModal';

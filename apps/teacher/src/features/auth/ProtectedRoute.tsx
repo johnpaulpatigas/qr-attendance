@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from './useAuth';
 import { LoadingState } from '@qr-attendance/ui';
 
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {

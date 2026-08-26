@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import React, { useEffect, useState, useCallback } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
   getCurrentUserProfile,
@@ -9,38 +9,7 @@ import {
   clearOfflineAuthSession,
 } from '@qr-attendance/supabase';
 import type { UserProfile, LinkedStudent } from '@qr-attendance/types';
-
-export interface SignUpParentParams {
-  fullName: string;
-  email: string;
-  password: string;
-  studentLrn: string;
-  relationship: string;
-}
-
-interface ParentAuthContextType {
-  user: User | null;
-  profile: UserProfile | null;
-  session: Session | null;
-  role: 'parent' | 'student' | null;
-  linkedChildren: LinkedStudent[];
-  activeChild: LinkedStudent | null;
-  isOfflineAuth: boolean;
-  setActiveChildId: (studentId: string) => void;
-  isLoading: boolean;
-  signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
-  signUpWithStudentLrn: (
-    params: SignUpParentParams
-  ) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
-  linkStudentByLrn: (
-    studentLrn: string,
-    relationship?: string
-  ) => Promise<{ success: boolean; message: string }>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: Error | null }>;
-}
-
-const AuthContext = createContext<ParentAuthContextType | undefined>(undefined);
+import { AuthContext, type SignUpParentParams } from './AuthContext';
 
 const PARENT_PROFILE_KEY = 'parent_auth_profile';
 const PARENT_CHILDREN_KEY = 'parent_auth_children';
@@ -103,41 +72,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const client = getSupabaseClient();
 
-  const loadProfileAndChildren = useCallback(async (userId: string, email?: string) => {
-    try {
+  const loadProfileAndChildren = useCallback(
+    async (userId: string, email?: string) => {
       try {
-        const p = await getCurrentUserProfile(client, userId);
-        if (p) {
-          setProfile(p);
-          localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(p));
-        } else {
-          const fallbackProfile: UserProfile = {
-            id: userId,
-            role: 'parent',
-            full_name: email?.split('@')[0] || 'Parent / Guardian',
-            email: email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setProfile(fallbackProfile);
-          localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(fallbackProfile));
+        try {
+          const p = await getCurrentUserProfile(client, userId);
+          if (p) {
+            setProfile(p);
+            localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(p));
+          } else {
+            const fallbackProfile: UserProfile = {
+              id: userId,
+              role: 'parent',
+              full_name: email?.split('@')[0] || 'Parent / Guardian',
+              email: email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            setProfile(fallbackProfile);
+            localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(fallbackProfile));
+          }
+        } catch {
+          const cached = localStorage.getItem(PARENT_PROFILE_KEY);
+          if (cached) setProfile(JSON.parse(cached));
         }
-      } catch {
-        const cached = localStorage.getItem(PARENT_PROFILE_KEY);
-        if (cached) setProfile(JSON.parse(cached));
-      }
 
-      const { data: parentRecord } = await client
-        .from('parents')
-        .select('id')
-        .eq('profile_id', userId)
-        .maybeSingle();
+        const { data: parentRecord } = await client
+          .from('parents')
+          .select('id')
+          .eq('profile_id', userId)
+          .maybeSingle();
 
-      if (parentRecord) {
-        const { data: relations } = await client
-          .from('student_parents')
-          .select(
-            `
+        if (parentRecord) {
+          const { data: relations } = await client
+            .from('student_parents')
+            .select(
+              `
             relationship,
             is_primary,
             students (
@@ -153,77 +123,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               )
             )
           `
-          )
-          .eq('parent_id', parentRecord.id);
-
-        if (relations && relations.length > 0) {
-          interface StudentParentJoinRow {
-            relationship: string;
-            is_primary: boolean;
-            students: {
-              id: string;
-              lrn: string;
-              first_name: string;
-              last_name: string;
-              middle_name: string | null;
-              suffix: string | null;
-              grade_level: number;
-              class_sections?: {
-                section_name: string;
-              } | null;
-            } | null;
-          }
-
-          const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
-            .filter(
-              (
-                rel
-              ): rel is StudentParentJoinRow & {
-                students: NonNullable<StudentParentJoinRow['students']>;
-              } => Boolean(rel.students)
             )
-            .map((rel) => ({
-              student_id: rel.students.id,
-              lrn: rel.students.lrn,
-              first_name: rel.students.first_name,
-              last_name: rel.students.last_name,
-              middle_name: rel.students.middle_name,
-              suffix: rel.students.suffix,
-              grade_level: rel.students.grade_level,
-              section_name: rel.students.class_sections?.section_name || 'Unassigned',
-              relationship: rel.relationship || 'Guardian',
-              is_primary: rel.is_primary || false,
-            }));
+            .eq('parent_id', parentRecord.id);
 
-          setLinkedChildren(children);
-          localStorage.setItem(PARENT_CHILDREN_KEY, JSON.stringify(children));
-          if (children.length > 0) {
-            setActiveChildId((prev) =>
-              prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
-            );
-          } else {
-            setActiveChildId(null);
+          if (relations && relations.length > 0) {
+            interface StudentParentJoinRow {
+              relationship: string;
+              is_primary: boolean;
+              students: {
+                id: string;
+                lrn: string;
+                first_name: string;
+                last_name: string;
+                middle_name: string | null;
+                suffix: string | null;
+                grade_level: number;
+                class_sections?: {
+                  section_name: string;
+                } | null;
+              } | null;
+            }
+
+            const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
+              .filter(
+                (
+                  rel
+                ): rel is StudentParentJoinRow & {
+                  students: NonNullable<StudentParentJoinRow['students']>;
+                } => Boolean(rel.students)
+              )
+              .map((rel) => ({
+                student_id: rel.students.id,
+                lrn: rel.students.lrn,
+                first_name: rel.students.first_name,
+                last_name: rel.students.last_name,
+                middle_name: rel.students.middle_name,
+                suffix: rel.students.suffix,
+                grade_level: rel.students.grade_level,
+                section_name: rel.students.class_sections?.section_name || 'Unassigned',
+                relationship: rel.relationship || 'Guardian',
+                is_primary: rel.is_primary || false,
+              }));
+
+            setLinkedChildren(children);
+            localStorage.setItem(PARENT_CHILDREN_KEY, JSON.stringify(children));
+            if (children.length > 0) {
+              setActiveChildId((prev) =>
+                prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
+              );
+            } else {
+              setActiveChildId(null);
+            }
           }
         }
-      }
-    } catch (err) {
-      console.warn('Network error loading parent data, using cache:', err);
-      try {
-        const cachedChildren = localStorage.getItem(PARENT_CHILDREN_KEY);
-        if (cachedChildren) {
-          const children = JSON.parse(cachedChildren) as LinkedStudent[];
-          setLinkedChildren(children);
-          if (children.length > 0) {
-            setActiveChildId((prev) =>
-              prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
-            );
+      } catch (err) {
+        console.warn('Network error loading parent data, using cache:', err);
+        try {
+          const cachedChildren = localStorage.getItem(PARENT_CHILDREN_KEY);
+          if (cachedChildren) {
+            const children = JSON.parse(cachedChildren) as LinkedStudent[];
+            setLinkedChildren(children);
+            if (children.length > 0) {
+              setActiveChildId((prev) =>
+                prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
+              );
+            }
           }
+        } catch {
+          // Cached read error ignored
         }
-      } catch {
-        // Cached read error ignored
       }
-    }
-  }, [client]);
+    },
+    [client]
+  );
 
   useEffect(() => {
     client.auth
@@ -307,7 +279,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [client, isOfflineAuth, loadProfileAndChildren]);
 
-  const signInWithEmail = async (email: string, pass: string): Promise<{ error: Error | null }> => {
+  const signInWithEmail = async (
+    email: string,
+    pass: string
+  ): Promise<{ error: Error | null }> => {
     const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     // 1. Direct offline verification if network is disconnected
@@ -603,12 +578,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = (): ParentAuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

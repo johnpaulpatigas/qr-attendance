@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Select, Input } from '@qr-attendance/ui';
 import type { AttendanceStatus, SessionType, StudentWithSection } from '@qr-attendance/types';
 import { getSupabaseClient } from '@qr-attendance/supabase';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth';
 import { enqueueScan } from './offlineQueueService';
 
 export interface ManualAttendanceModalProps {

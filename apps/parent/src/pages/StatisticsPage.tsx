@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, LoadingState, Badge } from '@qr-attendance/ui';
 import { formatGradeSection } from '@qr-attendance/validation';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import {
   fetchStudentStatistics,
   type StudentAttendanceMetrics,

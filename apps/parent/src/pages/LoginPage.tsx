@@ -12,7 +12,7 @@ import {
   Select,
 } from '@qr-attendance/ui';
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { useAppBackButton } from '../hooks/useAppBackButton';
 
 export const LoginPage: React.FC = () => {

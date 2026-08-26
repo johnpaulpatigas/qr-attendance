@@ -22,7 +22,7 @@ import {
 } from '@qr-attendance/ui';
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { getUtc8DateString, formatGradeSection } from '@qr-attendance/validation';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { getQueuedScans } from '../features/attendance/offlineQueueService';
 

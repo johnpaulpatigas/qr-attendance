@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import React, { useEffect, useState, useCallback } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
   getCurrentUserProfile,
@@ -9,19 +9,7 @@ import {
   clearOfflineAuthSession,
 } from '@qr-attendance/supabase';
 import type { UserProfile } from '@qr-attendance/types';
-
-interface AuthContextType {
-  user: User | null;
-  profile: UserProfile | null;
-  session: Session | null;
-  isOfflineAuth: boolean;
-  isLoading: boolean;
-  signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: Error | null }>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext } from './AuthContext';
 
 const CACHE_PROFILE_KEY = 'teacher_auth_profile';
 const STORAGE_PREFIX = 'teacher';
@@ -61,54 +49,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const client = getSupabaseClient();
 
-  const handleProfileResolution = useCallback(async (userId: string, email?: string) => {
-    try {
-      const p = await getCurrentUserProfile(client, userId);
-      if (p && (p.role === 'teacher' || p.role === 'admin')) {
-        setProfile(p);
-        localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(p));
-      } else if (p) {
-        setProfile(null);
-        localStorage.removeItem(CACHE_PROFILE_KEY);
-        await client.auth.signOut();
-      } else {
-        const cached = localStorage.getItem(CACHE_PROFILE_KEY);
-        if (cached) {
-          setProfile(JSON.parse(cached));
-        } else {
-          const fallbackProfile: UserProfile = {
-            id: userId,
-            role: 'teacher',
-            full_name: email?.split('@')[0] || 'Teacher',
-            email: email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setProfile(fallbackProfile);
-          localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(fallbackProfile));
-        }
-      }
-    } catch {
-      // Offline fallback: load from localStorage
+  const handleProfileResolution = useCallback(
+    async (userId: string, email?: string) => {
       try {
-        const cached = localStorage.getItem(CACHE_PROFILE_KEY);
-        if (cached) {
-          setProfile(JSON.parse(cached));
+        const p = await getCurrentUserProfile(client, userId);
+        if (p && (p.role === 'teacher' || p.role === 'admin')) {
+          setProfile(p);
+          localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(p));
+        } else if (p) {
+          setProfile(null);
+          localStorage.removeItem(CACHE_PROFILE_KEY);
+          await client.auth.signOut();
         } else {
-          setProfile({
-            id: userId,
-            role: 'teacher',
-            full_name: email?.split('@')[0] || 'Teacher',
-            email: email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+          const cached = localStorage.getItem(CACHE_PROFILE_KEY);
+          if (cached) {
+            setProfile(JSON.parse(cached));
+          } else {
+            const fallbackProfile: UserProfile = {
+              id: userId,
+              role: 'teacher',
+              full_name: email?.split('@')[0] || 'Teacher',
+              email: email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            setProfile(fallbackProfile);
+            localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(fallbackProfile));
+          }
         }
       } catch {
-        // Ignore
+        // Offline fallback: load from localStorage
+        try {
+          const cached = localStorage.getItem(CACHE_PROFILE_KEY);
+          if (cached) {
+            setProfile(JSON.parse(cached));
+          } else {
+            setProfile({
+              id: userId,
+              role: 'teacher',
+              full_name: email?.split('@')[0] || 'Teacher',
+              email: email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // Ignore
+        }
       }
-    }
-  }, [client]);
+    },
+    [client]
+  );
 
   useEffect(() => {
     // Initial session lookup
@@ -193,7 +184,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [client, isOfflineAuth, handleProfileResolution]);
 
-  const signInWithEmail = async (email: string, pass: string): Promise<{ error: Error | null }> => {
+  const signInWithEmail = async (
+    email: string,
+    pass: string
+  ): Promise<{ error: Error | null }> => {
     const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     // 1. Direct offline verification if network is disconnected
@@ -345,12 +339,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

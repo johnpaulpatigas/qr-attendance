@@ -19,7 +19,7 @@ import {
   EmptyState,
 } from '@qr-attendance/ui';
 import { formatGradeSection } from '@qr-attendance/validation';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   fetchTodayAttendance,

@@ -17,7 +17,7 @@ import {
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import type { ClassSectionWithDetails, SectionSubjectTeacher } from '@qr-attendance/types';
 import { formatGradeSection, cleanSectionName } from '@qr-attendance/validation';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import {
   fetchClassSections,
   claimClassSection,

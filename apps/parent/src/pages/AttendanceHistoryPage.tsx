@@ -13,7 +13,7 @@ import {
   TableCell,
   LoadingState,
 } from '@qr-attendance/ui';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { fetchAttendanceHistory } from '../features/attendance/parentAttendanceService';
 import type { AttendanceRecord } from '@qr-attendance/types';
 

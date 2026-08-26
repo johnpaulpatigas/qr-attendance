@@ -9,7 +9,7 @@ import {
   LoadingState,
   Button,
 } from '@qr-attendance/ui';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { fetchStudentNotificationLogs } from '../features/attendance/parentAttendanceService';
 import { requestPushPermissionAndRegister } from '../features/notifications/fcmService';
 import type { NotificationLog } from '@qr-attendance/types';

@@ -37,7 +37,7 @@ import { useAppBackButton } from '../hooks/useAppBackButton';
 import { fetchStudents } from '../features/students/studentService';
 import { formatGradeSection } from '@qr-attendance/validation';
 import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceModal';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '../features/auth';
 import { getUtc8DateString } from '@qr-attendance/validation';
 
 function playScanTone(type: 'success' | 'duplicate' | 'error') {
