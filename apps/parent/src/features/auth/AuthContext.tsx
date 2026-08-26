@@ -29,8 +29,13 @@ interface ParentAuthContextType {
   setActiveChildId: (studentId: string) => void;
   isLoading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<{ error: Error | null }>;
-  signUpWithStudentLrn: (params: SignUpParentParams) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
-  linkStudentByLrn: (studentLrn: string, relationship?: string) => Promise<{ success: boolean; message: string }>;
+  signUpWithStudentLrn: (
+    params: SignUpParentParams
+  ) => Promise<{ error: Error | null; emailConfirmationRequired?: boolean }>;
+  linkStudentByLrn: (
+    studentLrn: string,
+    relationship?: string
+  ) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
 }
@@ -131,7 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (parentRecord) {
         const { data: relations } = await client
           .from('student_parents')
-          .select(`
+          .select(
+            `
             relationship,
             is_primary,
             students (
@@ -146,7 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 section_name
               )
             )
-          `)
+          `
+          )
           .eq('parent_id', parentRecord.id);
 
         if (relations && relations.length > 0) {
@@ -168,7 +175,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
-            .filter((rel): rel is StudentParentJoinRow & { students: NonNullable<StudentParentJoinRow['students']> } => Boolean(rel.students))
+            .filter(
+              (
+                rel
+              ): rel is StudentParentJoinRow & {
+                students: NonNullable<StudentParentJoinRow['students']>;
+              } => Boolean(rel.students)
+            )
             .map((rel) => ({
               student_id: rel.students.id,
               lrn: rel.students.lrn,
@@ -213,15 +226,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    client.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setSession(session);
-        setUser(session.user);
-        setIsOfflineAuth(false);
-        loadProfileAndChildren(session.user.id, session.user.email).finally(() => {
+    client.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+          setIsOfflineAuth(false);
+          loadProfileAndChildren(session.user.id, session.user.email).finally(() => {
+            setIsLoading(false);
+          });
+        } else {
+          const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+          if (offlineUser) {
+            setUser({
+              id: offlineUser.userId,
+              email: offlineUser.email,
+              app_metadata: {},
+              user_metadata: {},
+              aud: 'authenticated',
+              created_at: new Date().toISOString(),
+            } as User);
+            setProfile(offlineUser.profile);
+            setIsOfflineAuth(true);
+          }
           setIsLoading(false);
-        });
-      } else {
+        }
+      })
+      .catch(() => {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
         if (offlineUser) {
           setUser({
@@ -236,25 +268,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOfflineAuth(true);
         }
         setIsLoading(false);
-      }
-    }).catch(() => {
-      const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-      if (offlineUser) {
-        setUser({
-          id: offlineUser.userId,
-          email: offlineUser.email,
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-        } as User);
-        setProfile(offlineUser.profile);
-        setIsOfflineAuth(true);
-      }
-      setIsLoading(false);
-    });
+      });
 
-    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setSession(session);
         setUser(session.user);
@@ -262,7 +280,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadProfileAndChildren(session.user.id, session.user.email);
       } else if (!isOfflineAuth) {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-        if (offlineUser && (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        if (offlineUser && typeof navigator !== 'undefined' && !navigator.onLine) {
           setUser({
             id: offlineUser.userId,
             email: offlineUser.email,
@@ -310,7 +328,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsOfflineAuth(true);
         return { error: null };
       }
-      return { error: new Error(offlineRes.error || 'Failed to authenticate offline.') };
+      return {
+        error: new Error(offlineRes.error || 'Failed to authenticate offline.'),
+      };
     }
 
     // 2. Online verification with Supabase Auth
@@ -321,7 +341,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network') ||
+          error.message.includes('Failed to fetch')
+        ) {
           const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
           if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
             setUser({
@@ -376,7 +400,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsOfflineAuth(true);
         return { error: null };
       }
-      return { error: err instanceof Error ? err : new Error('An unexpected error occurred') };
+      return {
+        error: err instanceof Error ? err : new Error('An unexpected error occurred'),
+      };
     }
   };
 
@@ -447,7 +473,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     relationship: string = 'Parent'
   ): Promise<{ success: boolean; message: string }> => {
     if (!user) {
-      return { success: false, message: 'You must be logged in to link a student.' };
+      return {
+        success: false,
+        message: 'You must be logged in to link a student.',
+      };
     }
 
     try {
@@ -543,11 +572,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return { error: error ? new Error(error.message) : null };
     } catch (err: unknown) {
-      return { error: err instanceof Error ? err : new Error('Failed to send reset email') };
+      return {
+        error: err instanceof Error ? err : new Error('Failed to send reset email'),
+      };
     }
   };
 
-  const activeChild = linkedChildren.find((c) => c.student_id === activeChildId) || linkedChildren[0] || null;
+  const activeChild =
+    linkedChildren.find((c) => c.student_id === activeChildId) || linkedChildren[0] || null;
 
   return (
     <AuthContext.Provider
@@ -580,4 +612,3 @@ export const useAuth = (): ParentAuthContextType => {
   }
   return context;
 };
-

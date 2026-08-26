@@ -40,7 +40,8 @@ export function downloadQrCode(canvasElementId: string, filename: string) {
 
 export async function printStudentQrCard(student: StudentWithSection) {
   const payload = getStudentQrPayload(student.qr_identifier);
-  const fullName = `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
+  const fullName =
+    `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
   const qrDataUrl = await generateQrDataUrl(payload, 220);
 
   const printWindow = window.open('', '_blank');
@@ -180,7 +181,8 @@ export async function printBatchStudentQrCards(students: StudentWithSection[]) {
     students.map(async (student) => {
       const payload = getStudentQrPayload(student.qr_identifier);
       const qrDataUrl = await generateQrDataUrl(payload, 160);
-      const fullName = `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
+      const fullName =
+        `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
       return { student, fullName, qrDataUrl };
     })
   );

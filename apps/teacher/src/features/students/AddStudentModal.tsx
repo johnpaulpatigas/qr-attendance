@@ -79,7 +79,6 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
     }
   };
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -91,8 +90,9 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       return;
     }
 
-    let syId = '';
+    let syId: string;
     const selectedSec = sections.find((s) => s.id === sectionId);
+
     if (selectedSec?.school_year_id) {
       syId = selectedSec.school_year_id;
     } else {
@@ -146,7 +146,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
             {error}
           </div>
         )}
@@ -234,19 +234,31 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                     value: s.id,
                     label: cleanSectionName(s.section_name) || s.section_name,
                   }))
-                : [{ value: '', label: `No Grade ${gradeLevel} sections available` }]
+                : [
+                    {
+                      value: '',
+                      label: `No Grade ${gradeLevel} sections available`,
+                    },
+                  ]
             }
-            helperText={availableSections.length === 0 ? `No sections registered for Grade ${gradeLevel} yet.` : undefined}
+            helperText={
+              availableSections.length === 0
+                ? `No sections registered for Grade ${gradeLevel} yet.`
+                : undefined
+            }
           />
-
         </div>
 
-
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading} disabled={sections.length === 0}>
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isLoading}
+            disabled={sections.length === 0}
+          >
             Generate QR & Save
           </Button>
         </div>

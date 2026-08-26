@@ -58,4 +58,3 @@ describe('UTC+8 Date & Time Utilities', () => {
     expect(parseFlexibleDate('not-a-date').success).toBe(false);
   });
 });
-

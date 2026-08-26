@@ -30,4 +30,3 @@ describe('Teacher QR Utilities', () => {
     expect(dataUrl.startsWith('data:image/png;base64,')).toBe(true);
   });
 });
-

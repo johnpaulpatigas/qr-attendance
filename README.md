@@ -30,6 +30,7 @@ qr-attendance/
 ## Key Features
 
 ### 1. Teacher Application (apps/teacher — Port 3000)
+
 - **High-Speed QR Barcode Scanner:** Real-time mobile back-camera and desktop webcam stream with animated laser viewfinder, 2-second debounce filter, synthesized Web Audio scan chimes, and automatic cross-section protection.
 - **High School Multi-Subject & Adviser Support:** Separate homeroom (DepEd SF2) and subject-level attendance (Mathematics, Science, English, etc.) with class claiming and multi-teacher access.
 - **Instant Attendance Feedback:** Visual alert banners (Present, Late, Already Recorded, Invalid QR, Student Not Enrolled with enrolled section info).
@@ -41,6 +42,7 @@ qr-attendance/
 - **Manual Attendance & Audit Trails:** Manual status corrections requiring explicit reason logs persisted in attendance_events.
 
 ### 2. Parent & Student Portal (apps/parent — Port 3001)
+
 - **Multi-Child Switching:** Parents with multiple enrolled children can switch active profiles seamlessly.
 - **Today's Live Status:** Real-time view of daily morning and afternoon scans, exact time-in timestamps, and recording teacher name.
 - **Monthly Attendance History:** Chronological log of past attendance records with status badges and notes.
@@ -48,6 +50,7 @@ qr-attendance/
 - **FCM Push Notifications & Delivery Logs:** Real-time background notifications delivered via Service Worker whenever a student's QR is scanned.
 
 ### 3. Backend & Security (supabase/)
+
 - **Strict 12-Digit Numeric LRN Validation:** Enforced by database regex constraints (^\d{12}$) and Zod schemas.
 - **Zero Duplicate Scans:** Guaranteed by database unique constraints (UNIQUE(student_id, attendance_session_id) and UNIQUE(student_id, attendance_date, attendance_type)).
 - **Privacy-Preserving QR Codes:** QR codes encode only ATTENDANCE:<uuid> without sensitive PII.
@@ -60,10 +63,12 @@ qr-attendance/
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -74,6 +79,7 @@ npm install
 ```
 
 ### Environment Configuration
+
 Copy .env.example to create local .env files where needed:
 
 ```bash
@@ -81,6 +87,7 @@ cp .env.example .env
 ```
 
 Client frontend variables (safe for client apps):
+
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
@@ -92,6 +99,7 @@ VITE_FIREBASE_VAPID_KEY=your-vapid-public-key
 ```
 
 Server-side Edge Function secrets (never exposed to clients):
+
 ```env
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 FCM_SERVER_KEY=your-firebase-server-key
@@ -101,17 +109,17 @@ FCM_SERVER_KEY=your-firebase-server-key
 
 ## Development Commands
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start both Teacher App (port 3000) and Parent App (port 3001) concurrently |
-| `npm run dev:teacher` | Start Teacher App dev server on http://localhost:3000 |
-| `npm run dev:parent` | Start Parent App dev server on http://localhost:3001 |
-| `npm run typecheck` | Run TypeScript typechecking across all workspaces |
-| `npm test` | Run Vitest unit & integration test suite |
-| `npm run build` | Build production bundles for all apps and packages |
-| `npm run cap:sync` | Build both apps and sync web bundles into Android projects |
-| `npm run cap:open:teacher` | Open Teacher App in Android Studio |
-| `npm run cap:open:parent` | Open Parent App in Android Studio |
+| Command                    | Description                                                                |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `npm run dev`              | Start both Teacher App (port 3000) and Parent App (port 3001) concurrently |
+| `npm run dev:teacher`      | Start Teacher App dev server on http://localhost:3000                      |
+| `npm run dev:parent`       | Start Parent App dev server on http://localhost:3001                       |
+| `npm run typecheck`        | Run TypeScript typechecking across all workspaces                          |
+| `npm test`                 | Run Vitest unit & integration test suite                                   |
+| `npm run build`            | Build production bundles for all apps and packages                         |
+| `npm run cap:sync`         | Build both apps and sync web bundles into Android projects                 |
+| `npm run cap:open:teacher` | Open Teacher App in Android Studio                                         |
+| `npm run cap:open:parent`  | Open Parent App in Android Studio                                          |
 
 ---
 
@@ -156,6 +164,7 @@ npm test
 ```
 
 All 17 tests validate:
+
 - 12-digit numeric LRN validation.
 - ATTENDANCE:<uuid> QR payload encoding and decoding.
 - SF1 row parser and error diagnostic generator.

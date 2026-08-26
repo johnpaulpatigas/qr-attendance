@@ -16,7 +16,9 @@ export async function registerDeviceToken(params: RegisterTokenParams): Promise<
       profile_id: params.profileId,
       fcm_token: params.fcmToken,
       platform: params.platform || ('web' as const),
-      device_name: params.deviceName || (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 80) : 'Browser'),
+      device_name:
+        params.deviceName ||
+        (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 80) : 'Browser'),
       student_id: params.studentId || null,
       parent_id: params.parentId || null,
       is_active: true,
@@ -55,7 +57,11 @@ export async function requestPushPermissionAndRegister(
   profileId: string,
   studentId?: string
 ): Promise<string | null> {
-  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+  if (
+    typeof window === 'undefined' ||
+    !('Notification' in window) ||
+    !('serviceWorker' in navigator)
+  ) {
     console.warn('Push notifications are not supported in this browser environment.');
     return null;
   }

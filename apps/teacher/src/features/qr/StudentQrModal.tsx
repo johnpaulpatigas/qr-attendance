@@ -25,7 +25,8 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
 
   if (!student) return null;
 
-  const fullName = `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
+  const fullName =
+    `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
   const payload = getStudentQrPayload(student.qr_identifier);
   const canvasId = `student-qr-canvas-${student.id}`;
 
@@ -43,7 +44,11 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
   };
 
   const handleRegenerate = async () => {
-    if (!window.confirm('Are you sure you want to regenerate this student QR identifier? The old QR code will immediately stop working.')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to regenerate this student QR identifier? The old QR code will immediately stop working.'
+      )
+    ) {
       return;
     }
     setIsRegenerating(true);
@@ -102,12 +107,12 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
       <div className="flex flex-col items-center space-y-4 py-2 text-center">
         {/* Printable Card Frame */}
         <div className="w-full max-w-xs rounded-2xl border-2 border-slate-200 bg-gradient-to-b from-blue-50/50 to-white p-6 shadow-md">
-          <div className="text-xs font-bold uppercase tracking-wider text-blue-700">
+          <div className="text-xs font-bold tracking-wider text-blue-700 uppercase">
             Department of Education
           </div>
-          <p className="text-[11px] text-slate-500 mb-3">Attendance QR Identification</p>
+          <p className="mb-3 text-[11px] text-slate-500">Attendance QR Identification</p>
 
-          <div className="my-2 flex justify-center rounded-xl bg-white p-4 shadow-xs border border-slate-100">
+          <div className="my-2 flex justify-center rounded-xl border border-slate-100 bg-white p-4 shadow-xs">
             <QRCodeCanvas
               id={canvasId}
               value={payload}
@@ -118,21 +123,24 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
           </div>
 
           <div className="mt-3 space-y-1">
-            <h4 className="text-base font-bold text-slate-900 leading-tight">{fullName}</h4>
+            <h4 className="text-base leading-tight font-bold text-slate-900">{fullName}</h4>
             <p className="font-mono text-xs font-semibold text-slate-600">LRN: {student.lrn}</p>
             <p className="text-xs font-medium text-blue-600">
               {formatGradeSection(student.grade_level, student.section_name)}
             </p>
           </div>
-
         </div>
 
         <div className="space-y-1 text-xs text-slate-400">
           <p>
-            Payload Format: <Badge variant="outline" size="sm" className="font-mono text-[10px]">{payload}</Badge>
+            Payload Format:{' '}
+            <Badge variant="outline" size="sm" className="font-mono text-[10px]">
+              {payload}
+            </Badge>
           </p>
           <p className="text-[11px]">
-            Security Note: QR contains only student UUID reference. Personal records remain protected by server-side RLS.
+            Security Note: QR contains only student UUID reference. Personal records remain
+            protected by server-side RLS.
           </p>
         </div>
       </div>

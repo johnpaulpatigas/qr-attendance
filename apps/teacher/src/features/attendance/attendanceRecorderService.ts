@@ -1,5 +1,10 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
-import type { RecordAttendancePayload, RecordAttendanceResponse, SessionType, AttendanceStatus } from '@qr-attendance/types';
+import type {
+  RecordAttendancePayload,
+  RecordAttendanceResponse,
+  SessionType,
+  AttendanceStatus,
+} from '@qr-attendance/types';
 import { parseQrPayload } from '@qr-attendance/validation';
 import { enqueueScan, findCachedStudent } from './offlineQueueService';
 
@@ -65,10 +70,17 @@ export async function submitAttendanceScan(
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
   if (isOffline) {
     const cachedStudent = findCachedStudent(payload.class_id, payload.qr_payload);
-    const studentName = cachedStudent ? `${cachedStudent.first_name} ${cachedStudent.last_name}` : 'Student';
+    const studentName = cachedStudent
+      ? `${cachedStudent.first_name} ${cachedStudent.last_name}`
+      : 'Student';
     const scanTime = new Date();
-    const finalStatus = payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
-    const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const finalStatus =
+      payload.status ||
+      calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
+    const timeStr = scanTime.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
     enqueueScan(payload, {
       name: studentName,
@@ -158,7 +170,9 @@ export async function submitAttendanceScan(
 
     let teacherId = payload.recorded_by;
     if (!teacherId) {
-      const { data: { user } } = await client.auth.getUser();
+      const {
+        data: { user },
+      } = await client.auth.getUser();
       teacherId = user?.id;
     }
 
@@ -181,7 +195,8 @@ export async function submitAttendanceScan(
 
     const scanTime = new Date();
     const finalStatus: AttendanceStatus =
-      payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
+      payload.status ||
+      calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
 
     const { data: inserted, error: insertError } = await client
       .from('attendance')
@@ -219,11 +234,17 @@ export async function submitAttendanceScan(
         teacher_id: teacherId,
         event_type: 'scanned',
         timestamp: scanTime.toISOString(),
-        metadata: { source: 'web_qr_scanner', session_type: payload.session_type },
+        metadata: {
+          source: 'web_qr_scanner',
+          session_type: payload.session_type,
+        },
       });
     }
 
-    const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = scanTime.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     const studentName = `${student.first_name} ${student.last_name}`;
 
     return {
@@ -250,10 +271,17 @@ export async function submitAttendanceScan(
 
     if (isNetworkError) {
       const cachedStudent = findCachedStudent(payload.class_id, payload.qr_payload);
-      const studentName = cachedStudent ? `${cachedStudent.first_name} ${cachedStudent.last_name}` : 'Student';
+      const studentName = cachedStudent
+        ? `${cachedStudent.first_name} ${cachedStudent.last_name}`
+        : 'Student';
       const scanTime = new Date();
-      const finalStatus = payload.status || calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
-      const timeStr = scanTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const finalStatus =
+        payload.status ||
+        calculateAttendanceStatus(payload.session_type, payload.attendance_date, scanTime);
+      const timeStr = scanTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
       enqueueScan(payload, {
         name: studentName,

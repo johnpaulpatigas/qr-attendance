@@ -112,16 +112,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Initial session lookup
-    client.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setSession(session);
-        setUser(session.user);
-        setIsOfflineAuth(false);
-        handleProfileResolution(session.user.id, session.user.email).finally(() => {
+    client.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+          setIsOfflineAuth(false);
+          handleProfileResolution(session.user.id, session.user.email).finally(() => {
+            setIsLoading(false);
+          });
+        } else {
+          // Check offline active session fallback
+          const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
+          if (offlineUser) {
+            setUser({
+              id: offlineUser.userId,
+              email: offlineUser.email,
+              app_metadata: {},
+              user_metadata: {},
+              aud: 'authenticated',
+              created_at: new Date().toISOString(),
+            } as User);
+            setProfile(offlineUser.profile);
+            setIsOfflineAuth(true);
+          }
           setIsLoading(false);
-        });
-      } else {
-        // Check offline active session fallback
+        }
+      })
+      .catch(() => {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
         if (offlineUser) {
           setUser({
@@ -136,26 +155,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOfflineAuth(true);
         }
         setIsLoading(false);
-      }
-    }).catch(() => {
-      const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-      if (offlineUser) {
-        setUser({
-          id: offlineUser.userId,
-          email: offlineUser.email,
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-        } as User);
-        setProfile(offlineUser.profile);
-        setIsOfflineAuth(true);
-      }
-      setIsLoading(false);
-    });
+      });
 
     // Subscribe to auth changes
-    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setSession(session);
         setUser(session.user);
@@ -163,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await handleProfileResolution(session.user.id, session.user.email);
       } else if (!isOfflineAuth) {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-        if (offlineUser && (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        if (offlineUser && typeof navigator !== 'undefined' && !navigator.onLine) {
           // Keep offline session alive during network disconnection
           setUser({
             id: offlineUser.userId,
@@ -209,7 +214,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsOfflineAuth(true);
         return { error: null };
       }
-      return { error: new Error(offlineRes.error || 'Failed to authenticate offline.') };
+      return {
+        error: new Error(offlineRes.error || 'Failed to authenticate offline.'),
+      };
     }
 
     // 2. Online verification with Supabase Auth
@@ -221,7 +228,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         // If server network error or fetch failure, attempt offline fallback
-        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network') ||
+          error.message.includes('Failed to fetch')
+        ) {
           const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
           if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
             setUser({
@@ -245,7 +256,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (p && p.role !== 'teacher' && p.role !== 'admin') {
           await client.auth.signOut();
           return {
-            error: new Error('Access denied: Only teachers and administrators can sign in to the Teacher Portal.'),
+            error: new Error(
+              'Access denied: Only teachers and administrators can sign in to the Teacher Portal.'
+            ),
           };
         }
 
@@ -288,7 +301,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsOfflineAuth(true);
         return { error: null };
       }
-      return { error: err instanceof Error ? err : new Error('An unexpected error occurred') };
+      return {
+        error: err instanceof Error ? err : new Error('An unexpected error occurred'),
+      };
     }
   };
 
@@ -308,7 +323,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return { error: error ? new Error(error.message) : null };
     } catch (err: unknown) {
-      return { error: err instanceof Error ? err : new Error('Failed to send reset email') };
+      return {
+        error: err instanceof Error ? err : new Error('Failed to send reset email'),
+      };
     }
   };
 
@@ -337,4 +354,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

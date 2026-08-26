@@ -6,11 +6,7 @@ export async function getCurrentUserProfile(
   client: TypedSupabaseClient,
   userId: string
 ): Promise<UserProfile | null> {
-  const { data, error } = await client
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  const { data, error } = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
 
   if (error) {
     console.error('Error fetching user profile:', error.message);

@@ -28,7 +28,11 @@ serve(async (req) => {
 
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ success: false, status: 'unauthorized', message: 'Missing Authorization header' }),
+        JSON.stringify({
+          success: false,
+          status: 'unauthorized',
+          message: 'Missing Authorization header',
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -36,11 +40,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ success: false, status: 'unauthorized', message: 'Invalid authentication token' }),
+        JSON.stringify({
+          success: false,
+          status: 'unauthorized',
+          message: 'Invalid authentication token',
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -63,7 +74,15 @@ serve(async (req) => {
     }
 
     const body: RecordAttendancePayload = await req.json();
-    const { qr_payload, class_id, session_id, attendance_date, session_type, status = 'present', subject_name } = body;
+    const {
+      qr_payload,
+      class_id,
+      session_id,
+      attendance_date,
+      session_type,
+      status = 'present',
+      subject_name,
+    } = body;
 
     if (profile.role !== 'admin') {
       const { data: classSection, error: classError } = await supabase
@@ -73,11 +92,10 @@ serve(async (req) => {
         .single();
 
       const isAdviser = Boolean(
-        classSection && (
-          classSection.teacher_id === user.id ||
+        classSection &&
+        (classSection.teacher_id === user.id ||
           classSection.adviser_id === user.id ||
-          (!classSection.teacher_id && !classSection.adviser_id)
-        )
+          (!classSection.teacher_id && !classSection.adviser_id))
       );
 
       let isSubjectTeacher = false;
@@ -108,7 +126,11 @@ serve(async (req) => {
     const QR_PREFIX = 'ATTENDANCE:';
     if (!qr_payload || !qr_payload.startsWith(QR_PREFIX)) {
       return new Response(
-        JSON.stringify({ success: false, status: 'invalid_qr', message: 'Invalid Student QR format.' }),
+        JSON.stringify({
+          success: false,
+          status: 'invalid_qr',
+          message: 'Invalid Student QR format.',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -116,7 +138,11 @@ serve(async (req) => {
     const qrIdentifier = qr_payload.slice(QR_PREFIX.length).trim();
     if (!qrIdentifier) {
       return new Response(
-        JSON.stringify({ success: false, status: 'invalid_qr', message: 'Empty student QR identifier.' }),
+        JSON.stringify({
+          success: false,
+          status: 'invalid_qr',
+          message: 'Empty student QR identifier.',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -129,7 +155,11 @@ serve(async (req) => {
 
     if (studentError || !student) {
       return new Response(
-        JSON.stringify({ success: false, status: 'invalid_qr', message: 'Student QR code not found in database.' }),
+        JSON.stringify({
+          success: false,
+          status: 'invalid_qr',
+          message: 'Student QR code not found in database.',
+        }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -142,11 +172,14 @@ serve(async (req) => {
         .maybeSingle();
 
       const cleanActualSec = actualSec?.section_name
-        ? actualSec.section_name.replace(/^(?:grade\s*\d+|gr\.\s*\d+|g\d+|\d+)\s*[-—–:]?\s*/i, '').trim() || actualSec.section_name
+        ? actualSec.section_name
+            .replace(/^(?:grade\s*\d+|gr\.\s*\d+|g\d+|\d+)\s*[-—–:]?\s*/i, '')
+            .trim() || actualSec.section_name
         : '';
-      const actualSecName = actualSec ? `Grade ${actualSec.grade_level} — ${cleanActualSec}` : 'another class section';
+      const actualSecName = actualSec
+        ? `Grade ${actualSec.grade_level} — ${cleanActualSec}`
+        : 'another class section';
       const studentFullName = `${student.first_name} ${student.last_name}`.trim();
-
 
       return new Response(
         JSON.stringify({
@@ -235,14 +268,16 @@ serve(async (req) => {
     });
 
     try {
-      supabase.functions.invoke('send-fcm-notification', {
-        body: {
-          student_id: student.id,
-          attendance_id: attendanceRecord.id,
-          status: status,
-          recorded_at: attendanceRecord.recorded_at,
-        },
-      }).catch((e: Error) => console.warn('Background FCM dispatch non-blocking error:', e));
+      supabase.functions
+        .invoke('send-fcm-notification', {
+          body: {
+            student_id: student.id,
+            attendance_id: attendanceRecord.id,
+            status: status,
+            recorded_at: attendanceRecord.recorded_at,
+          },
+        })
+        .catch((e: Error) => console.warn('Background FCM dispatch non-blocking error:', e));
     } catch {
       // Non-blocking notification dispatch
     }

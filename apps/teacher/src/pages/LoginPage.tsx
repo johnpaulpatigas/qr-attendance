@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { QrCode, Lock, Mail, KeyRound } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input } from '@qr-attendance/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  Input,
+} from '@qr-attendance/ui';
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 import { useAppBackButton } from '../hooks/useAppBackButton';
@@ -80,7 +88,7 @@ export const LoginPage: React.FC = () => {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl mb-3">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl">
             <QrCode className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">MNHS Teacher Portal</h1>
@@ -89,7 +97,7 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        <Card className="shadow-lg border-slate-200">
+        <Card className="border-slate-200 shadow-lg">
           <CardHeader>
             <CardTitle>{isResetMode ? 'Reset Password' : 'Sign In'}</CardTitle>
             <CardDescription>
@@ -100,20 +108,23 @@ export const LoginPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {typeof navigator !== 'undefined' && !navigator.onLine && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <span><strong>Offline Mode:</strong> Sign in with the credentials previously used on this device.</span>
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500"></span>
+                <span>
+                  <strong>Offline Mode:</strong> Sign in with the credentials previously used on
+                  this device.
+                </span>
               </div>
             )}
             {isResetMode ? (
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 {error && (
-                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
                     {error}
                   </div>
                 )}
                 {successMessage && (
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
                     {successMessage}
                   </div>
                 )}
@@ -127,10 +138,15 @@ export const LoginPage: React.FC = () => {
                   leftIcon={<Mail className="h-4 w-4" />}
                   required
                 />
-                <Button type="submit" className="w-full" isLoading={loading} leftIcon={<KeyRound className="h-4 w-4" />}>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  isLoading={loading}
+                  leftIcon={<KeyRound className="h-4 w-4" />}
+                >
                   Send Reset Link
                 </Button>
-                <div className="text-center pt-2">
+                <div className="pt-2 text-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -138,7 +154,7 @@ export const LoginPage: React.FC = () => {
                       setError(null);
                       setSuccessMessage(null);
                     }}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline"
+                    className="text-xs font-semibold text-blue-600 underline hover:text-blue-700"
                   >
                     Back to Sign In
                   </button>
@@ -147,7 +163,7 @@ export const LoginPage: React.FC = () => {
             ) : (
               <form onSubmit={handleLogin} className="space-y-4">
                 {error && (
-                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
                     {error}
                   </div>
                 )}
@@ -176,7 +192,7 @@ export const LoginPage: React.FC = () => {
                       setIsResetMode(true);
                       setError(null);
                     }}
-                    className="text-xs text-blue-600 hover:text-blue-700 underline"
+                    className="text-xs text-blue-600 underline hover:text-blue-700"
                   >
                     Forgot Password?
                   </button>

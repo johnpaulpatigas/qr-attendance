@@ -41,10 +41,10 @@ serve(async (req) => {
       .single();
 
     if (studentError || !student) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Student not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, message: 'Student not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const studentFullName = `${student.first_name} ${student.last_name}`;
@@ -151,7 +151,8 @@ serve(async (req) => {
             notification_type: notifType,
             status: 'failed',
             fcm_token: tokenItem.fcm_token,
-            error_message: dispatchErr instanceof Error ? dispatchErr.message : 'FCM Dispatch failed',
+            error_message:
+              dispatchErr instanceof Error ? dispatchErr.message : 'FCM Dispatch failed',
           });
         }
       }

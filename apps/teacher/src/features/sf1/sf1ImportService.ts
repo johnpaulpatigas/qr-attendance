@@ -3,9 +3,7 @@ import { cleanSectionName, extractGradeFromSection } from '@qr-attendance/valida
 import type { SF1ImportSummary } from '@qr-attendance/types';
 import type { SF1ValidatedRecord } from './sf1Validator';
 
-export async function executeSF1Import(
-  records: SF1ValidatedRecord[]
-): Promise<SF1ImportSummary> {
+export async function executeSF1Import(records: SF1ValidatedRecord[]): Promise<SF1ImportSummary> {
   const client = getSupabaseClient();
   const validRecords = records.filter((r) => r.isValid);
 
@@ -49,7 +47,10 @@ export async function executeSF1Import(
       }
     }
   } catch (err: unknown) {
-    throw new Error(`Failed to resolve school year: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to resolve school year: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      { cause: err }
+    );
   }
 
   const { data: authData } = await client.auth.getUser();
@@ -95,7 +96,6 @@ export async function executeSF1Import(
         sectionCache.set(cacheKey, sectionId as string);
       }
 
-
       const { data: existingStudent } = await client
         .from('students')
         .select('id, qr_identifier')
@@ -126,9 +126,7 @@ export async function executeSF1Import(
         if (updateErr) throw new Error(updateErr.message);
         updatedCount++;
       } else {
-        const { error: insertErr } = await client
-          .from('students')
-          .insert(studentData);
+        const { error: insertErr } = await client.from('students').insert(studentData);
 
         if (insertErr) throw new Error(insertErr.message);
         createdCount++;

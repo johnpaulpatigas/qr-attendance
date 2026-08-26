@@ -60,7 +60,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <div className="flex min-h-[280px] w-full items-center justify-center p-6">
           <ErrorState
             title="Application Error"
-            message={this.state.error.message || 'An unexpected error occurred while loading this view.'}
+            message={
+              this.state.error.message || 'An unexpected error occurred while loading this view.'
+            }
             onRetry={this.resetError}
           />
         </div>

@@ -28,10 +28,10 @@ describe('Offline Authentication Service', () => {
   };
 
   beforeEach(() => {
-    (globalThis as unknown as { localStorage: typeof localStorageMock }).localStorage = localStorageMock;
+    (globalThis as unknown as { localStorage: typeof localStorageMock }).localStorage =
+      localStorageMock;
     localStorageMock.clear();
   });
-
 
   it('computes consistent deterministic SHA-256 hash for given input', async () => {
     const hash1 = await computeSha256Hex('salt123:test@example.com:password123');

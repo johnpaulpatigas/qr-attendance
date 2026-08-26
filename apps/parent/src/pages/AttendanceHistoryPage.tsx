@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, LoadingState } from '@qr-attendance/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  LoadingState,
+} from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
 import { fetchAttendanceHistory } from '../features/attendance/parentAttendanceService';
 import type { AttendanceRecord } from '@qr-attendance/types';
@@ -21,7 +34,7 @@ export const AttendanceHistoryPage: React.FC = () => {
   if (!activeChild) return null;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Attendance History</h2>
         <p className="text-sm text-slate-500">
@@ -81,10 +94,10 @@ export const AttendanceHistoryPage: React.FC = () => {
                           rec.status === 'present'
                             ? 'success'
                             : rec.status === 'late'
-                            ? 'warning'
-                            : rec.status === 'absent'
-                            ? 'danger'
-                            : 'outline'
+                              ? 'warning'
+                              : rec.status === 'absent'
+                                ? 'danger'
+                                : 'outline'
                         }
                         size="sm"
                         className="capitalize"
@@ -92,7 +105,7 @@ export const AttendanceHistoryPage: React.FC = () => {
                         {rec.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-500 text-xs uppercase">
+                    <TableCell className="text-xs text-slate-500 uppercase">
                       {rec.source.replace('_', ' ')}
                     </TableCell>
                   </TableRow>

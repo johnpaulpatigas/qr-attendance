@@ -91,24 +91,31 @@ export const SF1ImportPage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const filteredRecords = validationSummary?.records.filter((r) => {
-    if (filterTab === 'valid') return r.isValid;
-    if (filterTab === 'invalid') return !r.isValid;
-    return true;
-  }) || [];
+  const filteredRecords =
+    validationSummary?.records.filter((r) => {
+      if (filterTab === 'valid') return r.isValid;
+      if (filterTab === 'invalid') return !r.isValid;
+      return true;
+    }) || [];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">MNHS SF1 Importer</h2>
           <p className="text-sm text-slate-500">
-            Import official School Form 1 (SF1) student lists (.xlsx, .xls, .csv) into Marigondon NHS sections.
+            Import official School Form 1 (SF1) student lists (.xlsx, .xls, .csv) into Marigondon
+            NHS sections.
           </p>
         </div>
         {validationSummary && (
-          <Button variant="outline" size="sm" onClick={handleReset} leftIcon={<RotateCcw className="h-4 w-4" />}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            leftIcon={<RotateCcw className="h-4 w-4" />}
+          >
             Upload Another File
           </Button>
         )}
@@ -127,7 +134,8 @@ export const SF1ImportPage: React.FC = () => {
             <CardHeader>
               <CardTitle>1. Upload MNHS / DepEd SF1 Spreadsheet</CardTitle>
               <CardDescription>
-                Upload your class SF1 file. The system will automatically detect student names, 12-digit LRNs, sex, birth dates, and section info.
+                Upload your class SF1 file. The system will automatically detect student names,
+                12-digit LRNs, sex, birth dates, and section info.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -146,9 +154,9 @@ export const SF1ImportPage: React.FC = () => {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-12 text-center hover:border-blue-500 hover:bg-blue-50/20 transition-all cursor-pointer"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-12 text-center transition-all hover:border-blue-500 hover:bg-blue-50/20"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 mb-4">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
                   <UploadCloud className="h-8 w-8" />
                 </div>
                 <h4 className="text-base font-semibold text-slate-800">
@@ -157,7 +165,12 @@ export const SF1ImportPage: React.FC = () => {
                 <p className="mt-1 text-xs text-slate-500">
                   Accepts standard School Form 1 (.xlsx, .xls, .csv)
                 </p>
-                <Button size="sm" variant="outline" className="mt-5" leftIcon={<FileSpreadsheet className="h-4 w-4" />}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-5"
+                  leftIcon={<FileSpreadsheet className="h-4 w-4" />}
+                >
                   Select File
                 </Button>
               </div>
@@ -183,7 +196,7 @@ export const SF1ImportPage: React.FC = () => {
             <Card className="border-slate-200">
               <CardContent className="p-4">
                 <span className="text-xs font-semibold text-slate-500 uppercase">Total Rows</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <div className="mt-1 text-2xl font-bold text-slate-900">
                   {validationSummary.totalRows}
                 </div>
               </CardContent>
@@ -191,26 +204,44 @@ export const SF1ImportPage: React.FC = () => {
 
             <Card className="border-emerald-200 bg-emerald-50/30">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-emerald-700 uppercase">Valid Records</span>
-                <div className="text-2xl font-bold text-emerald-700 mt-1">
+                <span className="text-xs font-semibold text-emerald-700 uppercase">
+                  Valid Records
+                </span>
+                <div className="mt-1 text-2xl font-bold text-emerald-700">
                   {validationSummary.validRows}
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={validationSummary.invalidRows > 0 ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200'}>
+            <Card
+              className={
+                validationSummary.invalidRows > 0
+                  ? 'border-rose-200 bg-rose-50/30'
+                  : 'border-slate-200'
+              }
+            >
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-rose-700 uppercase">Invalid Records</span>
-                <div className="text-2xl font-bold text-rose-700 mt-1">
+                <span className="text-xs font-semibold text-rose-700 uppercase">
+                  Invalid Records
+                </span>
+                <div className="mt-1 text-2xl font-bold text-rose-700">
                   {validationSummary.invalidRows}
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={validationSummary.duplicateCount > 0 ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200'}>
+            <Card
+              className={
+                validationSummary.duplicateCount > 0
+                  ? 'border-amber-200 bg-amber-50/30'
+                  : 'border-slate-200'
+              }
+            >
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-amber-700 uppercase">Duplicate LRNs</span>
-                <div className="text-2xl font-bold text-amber-700 mt-1">
+                <span className="text-xs font-semibold text-amber-700 uppercase">
+                  Duplicate LRNs
+                </span>
+                <div className="mt-1 text-2xl font-bold text-amber-700">
                   {validationSummary.duplicateCount}
                 </div>
               </CardContent>
@@ -218,28 +249,34 @@ export const SF1ImportPage: React.FC = () => {
           </div>
 
           {/* Action Bar */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setFilterTab('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  filterTab === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  filterTab === 'all'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 All Rows ({validationSummary.totalRows})
               </button>
               <button
                 onClick={() => setFilterTab('valid')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  filterTab === 'valid' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  filterTab === 'valid'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 Valid ({validationSummary.validRows})
               </button>
               <button
                 onClick={() => setFilterTab('invalid')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  filterTab === 'invalid' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  filterTab === 'invalid'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 Errors ({validationSummary.invalidRows})
@@ -278,23 +315,33 @@ export const SF1ImportPage: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredRecords.map((r) => {
-                    const fullName = `${r.data.last_name}, ${r.data.first_name} ${r.data.middle_name || ''} ${r.data.suffix || ''}`.trim();
+                    const fullName =
+                      `${r.data.last_name}, ${r.data.first_name} ${r.data.middle_name || ''} ${r.data.suffix || ''}`.trim();
                     return (
-                      <TableRow key={r.rowIndex} className={!r.isValid ? 'bg-rose-50/30' : undefined}>
-                        <TableCell className="font-mono text-xs text-slate-500">#{r.rowIndex}</TableCell>
+                      <TableRow
+                        key={r.rowIndex}
+                        className={!r.isValid ? 'bg-rose-50/30' : undefined}
+                      >
+                        <TableCell className="font-mono text-xs text-slate-500">
+                          #{r.rowIndex}
+                        </TableCell>
                         <TableCell>
                           {r.isValid ? (
                             <Badge variant="success" size="sm">
-                              <CheckCircle2 className="h-3 w-3 mr-1" /> Valid
+                              <CheckCircle2 className="mr-1 h-3 w-3" /> Valid
                             </Badge>
                           ) : (
                             <Badge variant="danger" size="sm">
-                              <XCircle className="h-3 w-3 mr-1" /> Error
+                              <XCircle className="mr-1 h-3 w-3" /> Error
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono text-xs font-semibold">{r.raw.lrn}</TableCell>
-                        <TableCell className="font-medium text-slate-900">{fullName || '(Missing Name)'}</TableCell>
+                        <TableCell className="font-mono text-xs font-semibold">
+                          {r.raw.lrn}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-900">
+                          {fullName || '(Missing Name)'}
+                        </TableCell>
                         <TableCell className="text-xs">{r.data.sex}</TableCell>
                         <TableCell className="text-xs">
                           {formatGradeSection(r.data.grade_level, r.data.section_name)}
@@ -302,14 +349,14 @@ export const SF1ImportPage: React.FC = () => {
 
                         <TableCell className="text-xs">
                           {r.errors.length > 0 && (
-                            <div className="space-y-0.5 text-rose-600 font-medium">
+                            <div className="space-y-0.5 font-medium text-rose-600">
                               {r.errors.map((e, idx) => (
                                 <p key={idx}>&bull; {e}</p>
                               ))}
                             </div>
                           )}
                           {r.warnings.length > 0 && (
-                            <div className="space-y-0.5 text-amber-600 text-[11px]">
+                            <div className="space-y-0.5 text-[11px] text-amber-600">
                               {r.warnings.map((w, idx) => (
                                 <p key={idx}>&bull; {w}</p>
                               ))}
@@ -333,10 +380,12 @@ export const SF1ImportPage: React.FC = () => {
       {importSummary && (
         <Card className="border-emerald-200 bg-gradient-to-br from-emerald-500/5 to-teal-500/10 shadow-lg">
           <CardHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white mb-2 shadow-md">
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md">
               <CheckCircle2 className="h-7 w-7" />
             </div>
-            <CardTitle className="text-xl text-emerald-900">SF1 Import Completed Successfully</CardTitle>
+            <CardTitle className="text-xl text-emerald-900">
+              SF1 Import Completed Successfully
+            </CardTitle>
             <CardDescription className="text-emerald-700">
               Student identities and QR identifiers have been generated and recorded.
             </CardDescription>
@@ -345,15 +394,21 @@ export const SF1ImportPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div className="rounded-xl border border-emerald-200 bg-white p-4">
                 <span className="text-xs text-slate-500">Processed</span>
-                <div className="text-xl font-bold text-slate-900">{importSummary.total_rows} rows</div>
+                <div className="text-xl font-bold text-slate-900">
+                  {importSummary.total_rows} rows
+                </div>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-white p-4">
                 <span className="text-xs text-emerald-600">Created</span>
-                <div className="text-xl font-bold text-emerald-700">{importSummary.created_students} new</div>
+                <div className="text-xl font-bold text-emerald-700">
+                  {importSummary.created_students} new
+                </div>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-white p-4">
                 <span className="text-xs text-blue-600">Updated</span>
-                <div className="text-xl font-bold text-blue-700">{importSummary.updated_students} existing</div>
+                <div className="text-xl font-bold text-blue-700">
+                  {importSummary.updated_students} existing
+                </div>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-white p-4">
                 <span className="text-xs text-slate-500">Skipped Errors</span>

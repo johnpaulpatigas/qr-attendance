@@ -11,7 +11,15 @@ import {
   PlusCircle,
   FileSpreadsheet,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, LoadingState } from '@qr-attendance/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Badge,
+  LoadingState,
+} from '@qr-attendance/ui';
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { getUtc8DateString, formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
@@ -59,7 +67,8 @@ export const DashboardPage: React.FC = () => {
         // 1. Fetch Teacher's Class Sections
         const { data: sectionData } = await client
           .from('class_sections')
-          .select(`
+          .select(
+            `
             id,
             grade_level,
             section_name,
@@ -67,7 +76,8 @@ export const DashboardPage: React.FC = () => {
             students (
               id
             )
-          `)
+          `
+          )
           .order('grade_level', { ascending: true });
 
         interface SectionJoinRow {
@@ -78,7 +88,9 @@ export const DashboardPage: React.FC = () => {
           students?: { id: string }[] | null;
         }
 
-        const mappedClasses: DashboardClass[] = ((sectionData as unknown as SectionJoinRow[]) || []).map((s) => ({
+        const mappedClasses: DashboardClass[] = (
+          (sectionData as unknown as SectionJoinRow[]) || []
+        ).map((s) => ({
           id: s.id,
           grade_level: s.grade_level,
           section_name: s.section_name,
@@ -119,7 +131,8 @@ export const DashboardPage: React.FC = () => {
           const todayStr = getUtc8DateString();
           let attendanceQuery = client
             .from('attendance')
-            .select(`
+            .select(
+              `
               id,
               student_id,
               status,
@@ -131,7 +144,8 @@ export const DashboardPage: React.FC = () => {
                 last_name,
                 lrn
               )
-            `)
+            `
+            )
             .eq('attendance_date', todayStr)
             .order('recorded_at', { ascending: false });
 
@@ -171,7 +185,9 @@ export const DashboardPage: React.FC = () => {
         if (typedAttRecords.length > 0) {
           const scans: RecentScan[] = typedAttRecords.slice(0, 5).map((r) => ({
             id: r.id,
-            student_name: r.students ? `${r.students.first_name} ${r.students.last_name}` : 'Student',
+            student_name: r.students
+              ? `${r.students.first_name} ${r.students.last_name}`
+              : 'Student',
             lrn: r.students?.lrn || '',
             status: r.status,
             recorded_at: r.recorded_at,
@@ -203,12 +219,14 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner / Hero */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
+      <div className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
+          <span className="text-xs font-bold tracking-wider text-blue-200 uppercase">
             Welcome back, {profile?.full_name || 'Teacher'}
           </span>
-          <h2 className="text-2xl font-extrabold tracking-tight mt-1">Today's Attendance Overview</h2>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">
+            Today's Attendance Overview
+          </h2>
           <p className="mt-1 text-sm text-blue-100">
             {selectedClass
               ? `${formatGradeSection(selectedClass.grade_level, selectedClass.section_name)} • ${metrics.totalEnrolled} Enrolled`
@@ -220,7 +238,7 @@ export const DashboardPage: React.FC = () => {
             <select
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="rounded-lg bg-blue-700/80 border border-blue-500 text-white text-xs font-semibold px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-white"
+              className="rounded-lg border border-blue-500 bg-blue-700/80 px-3 py-2.5 text-xs font-semibold text-white focus:ring-2 focus:ring-white focus:outline-none"
             >
               <option value="all">All Classes</option>
               {classes.map((c) => (
@@ -234,7 +252,7 @@ export const DashboardPage: React.FC = () => {
           <Link to="/attendance">
             <Button
               size="md"
-              className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-md shrink-0"
+              className="shrink-0 bg-white font-bold text-blue-700 shadow-md hover:bg-blue-50"
               leftIcon={<QrCode className="h-4 w-4" />}
             >
               Start Scanning
@@ -248,7 +266,7 @@ export const DashboardPage: React.FC = () => {
         <Card className="border-slate-200">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
                 Total Enrolled
               </span>
               <Users className="h-4 w-4 text-slate-400" />
@@ -263,7 +281,7 @@ export const DashboardPage: React.FC = () => {
         <Card className="border-emerald-100 bg-emerald-50/30">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+              <span className="text-xs font-semibold tracking-wider text-emerald-700 uppercase">
                 Present
               </span>
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -271,16 +289,14 @@ export const DashboardPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-700">{metrics.present}</div>
-            <p className="mt-1 text-xs text-emerald-600">
-              {metrics.attendanceRate}% attendance
-            </p>
+            <p className="mt-1 text-xs text-emerald-600">{metrics.attendanceRate}% attendance</p>
           </CardContent>
         </Card>
 
         <Card className="border-amber-100 bg-amber-50/30">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+              <span className="text-xs font-semibold tracking-wider text-amber-700 uppercase">
                 Late
               </span>
               <Clock className="h-4 w-4 text-amber-600" />
@@ -295,7 +311,7 @@ export const DashboardPage: React.FC = () => {
         <Card className="border-rose-100 bg-rose-50/30">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-rose-700">
+              <span className="text-xs font-semibold tracking-wider text-rose-700 uppercase">
                 Absent
               </span>
               <XCircle className="h-4 w-4 text-rose-600" />
@@ -307,10 +323,10 @@ export const DashboardPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="col-span-2 sm:col-span-1 border-slate-200">
+        <Card className="col-span-2 border-slate-200 sm:col-span-1">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
                 Unrecorded
               </span>
               <HelpCircle className="h-4 w-4 text-slate-400" />
@@ -336,16 +352,26 @@ export const DashboardPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {classes.length === 0 ? (
-              <div className="text-center py-6 space-y-3">
-                <p className="text-sm text-slate-500">No class sections registered in the database yet.</p>
+              <div className="space-y-3 py-6 text-center">
+                <p className="text-sm text-slate-500">
+                  No class sections registered in the database yet.
+                </p>
                 <div className="flex items-center justify-center gap-2">
                   <Link to="/classes">
-                    <Button size="sm" variant="outline" leftIcon={<PlusCircle className="h-4 w-4" />}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      leftIcon={<PlusCircle className="h-4 w-4" />}
+                    >
                       Create Class
                     </Button>
                   </Link>
                   <Link to="/students/import-sf1">
-                    <Button size="sm" variant="primary" leftIcon={<FileSpreadsheet className="h-4 w-4" />}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      leftIcon={<FileSpreadsheet className="h-4 w-4" />}
+                    >
                       Import SF1
                     </Button>
                   </Link>
@@ -355,19 +381,19 @@ export const DashboardPage: React.FC = () => {
               classes.map((cls) => (
                 <div
                   key={cls.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50 transition-colors"
+                  className="flex items-center justify-between rounded-lg border border-slate-100 p-4 transition-colors hover:bg-slate-50"
                 >
                   <div>
                     <Link
                       to={`/students?section=${cls.id}&grade=${cls.grade_level}`}
-                      className="font-semibold text-slate-900 hover:text-blue-600 transition-colors"
+                      className="font-semibold text-slate-900 transition-colors hover:text-blue-600"
                     >
                       {formatGradeSection(cls.grade_level, cls.section_name)}
                     </Link>
                     <p className="text-xs text-slate-500">
                       <Link
                         to={`/students?section=${cls.id}&grade=${cls.grade_level}`}
-                        className="hover:underline hover:text-blue-600"
+                        className="hover:text-blue-600 hover:underline"
                       >
                         {cls.student_count} Students
                       </Link>{' '}
@@ -375,8 +401,11 @@ export const DashboardPage: React.FC = () => {
                     </p>
                   </div>
                   <Link to="/attendance">
-
-                    <Button size="sm" variant="outline" rightIcon={<ArrowRight className="h-4 w-4" />}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      rightIcon={<ArrowRight className="h-4 w-4" />}
+                    >
                       Take Attendance
                     </Button>
                   </Link>
@@ -392,8 +421,9 @@ export const DashboardPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {recentScans.length === 0 ? (
-              <div className="text-sm text-slate-500 text-center py-8">
-                No scans recorded yet today. Open the Attendance page to start scanning student QR passes.
+              <div className="py-8 text-center text-sm text-slate-500">
+                No scans recorded yet today. Open the Attendance page to start scanning student QR
+                passes.
               </div>
             ) : (
               <div className="space-y-3">
@@ -403,7 +433,7 @@ export const DashboardPage: React.FC = () => {
                     className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-0"
                   >
                     <div>
-                      <div className="font-medium text-sm text-slate-900">{scan.student_name}</div>
+                      <div className="text-sm font-medium text-slate-900">{scan.student_name}</div>
                       <div className="text-xs text-slate-500">LRN: {scan.lrn}</div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -412,11 +442,11 @@ export const DashboardPage: React.FC = () => {
                           scan.status === 'present'
                             ? 'success'
                             : scan.status === 'late'
-                            ? 'warning'
-                            : 'danger'
+                              ? 'warning'
+                              : 'danger'
                         }
                         size="sm"
-                        className="uppercase font-bold text-[10px]"
+                        className="text-[10px] font-bold uppercase"
                       >
                         {scan.status}
                       </Badge>

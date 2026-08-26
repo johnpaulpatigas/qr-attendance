@@ -17,12 +17,15 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
   const { data: authData } = await client.auth.getUser();
   const currentUserId = authData.user?.id;
-  const userCacheKey = currentUserId ? `${SECTIONS_CACHE_KEY}_${currentUserId}` : SECTIONS_CACHE_KEY;
+  const userCacheKey = currentUserId
+    ? `${SECTIONS_CACHE_KEY}_${currentUserId}`
+    : SECTIONS_CACHE_KEY;
 
   try {
     const { data, error } = await client
       .from('class_sections')
-      .select(`
+      .select(
+        `
         *,
         school_years (
           name
@@ -37,7 +40,8 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
           teacher_id,
           schedule_time
         )
-      `)
+      `
+      )
       .order('grade_level', { ascending: false });
 
     if (!error && data && data.length > 0) {
@@ -53,13 +57,15 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
         updated_at: string;
         school_years?: { name: string } | null;
         students?: { id: string }[] | null;
-        section_subject_teachers?: {
-          id: string;
-          class_id: string;
-          subject_name: string;
-          teacher_id: string;
-          schedule_time?: string | null;
-        }[] | null;
+        section_subject_teachers?:
+          | {
+              id: string;
+              class_id: string;
+              subject_name: string;
+              teacher_id: string;
+              schedule_time?: string | null;
+            }[]
+          | null;
       }
 
       const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map((d) => {
@@ -218,7 +224,10 @@ export async function assignSubjectTeacher(
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : 'Failed to assign subject teacher' };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to assign subject teacher',
+    };
   }
 }
 
@@ -227,15 +236,15 @@ export async function removeSubjectTeacher(
 ): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
   try {
-    const { error } = await client
-      .from('section_subject_teachers')
-      .delete()
-      .eq('id', assignmentId);
+    const { error } = await client.from('section_subject_teachers').delete().eq('id', assignmentId);
 
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : 'Failed to remove subject teacher' };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to remove subject teacher',
+    };
   }
 }
 
@@ -256,7 +265,10 @@ export async function claimClassSection(
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : 'Failed to claim section' };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to claim section',
+    };
   }
 }
 
@@ -269,7 +281,8 @@ export async function fetchSessionRecords(
   try {
     const { data, error } = await client
       .from('attendance')
-      .select(`
+      .select(
+        `
         *,
         students (
           id,
@@ -279,7 +292,8 @@ export async function fetchSessionRecords(
           middle_name,
           suffix
         )
-      `)
+      `
+      )
       .eq('attendance_session_id', sessionId)
       .order('recorded_at', { ascending: false });
 
@@ -295,7 +309,9 @@ export async function fetchSessionRecords(
         } | null;
       }
 
-      const records: AttendanceRecordWithStudent[] = (data as unknown as AttendanceRecordJoinRow[]).map((d) => ({
+      const records: AttendanceRecordWithStudent[] = (
+        data as unknown as AttendanceRecordJoinRow[]
+      ).map((d) => ({
         ...d,
         student: d.students || undefined,
       }));

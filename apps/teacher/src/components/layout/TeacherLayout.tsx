@@ -52,7 +52,7 @@ export const TeacherLayout: React.FC = () => {
             <QrCode className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">MNHS Attendance</h1>
+            <h1 className="text-base leading-tight font-bold text-slate-900">MNHS Attendance</h1>
             <p className="text-xs font-medium text-slate-500">Marigondon NHS • Teacher</p>
           </div>
         </div>
@@ -68,7 +68,7 @@ export const TeacherLayout: React.FC = () => {
                 to={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors ${
                   active
-                    ? 'bg-blue-50 text-blue-700 font-semibold shadow-xs'
+                    ? 'bg-blue-50 font-semibold text-blue-700 shadow-xs'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
@@ -80,20 +80,20 @@ export const TeacherLayout: React.FC = () => {
         </nav>
 
         {/* Teacher Info & Logout */}
-        <div className="border-t border-slate-200 p-4 space-y-3">
+        <div className="space-y-3 border-t border-slate-200 p-4">
           <div className="flex items-center justify-between px-2 text-xs text-slate-500">
             {isOnline ? (
-              <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+              <span className="flex items-center gap-1.5 font-medium text-emerald-600">
                 <Wifi className="h-3.5 w-3.5 text-emerald-500" />
                 Online
                 {queuedCount > 0 && (
-                  <Badge variant="warning" size="sm" className="text-[10px] py-0 px-1">
+                  <Badge variant="warning" size="sm" className="px-1 py-0 text-[10px]">
                     {queuedCount} Q
                   </Badge>
                 )}
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-rose-600 font-medium animate-pulse">
+              <span className="flex animate-pulse items-center gap-1.5 font-medium text-rose-600">
                 <WifiOff className="h-3.5 w-3.5 text-rose-500" />
                 Offline ({queuedCount})
               </span>
@@ -103,18 +103,18 @@ export const TeacherLayout: React.FC = () => {
             </Badge>
           </div>
           <div className="flex items-center gap-3 px-2 py-1">
-            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
               {initials}
             </div>
             <div className="truncate">
-              <p className="text-xs font-semibold text-slate-900 truncate">{displayName}</p>
-              <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+              <p className="truncate text-xs font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-[11px] text-slate-400">{user?.email}</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+            className="w-full justify-start text-slate-600 hover:bg-rose-50 hover:text-rose-600"
             leftIcon={<LogOut className="h-4 w-4" />}
             onClick={() => signOut()}
           >
@@ -134,7 +134,7 @@ export const TeacherLayout: React.FC = () => {
             <span className="font-bold text-slate-900">Teacher Portal</span>
           </div>
 
-          <div className="hidden lg:block text-sm font-medium text-slate-600">
+          <div className="hidden text-sm font-medium text-slate-600 lg:block">
             School Year: <span className="font-semibold text-slate-900">2026-2027</span>
           </div>
 
@@ -142,7 +142,7 @@ export const TeacherLayout: React.FC = () => {
             <Badge variant="success" size="sm" className="hidden sm:inline-flex">
               Authenticated
             </Badge>
-            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
               {initials}
             </div>
           </div>
@@ -154,7 +154,7 @@ export const TeacherLayout: React.FC = () => {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white lg:hidden">
+        <nav className="fixed right-0 bottom-0 left-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white lg:hidden">
           {navigation.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;

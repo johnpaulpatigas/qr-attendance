@@ -1,11 +1,11 @@
-import type { CapacitorConfig } from "@capacitor/cli";
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: "com.johnpaulpatigas.qrattendance.parent",
-  appName: "MNHS Parent Attendance",
-  webDir: "dist",
+  appId: 'com.johnpaulpatigas.qrattendance.parent',
+  appName: 'MNHS Parent Attendance',
+  webDir: 'dist',
   server: {
-    androidScheme: "https",
+    androidScheme: 'https',
   },
   android: {
     allowMixedContent: true,

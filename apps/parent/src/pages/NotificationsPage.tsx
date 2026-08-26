@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, Button } from '@qr-attendance/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Badge,
+  LoadingState,
+  Button,
+} from '@qr-attendance/ui';
 import { useAuth } from '../features/auth/AuthContext';
 import { fetchStudentNotificationLogs } from '../features/attendance/parentAttendanceService';
 import { requestPushPermissionAndRegister } from '../features/notifications/fcmService';
@@ -34,7 +42,7 @@ export const NotificationsPage: React.FC = () => {
   if (!activeChild) return null;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -43,7 +51,8 @@ export const NotificationsPage: React.FC = () => {
             Real-time push alert delivery history for{' '}
             <strong className="text-slate-800">
               {activeChild.first_name} {activeChild.last_name}
-            </strong>.
+            </strong>
+            .
           </p>
         </div>
         <div>
@@ -56,14 +65,14 @@ export const NotificationsPage: React.FC = () => {
             Enable Device Push Alerts
           </Button>
           {pushStatusMessage && (
-            <p className="mt-1 text-xs text-slate-500 text-right">{pushStatusMessage}</p>
+            <p className="mt-1 text-right text-xs text-slate-500">{pushStatusMessage}</p>
           )}
         </div>
       </div>
 
       {/* Push Status Banner */}
       <Card className="border-blue-100 bg-blue-50/50">
-        <CardContent className="p-4 flex items-center justify-between">
+        <CardContent className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
               <ShieldCheck className="h-5 w-5" />
@@ -71,11 +80,14 @@ export const NotificationsPage: React.FC = () => {
             <div>
               <h4 className="text-sm font-bold text-blue-900">Instant Parent Alerts Active</h4>
               <p className="text-xs text-blue-700">
-                You receive instant FCM notifications whenever your student's QR code is scanned in class.
+                You receive instant FCM notifications whenever your student's QR code is scanned in
+                class.
               </p>
             </div>
           </div>
-          <Badge variant="info" size="sm">Active</Badge>
+          <Badge variant="info" size="sm">
+            Active
+          </Badge>
         </CardContent>
       </Card>
 
@@ -83,7 +95,9 @@ export const NotificationsPage: React.FC = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Push Alert History</CardTitle>
-          <Badge variant="outline" size="sm">{logs.length} Delivered</Badge>
+          <Badge variant="outline" size="sm">
+            {logs.length} Delivered
+          </Badge>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -98,15 +112,14 @@ export const NotificationsPage: React.FC = () => {
                 const isPresent = log.notification_type === 'attendance_present';
                 const isLate = log.notification_type === 'attendance_late';
                 return (
-                  <div key={log.id} className="flex items-start justify-between p-4 hover:bg-slate-50/50 transition-colors">
+                  <div
+                    key={log.id}
+                    className="flex items-start justify-between p-4 transition-colors hover:bg-slate-50/50"
+                  >
                     <div className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl text-white ${
-                          isPresent
-                            ? 'bg-emerald-600'
-                            : isLate
-                            ? 'bg-amber-600'
-                            : 'bg-rose-600'
+                          isPresent ? 'bg-emerald-600' : isLate ? 'bg-amber-600' : 'bg-rose-600'
                         }`}
                       >
                         {isPresent ? (
@@ -122,13 +135,13 @@ export const NotificationsPage: React.FC = () => {
                           {isPresent
                             ? `${activeChild.first_name} marked PRESENT`
                             : isLate
-                            ? `${activeChild.first_name} marked LATE`
-                            : `${activeChild.first_name} attendance notice`}
+                              ? `${activeChild.first_name} marked LATE`
+                              : `${activeChild.first_name} attendance notice`}
                         </p>
                         <p className="text-xs text-slate-500">
                           Delivered via Firebase Cloud Messaging push service
                         </p>
-                        <p className="text-[11px] font-mono text-slate-400">
+                        <p className="font-mono text-[11px] text-slate-400">
                           {new Date(log.created_at).toLocaleString([], {
                             dateStyle: 'medium',
                             timeStyle: 'short',

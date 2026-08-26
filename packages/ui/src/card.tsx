@@ -37,10 +37,7 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({
   ...props
 }) => {
   return (
-    <h3
-      className={cn('text-lg font-semibold leading-none tracking-tight', className)}
-      {...props}
-    >
+    <h3 className={cn('text-lg leading-none font-semibold tracking-tight', className)} {...props}>
       {children}
     </h3>
   );

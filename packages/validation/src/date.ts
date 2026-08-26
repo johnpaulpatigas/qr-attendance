@@ -27,7 +27,11 @@ export function getUtc8DateString(date: Date = new Date()): string {
 /**
  * Returns the hour and minute in UTC+8 (Asia/Manila timezone).
  */
-export function getUtc8Time(date: Date = new Date()): { hours: number; minutes: number; totalMinutes: number } {
+export function getUtc8Time(date: Date = new Date()): {
+  hours: number;
+  minutes: number;
+  totalMinutes: number;
+} {
   try {
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Manila',
@@ -79,7 +83,10 @@ export function parseFlexibleDate(val: unknown): ParseDateResult {
   }
 
   // 2. If Excel serial number (e.g., 20000 - 60000)
-  if (typeof val === 'number' || (typeof val === 'string' && /^\d{4,6}(\.\d+)?$/.test(val.trim()))) {
+  if (
+    typeof val === 'number' ||
+    (typeof val === 'string' && /^\d{4,6}(\.\d+)?$/.test(val.trim()))
+  ) {
     const num = typeof val === 'number' ? val : Number(val);
     if (!isNaN(num) && num > 1000 && num < 100000) {
       // Excel 1900 date system

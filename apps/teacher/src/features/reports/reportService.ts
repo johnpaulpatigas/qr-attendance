@@ -44,8 +44,18 @@ export interface DailyReportRow {
 }
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 export async function fetchDailyReport(
@@ -81,7 +91,8 @@ export async function fetchDailyReport(
 
     return studentList.map((s) => {
       const att = attMap.get(s.id);
-      const fullName = `${s.last_name}, ${s.first_name} ${s.middle_name || ''} ${s.suffix || ''}`.trim();
+      const fullName =
+        `${s.last_name}, ${s.first_name} ${s.middle_name || ''} ${s.suffix || ''}`.trim();
       return {
         studentId: s.id,
         lrn: s.lrn,
@@ -121,7 +132,8 @@ export async function generateSF2Report(
   try {
     const { data, error } = await client
       .from('students')
-      .select(`
+      .select(
+        `
         *,
         class_sections (
           section_name,
@@ -130,7 +142,8 @@ export async function generateSF2Report(
         school_years (
           name
         )
-      `)
+      `
+      )
       .eq('section_id', classId)
       .order('last_name', { ascending: true });
 
@@ -241,9 +254,13 @@ export async function generateSF2Report(
 
   const totalEnrollment = students.length;
   const totalSchoolDaysCount = Math.max(1, schoolDays.length);
-  const totalDailyAttendance = (maleRows.reduce((s, r) => s + r.totalPresent, 0) + femaleRows.reduce((s, r) => s + r.totalPresent, 0));
-  const ada = totalEnrollment > 0 ? Number((totalDailyAttendance / totalSchoolDaysCount).toFixed(1)) : 0;
-  const attendancePercentage = totalEnrollment > 0 ? Number((((ada / totalEnrollment) * 100)).toFixed(1)) : 0;
+  const totalDailyAttendance =
+    maleRows.reduce((s, r) => s + r.totalPresent, 0) +
+    femaleRows.reduce((s, r) => s + r.totalPresent, 0);
+  const ada =
+    totalEnrollment > 0 ? Number((totalDailyAttendance / totalSchoolDaysCount).toFixed(1)) : 0;
+  const attendancePercentage =
+    totalEnrollment > 0 ? Number(((ada / totalEnrollment) * 100).toFixed(1)) : 0;
 
   return {
     schoolName: 'Marigondon National High School',

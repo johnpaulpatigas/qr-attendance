@@ -25,9 +25,7 @@ import {
   TableCell,
   LoadingState,
 } from '@qr-attendance/ui';
-import {
-  fetchClassSections,
-} from '../features/attendance/attendanceSessionService';
+import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { formatGradeSection } from '@qr-attendance/validation';
 import {
   generateSF2Report,
@@ -99,7 +97,8 @@ export const ReportsPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">MNHS Attendance Reports & SF2</h2>
           <p className="text-sm text-slate-500">
-            Generate monthly School Form 2 (SF2) registers and daily attendance audits for Marigondon NHS.
+            Generate monthly School Form 2 (SF2) registers and daily attendance audits for
+            Marigondon NHS.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +129,7 @@ export const ReportsPage: React.FC = () => {
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab('sf2')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-all ${
             activeTab === 'sf2'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -141,7 +140,7 @@ export const ReportsPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('daily')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-all ${
             activeTab === 'daily'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -165,7 +164,6 @@ export const ReportsPage: React.FC = () => {
                 label: formatGradeSection(s.grade_level, s.section_name),
               }))}
             />
-
 
             {activeTab === 'sf2' ? (
               <>
@@ -196,14 +194,14 @@ export const ReportsPage: React.FC = () => {
               </>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Report Date
                 </label>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                 />
               </div>
             )}
@@ -227,10 +225,10 @@ export const ReportsPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Card>
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase">
                   <Users className="h-3.5 w-3.5" /> Total Enrollment
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <div className="mt-1 text-2xl font-bold text-slate-900">
                   {sf2Data.totalEnrollment}
                 </div>
               </CardContent>
@@ -238,10 +236,10 @@ export const ReportsPage: React.FC = () => {
 
             <Card className="border-blue-200 bg-blue-50/30">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-blue-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-blue-700 uppercase">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Average Daily (ADA)
                 </span>
-                <div className="text-2xl font-bold text-blue-700 mt-1">
+                <div className="mt-1 text-2xl font-bold text-blue-700">
                   {sf2Data.averageDailyAttendance}
                 </div>
               </CardContent>
@@ -249,10 +247,10 @@ export const ReportsPage: React.FC = () => {
 
             <Card className="border-emerald-200 bg-emerald-50/30">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-emerald-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 uppercase">
                   <TrendingUp className="h-3.5 w-3.5" /> Attendance Rate
                 </span>
-                <div className="text-2xl font-bold text-emerald-700 mt-1">
+                <div className="mt-1 text-2xl font-bold text-emerald-700">
                   {sf2Data.attendancePercentage}%
                 </div>
               </CardContent>
@@ -260,10 +258,10 @@ export const ReportsPage: React.FC = () => {
 
             <Card className="border-amber-200 bg-amber-50/30">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-amber-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 uppercase">
                   <Clock className="h-3.5 w-3.5" /> Total Tardy Days
                 </span>
-                <div className="text-2xl font-bold text-amber-700 mt-1">
+                <div className="mt-1 text-2xl font-bold text-amber-700">
                   {sf2Data.maleTotalTardy + sf2Data.femaleTotalTardy}
                 </div>
               </CardContent>
@@ -281,9 +279,11 @@ export const ReportsPage: React.FC = () => {
                   {sf2Data.schoolDays.length} School Days &bull; DepEd Standard Form
                 </p>
               </div>
-              <Badge variant="info" size="sm">SY {sf2Data.schoolYear}</Badge>
+              <Badge variant="info" size="sm">
+                SY {sf2Data.schoolYear}
+              </Badge>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="overflow-x-auto p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -291,14 +291,12 @@ export const ReportsPage: React.FC = () => {
                     <TableHead className="w-28">LRN</TableHead>
                     <TableHead className="min-w-[180px]">Learner's Name</TableHead>
                     {sf2Data.schoolDays.slice(0, 15).map((d) => (
-                      <TableHead key={d} className="w-7 text-center text-[10px] p-1">
+                      <TableHead key={d} className="w-7 p-1 text-center text-[10px]">
                         {d}
                       </TableHead>
                     ))}
                     {sf2Data.schoolDays.length > 15 && (
-                      <TableHead className="w-10 text-center text-xs text-slate-400">
-                        ...
-                      </TableHead>
+                      <TableHead className="w-10 text-center text-xs text-slate-400">...</TableHead>
                     )}
                     <TableHead className="w-12 text-center text-xs">ABS</TableHead>
                     <TableHead className="w-12 text-center text-xs">TAR</TableHead>
@@ -307,21 +305,24 @@ export const ReportsPage: React.FC = () => {
                 <TableBody>
                   {/* Male Learners Header */}
                   <TableRow className="bg-slate-50 font-bold">
-                    <TableCell colSpan={18} className="text-xs text-blue-900 py-1.5">
+                    <TableCell colSpan={18} className="py-1.5 text-xs text-blue-900">
                       MALE LEARNERS ({sf2Data.maleStudents.length})
                     </TableCell>
                   </TableRow>
                   {sf2Data.maleStudents.map((r, idx) => {
-                    const fullName = `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
+                    const fullName =
+                      `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
                     return (
                       <TableRow key={r.student.id}>
                         <TableCell className="text-xs text-slate-400">{idx + 1}</TableCell>
                         <TableCell className="font-mono text-xs">{r.student.lrn}</TableCell>
-                        <TableCell className="font-medium text-xs text-slate-900">{fullName}</TableCell>
+                        <TableCell className="text-xs font-medium text-slate-900">
+                          {fullName}
+                        </TableCell>
                         {sf2Data.schoolDays.slice(0, 15).map((d) => {
                           const st = r.dailyStatus[d];
                           return (
-                            <TableCell key={d} className="text-center font-bold text-[10px] p-1">
+                            <TableCell key={d} className="p-1 text-center text-[10px] font-bold">
                               {st === 'present' ? (
                                 <span className="text-slate-400">/</span>
                               ) : st === 'late' ? (
@@ -337,29 +338,36 @@ export const ReportsPage: React.FC = () => {
                         {sf2Data.schoolDays.length > 15 && (
                           <TableCell className="text-center text-xs text-slate-400">...</TableCell>
                         )}
-                        <TableCell className="text-center font-bold text-xs">{r.totalAbsences}</TableCell>
-                        <TableCell className="text-center font-bold text-xs">{r.totalTardy}</TableCell>
+                        <TableCell className="text-center text-xs font-bold">
+                          {r.totalAbsences}
+                        </TableCell>
+                        <TableCell className="text-center text-xs font-bold">
+                          {r.totalTardy}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
 
                   {/* Female Learners Header */}
                   <TableRow className="bg-slate-50 font-bold">
-                    <TableCell colSpan={18} className="text-xs text-rose-900 py-1.5">
+                    <TableCell colSpan={18} className="py-1.5 text-xs text-rose-900">
                       FEMALE LEARNERS ({sf2Data.femaleStudents.length})
                     </TableCell>
                   </TableRow>
                   {sf2Data.femaleStudents.map((r, idx) => {
-                    const fullName = `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
+                    const fullName =
+                      `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
                     return (
                       <TableRow key={r.student.id}>
                         <TableCell className="text-xs text-slate-400">{idx + 1}</TableCell>
                         <TableCell className="font-mono text-xs">{r.student.lrn}</TableCell>
-                        <TableCell className="font-medium text-xs text-slate-900">{fullName}</TableCell>
+                        <TableCell className="text-xs font-medium text-slate-900">
+                          {fullName}
+                        </TableCell>
                         {sf2Data.schoolDays.slice(0, 15).map((d) => {
                           const st = r.dailyStatus[d];
                           return (
-                            <TableCell key={d} className="text-center font-bold text-[10px] p-1">
+                            <TableCell key={d} className="p-1 text-center text-[10px] font-bold">
                               {st === 'present' ? (
                                 <span className="text-slate-400">/</span>
                               ) : st === 'late' ? (
@@ -375,8 +383,12 @@ export const ReportsPage: React.FC = () => {
                         {sf2Data.schoolDays.length > 15 && (
                           <TableCell className="text-center text-xs text-slate-400">...</TableCell>
                         )}
-                        <TableCell className="text-center font-bold text-xs">{r.totalAbsences}</TableCell>
-                        <TableCell className="text-center font-bold text-xs">{r.totalTardy}</TableCell>
+                        <TableCell className="text-center text-xs font-bold">
+                          {r.totalAbsences}
+                        </TableCell>
+                        <TableCell className="text-center text-xs font-bold">
+                          {r.totalTardy}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -392,9 +404,14 @@ export const ReportsPage: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">
-              Daily Attendance Log — {new Date(selectedDate).toLocaleDateString([], { dateStyle: 'full' })}
+              Daily Attendance Log —{' '}
+              {new Date(selectedDate).toLocaleDateString([], {
+                dateStyle: 'full',
+              })}
             </CardTitle>
-            <Badge variant="outline" size="sm">{dailyData.length} Students</Badge>
+            <Badge variant="outline" size="sm">
+              {dailyData.length} Students
+            </Badge>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -420,10 +437,10 @@ export const ReportsPage: React.FC = () => {
                           row.status === 'present'
                             ? 'success'
                             : row.status === 'late'
-                            ? 'warning'
-                            : row.status === 'absent'
-                            ? 'danger'
-                            : 'outline'
+                              ? 'warning'
+                              : row.status === 'absent'
+                                ? 'danger'
+                                : 'outline'
                         }
                         size="sm"
                         className="capitalize"

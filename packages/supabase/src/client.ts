@@ -52,13 +52,17 @@ export function createSupabaseClient(config?: SupabaseConfig): TypedSupabaseClie
     );
   }
 
-  const client = createClient<Database>(url || 'https://placeholder.supabase.co', key || 'placeholder-key', {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  });
+  const client = createClient<Database>(
+    url || 'https://placeholder.supabase.co',
+    key || 'placeholder-key',
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    }
+  );
 
   return client;
 }

@@ -68,7 +68,9 @@ async function ensureTrackingTable(client) {
 
 async function getAppliedMigrations(client) {
   await ensureTrackingTable(client);
-  const res = await client.query(`SELECT version, name, applied_at, checksum FROM ${TRACKING_TABLE} ORDER BY version ASC`);
+  const res = await client.query(
+    `SELECT version, name, applied_at, checksum FROM ${TRACKING_TABLE} ORDER BY version ASC`
+  );
   return new Map(res.rows.map((row) => [row.version, row]));
 }
 
@@ -116,9 +118,13 @@ async function main() {
     console.error('\n❌ No database connection string found.');
     console.error('\nPlease provide DATABASE_URL or SUPABASE_DB_URL in your .env or environment:');
     console.error('Example:');
-    console.error('  DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres');
+    console.error(
+      '  DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres'
+    );
     console.error('  or (via connection pooler):');
-    console.error('  DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require\n');
+    console.error(
+      '  DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require\n'
+    );
     process.exit(1);
   }
 
@@ -144,7 +150,9 @@ async function main() {
     }
 
     if (targetFile) {
-      const fullPath = path.isAbsolute(targetFile) ? targetFile : path.join(MIGRATIONS_DIR, targetFile);
+      const fullPath = path.isAbsolute(targetFile)
+        ? targetFile
+        : path.join(MIGRATIONS_DIR, targetFile);
       if (!fs.existsSync(fullPath)) {
         throw new Error(`File not found: ${fullPath}`);
       }
@@ -160,7 +168,9 @@ async function main() {
       for (const m of migrations) {
         const applied = appliedMap.get(m.version);
         if (applied) {
-          console.log(`  [APPLIED] ${m.file} (at ${new Date(applied.applied_at).toLocaleString()})`);
+          console.log(
+            `  [APPLIED] ${m.file} (at ${new Date(applied.applied_at).toLocaleString()})`
+          );
         } else {
           console.log(`  [PENDING] ${m.file}`);
         }

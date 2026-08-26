@@ -59,7 +59,8 @@ export const ClassesPage: React.FC = () => {
   const [roomNumber, setRoomNumber] = useState('');
 
   // Subject Teacher Assignment Modal state
-  const [selectedClassForSubjects, setSelectedClassForSubjects] = useState<ClassSectionWithDetails | null>(null);
+  const [selectedClassForSubjects, setSelectedClassForSubjects] =
+    useState<ClassSectionWithDetails | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('Mathematics');
   const [customSubjectName, setCustomSubjectName] = useState('');
   const [assignedTeacherId, setAssignedTeacherId] = useState(user?.id || '');
@@ -152,7 +153,6 @@ export const ClassesPage: React.FC = () => {
         adviser_id: user?.id || null,
       });
 
-
       if (insertErr) {
         throw new Error(insertErr.message);
       }
@@ -202,7 +202,9 @@ export const ClassesPage: React.FC = () => {
       setScheduleTime('');
       await loadClasses();
       // Refresh current modal section
-      const updated = (await fetchClassSections()).find((s) => s.id === selectedClassForSubjects.id);
+      const updated = (await fetchClassSections()).find(
+        (s) => s.id === selectedClassForSubjects.id
+      );
       if (updated) setSelectedClassForSubjects(updated);
     } else {
       setSubjectError(res.error || 'Failed to assign subject teacher.');
@@ -215,7 +217,9 @@ export const ClassesPage: React.FC = () => {
     const res = await removeSubjectTeacher(assignmentId);
     if (res.success) {
       await loadClasses();
-      const updated = (await fetchClassSections()).find((s) => s.id === selectedClassForSubjects.id);
+      const updated = (await fetchClassSections()).find(
+        (s) => s.id === selectedClassForSubjects.id
+      );
       if (updated) setSelectedClassForSubjects(updated);
     }
   };
@@ -258,11 +262,14 @@ export const ClassesPage: React.FC = () => {
             const subjectTeachers = cls.subject_teachers || [];
 
             return (
-              <Card key={cls.id} className="hover:shadow-md transition-shadow flex flex-col justify-between">
+              <Card
+                key={cls.id}
+                className="flex flex-col justify-between transition-shadow hover:shadow-md"
+              >
                 <div>
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                      <span className="text-xs font-bold tracking-wider text-blue-600 uppercase">
                         Grade {cls.grade_level}
                       </span>
                       {isMyAdvisory ? (
@@ -281,7 +288,7 @@ export const ClassesPage: React.FC = () => {
                     </div>
                     <CardTitle className="text-lg">{cleanSectionName(cls.section_name)}</CardTitle>
                     {cls.room_number && (
-                      <p className="text-xs text-slate-400 font-medium">Room {cls.room_number}</p>
+                      <p className="text-xs font-medium text-slate-400">Room {cls.room_number}</p>
                     )}
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -293,33 +300,36 @@ export const ClassesPage: React.FC = () => {
                     </div>
 
                     {/* Subject Teachers Preview */}
-                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-2.5 space-y-1.5">
+                    <div className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50 p-2.5">
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                         <span className="flex items-center gap-1">
-                          <BookOpen className="h-3.5 w-3.5 text-blue-600" /> Subject Teachers ({subjectTeachers.length})
+                          <BookOpen className="h-3.5 w-3.5 text-blue-600" /> Subject Teachers (
+                          {subjectTeachers.length})
                         </span>
                         <button
                           type="button"
                           onClick={() => setSelectedClassForSubjects(cls)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-[11px]"
+                          className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline"
                         >
                           Manage
                         </button>
                       </div>
                       {subjectTeachers.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic">No subject teachers assigned yet.</p>
+                        <p className="text-[11px] text-slate-400 italic">
+                          No subject teachers assigned yet.
+                        </p>
                       ) : (
                         <div className="flex flex-wrap gap-1 pt-1">
                           {subjectTeachers.slice(0, 3).map((st) => (
                             <span
                               key={st.id}
-                              className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-200/60"
+                              className="inline-flex items-center rounded border border-blue-200/60 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700"
                             >
                               {st.subject_name}
                             </span>
                           ))}
                           {subjectTeachers.length > 3 && (
-                            <span className="inline-flex items-center text-[10px] text-slate-500 font-medium pl-1">
+                            <span className="inline-flex items-center pl-1 text-[10px] font-medium text-slate-500">
                               +{subjectTeachers.length - 3} more
                             </span>
                           )}
@@ -329,7 +339,7 @@ export const ClassesPage: React.FC = () => {
                   </CardContent>
                 </div>
 
-                <div className="p-4 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 border-t border-slate-100 p-4 pt-2">
                   {isUnassigned ? (
                     <Button
                       variant="outline"
@@ -341,7 +351,7 @@ export const ClassesPage: React.FC = () => {
                       Claim Section
                     </Button>
                   ) : (
-                    <div className="text-xs text-slate-500 truncate max-w-[120px]">
+                    <div className="max-w-[120px] truncate text-xs text-slate-500">
                       {isMyAdvisory ? 'Your Advisory' : 'Teaching Subject'}
                     </div>
                   )}
@@ -353,8 +363,11 @@ export const ClassesPage: React.FC = () => {
                       </Button>
                     </Link>
                     <Link to={`/attendance`}>
-
-                      <Button variant="primary" size="sm" leftIcon={<QrCode className="h-3.5 w-3.5" />}>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<QrCode className="h-3.5 w-3.5" />}
+                      >
                         Scan
                       </Button>
                     </Link>
@@ -375,7 +388,7 @@ export const ClassesPage: React.FC = () => {
       >
         <form onSubmit={handleCreateClass} className="space-y-4">
           {formError && (
-            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
               {formError}
             </div>
           )}
@@ -402,7 +415,6 @@ export const ClassesPage: React.FC = () => {
             required
           />
 
-
           <Input
             label="Room Number (Optional)"
             placeholder="e.g. Building 2 - Room 304"
@@ -410,7 +422,7 @@ export const ClassesPage: React.FC = () => {
             onChange={(e) => setRoomNumber(e.target.value)}
           />
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
             <Button
               type="button"
               variant="outline"
@@ -437,30 +449,37 @@ export const ClassesPage: React.FC = () => {
           <div className="space-y-5">
             {/* List of current subject assignments */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+              <h4 className="mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">
                 Assigned Subjects ({selectedClassForSubjects.subject_teachers?.length || 0})
               </h4>
-              {(!selectedClassForSubjects.subject_teachers || selectedClassForSubjects.subject_teachers.length === 0) ? (
-                <p className="text-xs text-slate-400 italic bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  No subject teachers assigned yet. Assign Mathematics, Science, English, etc. below.
+              {!selectedClassForSubjects.subject_teachers ||
+              selectedClassForSubjects.subject_teachers.length === 0 ? (
+                <p className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-400 italic">
+                  No subject teachers assigned yet. Assign Mathematics, Science, English, etc.
+                  below.
                 </p>
               ) : (
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white max-h-48 overflow-y-auto">
+                <div className="max-h-48 divide-y divide-slate-100 overflow-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white">
                   {selectedClassForSubjects.subject_teachers.map((st: SectionSubjectTeacher) => {
                     const assignedTeacherName =
                       teachersList.find((t) => t.id === st.teacher_id)?.full_name ||
-                      (st.teacher_id === user?.id ? `${profile?.full_name || 'You'}` : 'Assigned Teacher');
+                      (st.teacher_id === user?.id
+                        ? `${profile?.full_name || 'You'}`
+                        : 'Assigned Teacher');
 
                     return (
-                      <div key={st.id} className="p-2.5 flex items-center justify-between text-xs">
+                      <div key={st.id} className="flex items-center justify-between p-2.5 text-xs">
                         <div>
                           <p className="font-bold text-slate-900">{st.subject_name}</p>
-                          <p className="text-slate-500 text-[11px]">Teacher: {assignedTeacherName} {st.schedule_time ? `• ${st.schedule_time}` : ''}</p>
+                          <p className="text-[11px] text-slate-500">
+                            Teacher: {assignedTeacherName}{' '}
+                            {st.schedule_time ? `• ${st.schedule_time}` : ''}
+                          </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveSubject(st.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1"
+                          className="p-1 text-slate-400 hover:text-rose-600"
                           title="Remove Assignment"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -473,13 +492,16 @@ export const ClassesPage: React.FC = () => {
             </div>
 
             {/* Form to assign a subject teacher */}
-            <form onSubmit={handleAssignSubjectTeacher} className="space-y-3 pt-3 border-t border-slate-100">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            <form
+              onSubmit={handleAssignSubjectTeacher}
+              className="space-y-3 border-t border-slate-100 pt-3"
+            >
+              <h4 className="text-xs font-bold tracking-wider text-slate-700 uppercase">
                 + Assign Subject Teacher
               </h4>
 
               {subjectError && (
-                <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-700">
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">
                   {subjectError}
                 </div>
               )}
@@ -509,7 +531,10 @@ export const ClassesPage: React.FC = () => {
                 value={assignedTeacherId}
                 onChange={(e) => setAssignedTeacherId(e.target.value)}
                 options={[
-                  { value: user?.id || '', label: `Myself (${profile?.full_name || 'Logged in'})` },
+                  {
+                    value: user?.id || '',
+                    label: `Myself (${profile?.full_name || 'Logged in'})`,
+                  },
                   ...teachersList
                     .filter((t) => t.id !== user?.id)
                     .map((t) => ({ value: t.id, label: t.full_name })),
@@ -549,4 +574,3 @@ export const ClassesPage: React.FC = () => {
     </div>
   );
 };
-

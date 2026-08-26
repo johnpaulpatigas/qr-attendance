@@ -14,7 +14,14 @@ export interface RecordAttendancePayload {
 
 export interface RecordAttendanceResponse {
   success: boolean;
-  status: 'recorded' | 'already_recorded' | 'unauthorized' | 'invalid_qr' | 'not_enrolled' | 'queued_offline' | 'error';
+  status:
+    | 'recorded'
+    | 'already_recorded'
+    | 'unauthorized'
+    | 'invalid_qr'
+    | 'not_enrolled'
+    | 'queued_offline'
+    | 'error';
   message: string;
   student?: {
     id: string;

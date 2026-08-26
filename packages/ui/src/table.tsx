@@ -13,16 +13,12 @@ export const Table: React.FC<React.TableHTMLAttributes<HTMLTableElement>> = ({
 export const TableHeader: React.FC<React.HTMLAttributes<HTMLTableSectionElement>> = ({
   className,
   ...props
-}) => (
-  <thead className={cn('[&_tr]:border-b bg-slate-50', className)} {...props} />
-);
+}) => <thead className={cn('bg-slate-50 [&_tr]:border-b', className)} {...props} />;
 
 export const TableBody: React.FC<React.HTMLAttributes<HTMLTableSectionElement>> = ({
   className,
   ...props
-}) => (
-  <tbody className={cn('[&_tr:last-child]:border-0', className)} {...props} />
-);
+}) => <tbody className={cn('[&_tr:last-child]:border-0', className)} {...props} />;
 
 export const TableRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> = ({
   className,

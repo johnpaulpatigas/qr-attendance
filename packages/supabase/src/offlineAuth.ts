@@ -7,7 +7,11 @@ export async function computeSha256Hex(text: string): Promise<string> {
   const enc = new TextEncoder();
   const data = enc.encode(text);
 
-  if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    crypto.subtle &&
+    typeof crypto.subtle.digest === 'function'
+  ) {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -43,7 +47,10 @@ export async function saveOfflineAuthCredentials(
 
   try {
     const cleanEmail = email.trim().toLowerCase();
-    const salt = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+    const salt =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2);
     const hash = await computeSha256Hex(`${salt}:${cleanEmail}:${password}`);
 
     const record: OfflineAuthRecord = {
@@ -79,7 +86,8 @@ export async function verifyOfflineAuthCredentials(
     if (!raw) {
       return {
         success: false,
-        error: 'No cached account found on this device. Please connect to the internet to sign in first.',
+        error:
+          'No cached account found on this device. Please connect to the internet to sign in first.',
       };
     }
 
@@ -97,7 +105,8 @@ export async function verifyOfflineAuthCredentials(
     if (testHash !== record.hash) {
       return {
         success: false,
-        error: 'Incorrect password for offline sign-in. Please use the password from your last online session.',
+        error:
+          'Incorrect password for offline sign-in. Please use the password from your last online session.',
       };
     }
 
@@ -117,7 +126,9 @@ export async function verifyOfflineAuthCredentials(
   }
 }
 
-export function getStoredOfflineUser(storagePrefix: string): { userId: string; email: string; profile: UserProfile } | null {
+export function getStoredOfflineUser(
+  storagePrefix: string
+): { userId: string; email: string; profile: UserProfile } | null {
   if (typeof localStorage === 'undefined') return null;
 
   try {

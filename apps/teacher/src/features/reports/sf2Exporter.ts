@@ -8,9 +8,27 @@ export function exportSF2ToExcel(report: SF2ReportData) {
   const rows: (string | number)[][] = [];
 
   rows.push(['School Form 2 (SF2) Daily Attendance Report of Learners']);
-  rows.push([`School Name: ${report.schoolName}`, '', `School ID: ${report.schoolId}`, '', `District: ${report.district}`]);
-  rows.push([`Division: ${report.division}`, '', `Region: ${report.region}`, '', `School Year: ${report.schoolYear}`]);
-  rows.push([`Grade Level: ${report.gradeLevel}`, '', `Section: ${cleanSectionName(report.sectionName)}`, '', `Month: ${report.monthName} ${report.year}`]);
+  rows.push([
+    `School Name: ${report.schoolName}`,
+    '',
+    `School ID: ${report.schoolId}`,
+    '',
+    `District: ${report.district}`,
+  ]);
+  rows.push([
+    `Division: ${report.division}`,
+    '',
+    `Region: ${report.region}`,
+    '',
+    `School Year: ${report.schoolYear}`,
+  ]);
+  rows.push([
+    `Grade Level: ${report.gradeLevel}`,
+    '',
+    `Section: ${cleanSectionName(report.sectionName)}`,
+    '',
+    `Month: ${report.monthName} ${report.year}`,
+  ]);
   rows.push([]); // blank
 
   // Table Headers
@@ -22,7 +40,8 @@ export function exportSF2ToExcel(report: SF2ReportData) {
   // Male Section
   rows.push(['MALE']);
   report.maleStudents.forEach((r, idx) => {
-    const fullName = `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
+    const fullName =
+      `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
     const row = [idx + 1, r.student.lrn, fullName];
     report.schoolDays.forEach((d) => {
       const st = r.dailyStatus[d];
@@ -31,12 +50,21 @@ export function exportSF2ToExcel(report: SF2ReportData) {
     row.push(r.totalAbsences, r.totalTardy, '');
     rows.push(row);
   });
-  rows.push(['', '', 'TOTAL MALE', ...report.schoolDays.map(() => ''), report.maleTotalAbsent, report.maleTotalTardy, '']);
+  rows.push([
+    '',
+    '',
+    'TOTAL MALE',
+    ...report.schoolDays.map(() => ''),
+    report.maleTotalAbsent,
+    report.maleTotalTardy,
+    '',
+  ]);
 
   // Female Section
   rows.push(['FEMALE']);
   report.femaleStudents.forEach((r, idx) => {
-    const fullName = `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
+    const fullName =
+      `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
     const row = [idx + 1, r.student.lrn, fullName];
     report.schoolDays.forEach((d) => {
       const st = r.dailyStatus[d];
@@ -45,7 +73,15 @@ export function exportSF2ToExcel(report: SF2ReportData) {
     row.push(r.totalAbsences, r.totalTardy, '');
     rows.push(row);
   });
-  rows.push(['', '', 'TOTAL FEMALE', ...report.schoolDays.map(() => ''), report.femaleTotalAbsent, report.femaleTotalTardy, '']);
+  rows.push([
+    '',
+    '',
+    'TOTAL FEMALE',
+    ...report.schoolDays.map(() => ''),
+    report.femaleTotalAbsent,
+    report.femaleTotalTardy,
+    '',
+  ]);
 
   // Summary
   rows.push([]);
@@ -68,7 +104,8 @@ export function printSF2Document(report: SF2ReportData) {
   const renderStudentRows = (list: typeof report.maleStudents, startIndex: number) => {
     return list
       .map((r, idx) => {
-        const fullName = `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
+        const fullName =
+          `${r.student.last_name}, ${r.student.first_name} ${r.student.middle_name || ''} ${r.student.suffix || ''}`.trim();
         const daysCells = report.schoolDays
           .map((d) => {
             const st = r.dailyStatus[d];

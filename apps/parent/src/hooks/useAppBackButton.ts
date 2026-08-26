@@ -12,7 +12,9 @@ export function useAppBackButton(options?: UseAppBackButtonOptions) {
   const location = useLocation();
   const lastBackPressRef = useRef<number>(0);
   const optionsRef = useRef(options);
-  optionsRef.current = options;
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   useEffect(() => {
     let listenerHandle: { remove: () => void } | null = null;

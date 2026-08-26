@@ -29,7 +29,11 @@ import { printBatchStudentQrCards } from '../features/qr/qrUtils';
 
 export const StudentsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlSection = searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId') || 'all';
+  const urlSection =
+    searchParams.get('section') ||
+    searchParams.get('class_id') ||
+    searchParams.get('classId') ||
+    'all';
   const urlGrade = searchParams.get('grade') || 'all';
 
   const [students, setStudents] = useState<StudentWithSection[]>([]);
@@ -45,7 +49,11 @@ export const StudentsPage: React.FC = () => {
 
   // Sync state when URL params change
   useEffect(() => {
-    const currentUrlSection = searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId') || 'all';
+    const currentUrlSection =
+      searchParams.get('section') ||
+      searchParams.get('class_id') ||
+      searchParams.get('classId') ||
+      'all';
     const currentUrlGrade = searchParams.get('grade') || 'all';
     setSectionFilter(currentUrlSection);
     setGradeFilter(currentUrlGrade);
@@ -55,7 +63,8 @@ export const StudentsPage: React.FC = () => {
     fetchClassSections().then((secs) => {
       setSections(secs);
       // If a section is in the URL but grade wasn't specified, automatically resolve the section's grade level
-      const currentSectionId = searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId');
+      const currentSectionId =
+        searchParams.get('section') || searchParams.get('class_id') || searchParams.get('classId');
       if (currentSectionId && currentSectionId !== 'all') {
         const match = secs.find((s) => s.id === currentSectionId);
         if (match && (!searchParams.get('grade') || searchParams.get('grade') === 'all')) {
@@ -189,7 +198,7 @@ export const StudentsPage: React.FC = () => {
 
       {/* Filter and Search Bar */}
       <Card>
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="space-y-3 p-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
               placeholder="Search by name or LRN..."
@@ -214,28 +223,36 @@ export const StudentsPage: React.FC = () => {
               value={sectionFilter}
               onChange={(e) => handleSectionChange(e.target.value)}
               options={[
-                { value: 'all', label: gradeFilter !== 'all' ? `All Grade ${gradeFilter} Sections` : 'All Sections' },
+                {
+                  value: 'all',
+                  label:
+                    gradeFilter !== 'all' ? `All Grade ${gradeFilter} Sections` : 'All Sections',
+                },
                 ...availableSections.map((s) => ({
                   value: s.id,
-                  label: gradeFilter !== 'all' ? cleanSectionName(s.section_name) : formatGradeSection(s.grade_level, s.section_name),
+                  label:
+                    gradeFilter !== 'all'
+                      ? cleanSectionName(s.section_name)
+                      : formatGradeSection(s.grade_level, s.section_name),
                 })),
               ]}
             />
-
           </div>
 
           {/* Active Filter Indicator */}
           {isFiltered && (
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
               <div className="flex items-center gap-2 text-slate-600">
                 <Filter className="h-3.5 w-3.5 text-blue-600" />
                 <span>Showing:</span>
                 {activeSelectedSection ? (
                   <Badge variant="info" size="sm">
-                    {formatGradeSection(activeSelectedSection.grade_level, activeSelectedSection.section_name)}
+                    {formatGradeSection(
+                      activeSelectedSection.grade_level,
+                      activeSelectedSection.section_name
+                    )}
                   </Badge>
                 ) : gradeFilter !== 'all' ? (
-
                   <Badge variant="info" size="sm">
                     Grade {gradeFilter}
                   </Badge>
@@ -245,7 +262,9 @@ export const StudentsPage: React.FC = () => {
                     Search: "{search}"
                   </Badge>
                 )}
-                <span className="text-slate-400 font-medium">({students.length} students found)</span>
+                <span className="font-medium text-slate-400">
+                  ({students.length} students found)
+                </span>
               </div>
               <button
                 type="button"
@@ -259,14 +278,13 @@ export const StudentsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-
       {/* Students Data Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">
-            Enrolled Students ({students.length})
-          </CardTitle>
-          <Badge variant="info" size="sm">SY 2026-2027</Badge>
+          <CardTitle className="text-base">Enrolled Students ({students.length})</CardTitle>
+          <Badge variant="info" size="sm">
+            SY 2026-2027
+          </Badge>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -296,16 +314,15 @@ export const StudentsPage: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {students.map((student) => {
-                  const fullName = `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
+                  const fullName =
+                    `${student.last_name}, ${student.first_name} ${student.middle_name || ''} ${student.suffix || ''}`.trim();
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="font-mono text-xs font-semibold text-slate-800">
                         {student.lrn}
                       </TableCell>
-                      <TableCell className="font-medium text-slate-900">
-                        {fullName}
-                      </TableCell>
-                      <TableCell className="capitalize text-xs text-slate-600">
+                      <TableCell className="font-medium text-slate-900">{fullName}</TableCell>
+                      <TableCell className="text-xs text-slate-600 capitalize">
                         {student.sex.toLowerCase()}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
@@ -313,7 +330,11 @@ export const StudentsPage: React.FC = () => {
                       </TableCell>
 
                       <TableCell>
-                        <Badge variant="outline" size="sm" className="font-mono text-[10px] truncate max-w-[140px]">
+                        <Badge
+                          variant="outline"
+                          size="sm"
+                          className="max-w-[140px] truncate font-mono text-[10px]"
+                        >
                           ATTENDANCE:{student.qr_identifier.slice(0, 8)}...
                         </Badge>
                       </TableCell>
@@ -355,4 +376,3 @@ export const StudentsPage: React.FC = () => {
     </div>
   );
 };
-

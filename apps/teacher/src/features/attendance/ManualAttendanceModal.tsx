@@ -35,7 +35,9 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim() || reason.trim().length < 3) {
-      setError('A valid reason (at least 3 characters) is required for manual attendance records and corrections.');
+      setError(
+        'A valid reason (at least 3 characters) is required for manual attendance records and corrections.'
+      );
       return;
     }
 
@@ -61,7 +63,9 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
       const { data: record, error: attError } = await client
         .from('attendance')
-        .upsert(attendanceData, { onConflict: 'student_id,attendance_session_id' })
+        .upsert(attendanceData, {
+          onConflict: 'student_id,attendance_session_id',
+        })
         .select()
         .single();
 
@@ -98,15 +102,13 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Manual Attendance Record">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 text-xs rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
             {error}
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Select Student
-          </label>
+          <label className="mb-1 block text-xs font-semibold text-slate-700">Select Student</label>
           <Select
             value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
@@ -121,7 +123,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <label className="mb-1 block text-xs font-semibold text-slate-700">
             Attendance Status
           </label>
           <Select
@@ -137,7 +139,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <label className="mb-1 block text-xs font-semibold text-slate-700">
             Reason for Manual Entry / Correction
           </label>
           <Input
@@ -149,7 +151,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>

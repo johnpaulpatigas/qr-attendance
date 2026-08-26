@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, LoadingState, Badge } from '@qr-attendance/ui';
 import { formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
-import { fetchStudentStatistics, type StudentAttendanceMetrics } from '../features/attendance/parentAttendanceService';
+import {
+  fetchStudentStatistics,
+  type StudentAttendanceMetrics,
+} from '../features/attendance/parentAttendanceService';
 import { CheckCircle2, Clock, XCircle, Award } from 'lucide-react';
 
 export const StatisticsPage: React.FC = () => {
@@ -24,7 +27,7 @@ export const StatisticsPage: React.FC = () => {
   const childName = `${activeChild.first_name} ${activeChild.last_name}`;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Attendance Statistics</h2>
         <p className="text-sm text-slate-500">
@@ -40,9 +43,9 @@ export const StatisticsPage: React.FC = () => {
           {/* Rate Highlights */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <Card className="border-blue-200 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md">
-              <CardContent className="p-6 space-y-2">
+              <CardContent className="space-y-2 p-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
+                  <span className="text-xs font-bold tracking-wider text-blue-200 uppercase">
                     Overall Attendance Rate
                   </span>
                   <Award className="h-6 w-6 text-blue-200" />
@@ -57,9 +60,9 @@ export const StatisticsPage: React.FC = () => {
             </Card>
 
             <Card className="border-amber-200 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md">
-              <CardContent className="p-6 space-y-2">
+              <CardContent className="space-y-2 p-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-bold tracking-wider text-amber-200">
+                  <span className="text-xs font-bold tracking-wider text-amber-200 uppercase">
                     Tardiness / Late Rate
                   </span>
                   <Clock className="h-6 w-6 text-amber-200" />
@@ -76,8 +79,10 @@ export const StatisticsPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Card>
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-slate-500 uppercase">Total School Days</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase">
+                  Total School Days
+                </span>
+                <div className="mt-1 text-2xl font-bold text-slate-900">
                   {metrics.total_school_days}
                 </div>
               </CardContent>
@@ -85,10 +90,10 @@ export const StatisticsPage: React.FC = () => {
 
             <Card className="border-emerald-200 bg-emerald-50/40">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-emerald-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 uppercase">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Present Days
                 </span>
-                <div className="text-2xl font-bold text-emerald-700 mt-1">
+                <div className="mt-1 text-2xl font-bold text-emerald-700">
                   {metrics.present_days}
                 </div>
               </CardContent>
@@ -96,23 +101,19 @@ export const StatisticsPage: React.FC = () => {
 
             <Card className="border-amber-200 bg-amber-50/40">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-amber-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 uppercase">
                   <Clock className="h-3.5 w-3.5" /> Late Days
                 </span>
-                <div className="text-2xl font-bold text-amber-700 mt-1">
-                  {metrics.late_days}
-                </div>
+                <div className="mt-1 text-2xl font-bold text-amber-700">{metrics.late_days}</div>
               </CardContent>
             </Card>
 
             <Card className="border-rose-200 bg-rose-50/40">
               <CardContent className="p-4">
-                <span className="text-xs font-semibold text-rose-700 uppercase flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs font-semibold text-rose-700 uppercase">
                   <XCircle className="h-3.5 w-3.5" /> Absent Days
                 </span>
-                <div className="text-2xl font-bold text-rose-700 mt-1">
-                  {metrics.absent_days}
-                </div>
+                <div className="mt-1 text-2xl font-bold text-rose-700">{metrics.absent_days}</div>
               </CardContent>
             </Card>
           </div>
@@ -121,15 +122,22 @@ export const StatisticsPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">MNHS Academic Standing Summary</CardTitle>
-              <Badge variant="success" size="sm">Good Standing</Badge>
+              <Badge variant="success" size="sm">
+                Good Standing
+              </Badge>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>
-                Student is currently enrolled in <strong>{formatGradeSection(activeChild.grade_level, activeChild.section_name)}</strong> for School Year 2026-2027.
+                Student is currently enrolled in{' '}
+                <strong>
+                  {formatGradeSection(activeChild.grade_level, activeChild.section_name)}
+                </strong>{' '}
+                for School Year 2026-2027.
               </p>
               <p>
-
-                MNHS standard requires students to maintain above 80% attendance throughout the school year. Current attendance rate is <strong>{metrics.attendance_rate_percentage}%</strong>.
+                MNHS standard requires students to maintain above 80% attendance throughout the
+                school year. Current attendance rate is{' '}
+                <strong>{metrics.attendance_rate_percentage}%</strong>.
               </p>
             </CardContent>
           </Card>

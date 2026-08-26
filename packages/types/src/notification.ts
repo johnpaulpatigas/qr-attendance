@@ -1,10 +1,7 @@
 export type NotificationPlatform = 'web' | 'android' | 'ios';
 
 export type NotificationType =
-  | 'attendance_present'
-  | 'attendance_late'
-  | 'attendance_absent'
-  | 'general';
+  'attendance_present' | 'attendance_late' | 'attendance_absent' | 'general';
 
 export type NotificationStatus = 'pending' | 'sent' | 'failed';
 

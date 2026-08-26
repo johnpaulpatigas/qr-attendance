@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-*
+build
+.system_generated
+package-lock.json
+android
+.capacitor
+*.log

@@ -62,8 +62,7 @@ export function validateSf1Row(row: Record<string, unknown>): SF1ParsedStudent {
   if (!result.success) {
     const errorMessages = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`);
     const rawSex = String(row.sex || '').toUpperCase();
-    const isFemale =
-      rawSex.startsWith('F') || rawSex.startsWith('B') || rawSex.includes('GIRL');
+    const isFemale = rawSex.startsWith('F') || rawSex.startsWith('B') || rawSex.includes('GIRL');
 
     return {
       lrn: String(row.lrn || '').replace(/\D/g, ''),
@@ -97,4 +96,3 @@ export function validateSf1Row(row: Record<string, unknown>): SF1ParsedStudent {
     errors: [],
   };
 }
-

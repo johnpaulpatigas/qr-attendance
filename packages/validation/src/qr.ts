@@ -5,12 +5,9 @@ export const QR_PREFIX = 'ATTENDANCE:';
 export const qrPayloadSchema = z
   .string()
   .trim()
-  .refine(
-    (val) => val.startsWith(QR_PREFIX) && val.length > QR_PREFIX.length,
-    {
-      message: `QR code must begin with "${QR_PREFIX}" followed by a valid student identifier`,
-    }
-  );
+  .refine((val) => val.startsWith(QR_PREFIX) && val.length > QR_PREFIX.length, {
+    message: `QR code must begin with "${QR_PREFIX}" followed by a valid student identifier`,
+  });
 
 export function createQrPayload(qrIdentifier: string): string {
   return `${QR_PREFIX}${qrIdentifier.trim()}`;

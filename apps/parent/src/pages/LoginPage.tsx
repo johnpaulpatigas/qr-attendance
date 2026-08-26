@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserCheck, Lock, Mail, KeyRound, User, Hash, HeartHandshake } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Select } from '@qr-attendance/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Button,
+  Input,
+  Select,
+} from '@qr-attendance/ui';
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 import { useAppBackButton } from '../hooks/useAppBackButton';
 
 export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -96,7 +105,9 @@ export const LoginPage: React.FC = () => {
     if (res.error) {
       setError(res.error.message);
     } else if (res.emailConfirmationRequired) {
-      setSuccessMessage('Account registered and student linked! Please check your email inbox to confirm your account, then sign in.');
+      setSuccessMessage(
+        'Account registered and student linked! Please check your email inbox to confirm your account, then sign in.'
+      );
       setEmail(signUpEmail);
       setTimeout(() => {
         setMode('signin');
@@ -135,7 +146,7 @@ export const LoginPage: React.FC = () => {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-xl mb-3">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-xl">
             <UserCheck className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">MNHS Parent & Student Portal</h1>
@@ -155,7 +166,9 @@ export const LoginPage: React.FC = () => {
                 setSuccessMessage(null);
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
-                mode === 'signin' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                mode === 'signin'
+                  ? 'bg-white text-emerald-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Sign In
@@ -168,7 +181,9 @@ export const LoginPage: React.FC = () => {
                 setSuccessMessage(null);
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
-                mode === 'signup' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                mode === 'signup'
+                  ? 'bg-white text-emerald-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Create Account
@@ -176,38 +191,41 @@ export const LoginPage: React.FC = () => {
           </div>
         )}
 
-        <Card className="shadow-lg border-slate-200">
+        <Card className="border-slate-200 shadow-lg">
           <CardHeader>
             <CardTitle>
               {mode === 'signup'
                 ? 'Create Parent Account'
                 : mode === 'reset'
-                ? 'Reset Password'
-                : 'Sign In'}
+                  ? 'Reset Password'
+                  : 'Sign In'}
             </CardTitle>
             <CardDescription>
               {mode === 'signup'
                 ? 'Link your student with their 12-digit LRN for instant attendance access'
                 : mode === 'reset'
-                ? 'Enter your registered email address to receive reset instructions'
-                : 'Enter your credentials to view attendance'}
+                  ? 'Enter your registered email address to receive reset instructions'
+                  : 'Enter your credentials to view attendance'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {typeof navigator !== 'undefined' && !navigator.onLine && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <span><strong>Offline Mode:</strong> Sign in with the account previously used on this device.</span>
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500"></span>
+                <span>
+                  <strong>Offline Mode:</strong> Sign in with the account previously used on this
+                  device.
+                </span>
               </div>
             )}
             {error && (
-              <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 mb-4">
+              <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
                 {error}
               </div>
             )}
 
             {successMessage && (
-              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700 mb-4">
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
                 {successMessage}
               </div>
             )}
@@ -260,7 +278,13 @@ export const LoginPage: React.FC = () => {
                     { value: 'Student (Self)', label: 'Student (Self)' },
                   ]}
                 />
-                <Button type="submit" variant="success" className="w-full mt-2" isLoading={loading} leftIcon={<HeartHandshake className="h-4 w-4" />}>
+                <Button
+                  type="submit"
+                  variant="success"
+                  className="mt-2 w-full"
+                  isLoading={loading}
+                  leftIcon={<HeartHandshake className="h-4 w-4" />}
+                >
                   Register & Link Student
                 </Button>
               </form>
@@ -284,7 +308,7 @@ export const LoginPage: React.FC = () => {
                 >
                   Send Reset Link
                 </Button>
-                <div className="text-center pt-2">
+                <div className="pt-2 text-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -292,7 +316,7 @@ export const LoginPage: React.FC = () => {
                       setError(null);
                       setSuccessMessage(null);
                     }}
-                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
+                    className="text-xs font-semibold text-emerald-700 underline hover:text-emerald-800"
                   >
                     Back to Sign In
                   </button>
@@ -325,7 +349,7 @@ export const LoginPage: React.FC = () => {
                       setMode('reset');
                       setError(null);
                     }}
-                    className="text-xs text-emerald-700 hover:text-emerald-800 underline"
+                    className="text-xs text-emerald-700 underline hover:text-emerald-800"
                   >
                     Forgot Password?
                   </button>

@@ -38,5 +38,3 @@ export interface ClassSectionWithDetails extends ClassSection {
   my_role?: 'adviser' | 'subject_teacher';
   my_subject?: string;
 }
-
-

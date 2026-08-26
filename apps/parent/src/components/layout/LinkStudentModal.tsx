@@ -53,12 +53,12 @@ export const LinkStudentModal: React.FC<LinkStudentModalProps> = ({ isOpen, onCl
     >
       <form onSubmit={handleLink} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
             {error}
           </div>
         )}
         {success && (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
             {success}
           </div>
         )}
@@ -85,7 +85,7 @@ export const LinkStudentModal: React.FC<LinkStudentModalProps> = ({ isOpen, onCl
           ]}
         />
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

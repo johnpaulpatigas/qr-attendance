@@ -37,7 +37,10 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
 
-  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, blankrows: false });
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+    header: 1,
+    blankrows: false,
+  });
 
   if (rawRows.length === 0) {
     throw new Error('The uploaded spreadsheet is empty.');
@@ -48,8 +51,15 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
 
   for (let r = 0; r < Math.min(rawRows.length, 15); r++) {
     const row = rawRows[r] || [];
-    const rowStr = row.map((cell) => String(cell ?? '')).join(' ').toUpperCase();
-    if (rowStr.includes('LRN') || rowStr.includes('LEARNER') || (rowStr.includes('NAME') && rowStr.includes('SEX'))) {
+    const rowStr = row
+      .map((cell) => String(cell ?? ''))
+      .join(' ')
+      .toUpperCase();
+    if (
+      rowStr.includes('LRN') ||
+      rowStr.includes('LEARNER') ||
+      (rowStr.includes('NAME') && rowStr.includes('SEX'))
+    ) {
       headerRowIndex = r;
       headers = row.map((cell) => String(cell ?? '').trim());
       break;
@@ -61,12 +71,22 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
     headers = (rawRows[0] || []).map((cell) => String(cell ?? '').trim());
   }
 
-  const colLrn = findHeaderMatch(headers, ['lrn', 'learner reference', 'reference number', 'learner no']);
+  const colLrn = findHeaderMatch(headers, [
+    'lrn',
+    'learner reference',
+    'reference number',
+    'learner no',
+  ]);
   const colLastName = findHeaderMatch(headers, ['last name', 'surname', 'family name', 'apelyido']);
   const colFirstName = findHeaderMatch(headers, ['first name', 'given name', 'pangalan']);
   const colMiddleName = findHeaderMatch(headers, ['middle name', 'middle']);
   const colSuffix = findHeaderMatch(headers, ['suffix', 'extension', 'ext']);
-  const colFullName = findHeaderMatch(headers, ['name', 'learner name', 'student name', 'full name']);
+  const colFullName = findHeaderMatch(headers, [
+    'name',
+    'learner name',
+    'student name',
+    'full name',
+  ]);
   const colSex = findHeaderMatch(headers, ['sex', 'gender', 'kasarian']);
   const colBirthDate = findHeaderMatch(headers, ['birth', 'dob', 'date of birth', 'kapanganakan']);
   const colGrade = findHeaderMatch(headers, ['grade', 'grade level', 'year level']);
@@ -86,12 +106,15 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
       }
     });
 
-    let lrnValue = String(colLrn ? rowObj[colLrn] ?? '' : rowArray[0] ?? '').trim();
+    let lrnValue = String(colLrn ? (rowObj[colLrn] ?? '') : (rowArray[0] ?? '')).trim();
     // Clean non-numeric characters from LRN
     lrnValue = lrnValue.replace(/\D/g, '');
 
     // Skip empty rows, header repeats, or footer summary notes in DepEd SF1
-    const rowText = rowArray.map((c) => String(c ?? '')).join(' ').toUpperCase();
+    const rowText = rowArray
+      .map((c) => String(c ?? ''))
+      .join(' ')
+      .toUpperCase();
     if (
       !lrnValue ||
       lrnValue.length < 6 ||
@@ -142,7 +165,8 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
 
     // Extract Grade Level & Section
     const gradeRaw = colGrade ? rowObj[colGrade] : null;
-    const gradeVal = gradeRaw !== null && gradeRaw !== undefined && gradeRaw !== '' ? Number(gradeRaw) : 0;
+    const gradeVal =
+      gradeRaw !== null && gradeRaw !== undefined && gradeRaw !== '' ? Number(gradeRaw) : 0;
     const sectionVal = String(colSection ? rowObj[colSection] || '' : '').trim();
     const syVal = String(colSchoolYear ? rowObj[colSchoolYear] || '2026-2027' : '2026-2027').trim();
 
@@ -167,11 +191,12 @@ export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
     totalParsed: records.length,
     detectedHeaders: {
       lrn: colLrn || 'Auto-Detected',
-      name: colFullName || (colLastName && colFirstName ? `${colLastName}, ${colFirstName}` : 'Auto-Detected'),
+      name:
+        colFullName ||
+        (colLastName && colFirstName ? `${colLastName}, ${colFirstName}` : 'Auto-Detected'),
       sex: colSex || 'Auto-Detected',
       birthDate: colBirthDate || 'Auto-Detected',
       section: colSection || 'Auto-Detected',
     },
   };
 }
-

@@ -19,7 +19,8 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
   try {
     let query = client
       .from('students')
-      .select(`
+      .select(
+        `
         *,
         class_sections (
           section_name
@@ -27,7 +28,8 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
         school_years (
           name
         )
-      `)
+      `
+      )
       .order('last_name', { ascending: true });
 
     if (secId && secId !== 'all') {
@@ -161,7 +163,8 @@ export async function createStudent(input: CreateStudentInput): Promise<StudentW
   const { data, error } = await client
     .from('students')
     .insert(newRecord)
-    .select(`
+    .select(
+      `
       *,
       class_sections (
         section_name
@@ -169,7 +172,8 @@ export async function createStudent(input: CreateStudentInput): Promise<StudentW
       school_years (
         name
       )
-    `)
+    `
+    )
     .single();
 
   if (error || !data) {
@@ -206,10 +210,7 @@ export async function createStudent(input: CreateStudentInput): Promise<StudentW
 
 export async function updateStudent(id: string, input: UpdateStudentInput): Promise<void> {
   const client = getSupabaseClient();
-  const { error } = await client
-    .from('students')
-    .update(input)
-    .eq('id', id);
+  const { error } = await client.from('students').update(input).eq('id', id);
 
   if (error) {
     throw new Error(error.message);

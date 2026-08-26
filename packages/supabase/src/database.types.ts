@@ -1,10 +1,4 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
@@ -418,10 +412,7 @@ export type Database = {
           student_id: string;
           attendance_id: string | null;
           notification_type:
-            | 'attendance_present'
-            | 'attendance_late'
-            | 'attendance_absent'
-            | 'general';
+            'attendance_present' | 'attendance_late' | 'attendance_absent' | 'general';
           status: 'pending' | 'sent' | 'failed';
           fcm_token: string | null;
           error_message: string | null;
@@ -434,10 +425,7 @@ export type Database = {
           student_id: string;
           attendance_id?: string | null;
           notification_type:
-            | 'attendance_present'
-            | 'attendance_late'
-            | 'attendance_absent'
-            | 'general';
+            'attendance_present' | 'attendance_late' | 'attendance_absent' | 'general';
           status?: 'pending' | 'sent' | 'failed';
           fcm_token?: string | null;
           error_message?: string | null;
@@ -450,10 +438,7 @@ export type Database = {
           student_id?: string;
           attendance_id?: string | null;
           notification_type?:
-            | 'attendance_present'
-            | 'attendance_late'
-            | 'attendance_absent'
-            | 'general';
+            'attendance_present' | 'attendance_late' | 'attendance_absent' | 'general';
           status?: 'pending' | 'sent' | 'failed';
           fcm_token?: string | null;
           error_message?: string | null;
@@ -510,11 +495,7 @@ export type Database = {
       session_type: 'morning' | 'afternoon';
       attendance_status: 'present' | 'late' | 'absent' | 'excused';
       attendance_source: 'qr_scan' | 'manual' | 'import' | 'correction';
-      notification_type:
-        | 'attendance_present'
-        | 'attendance_late'
-        | 'attendance_absent'
-        | 'general';
+      notification_type: 'attendance_present' | 'attendance_late' | 'attendance_absent' | 'general';
     };
   };
 };

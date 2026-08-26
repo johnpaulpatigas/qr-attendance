@@ -89,7 +89,9 @@ export async function validateSF1Records(
     const isExistingInDb = existingDbLrns.has(record.lrn);
     if (isExistingInDb) {
       existingCount++;
-      rowWarnings.push('Student LRN already registered in system. Existing record will be updated.');
+      rowWarnings.push(
+        'Student LRN already registered in system. Existing record will be updated.'
+      );
     }
 
     const isValid = rowErrors.length === 0;

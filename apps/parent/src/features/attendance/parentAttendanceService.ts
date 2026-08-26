@@ -1,10 +1,6 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import { getUtc8DateString } from '@qr-attendance/validation';
-import type {
-  AttendanceRecord,
-  AttendanceStatus,
-  NotificationLog,
-} from '@qr-attendance/types';
+import type { AttendanceRecord, AttendanceStatus, NotificationLog } from '@qr-attendance/types';
 
 export interface AttendanceRecordWithTeacher extends AttendanceRecord {
   teacher_name?: string | null;
@@ -66,12 +62,14 @@ export async function fetchTodayAttendance(
   try {
     const { data, error } = await client
       .from('attendance')
-      .select(`
+      .select(
+        `
         *,
         profiles:recorded_by (
           full_name
         )
-      `)
+      `
+      )
       .eq('student_id', studentId)
       .eq('attendance_date', targetDate);
 
@@ -108,10 +106,12 @@ export async function fetchTodayAttendance(
       } | null;
     }
 
-    const records: AttendanceRecordWithTeacher[] = (data as unknown as AttendanceJoinRow[]).map((r) => ({
-      ...r,
-      teacher_name: r.profiles?.full_name || 'Class Adviser',
-    }));
+    const records: AttendanceRecordWithTeacher[] = (data as unknown as AttendanceJoinRow[]).map(
+      (r) => ({
+        ...r,
+        teacher_name: r.profiles?.full_name || 'Class Adviser',
+      })
+    );
 
     const morning = records.find((r) => r.attendance_type === 'morning') || null;
     const afternoon = records.find((r) => r.attendance_type === 'afternoon') || null;
@@ -143,9 +143,7 @@ export async function fetchTodayAttendance(
   }
 }
 
-export async function fetchAttendanceHistory(
-  studentId: string
-): Promise<AttendanceRecord[]> {
+export async function fetchAttendanceHistory(studentId: string): Promise<AttendanceRecord[]> {
   const cacheKey = `history_${studentId}`;
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -217,10 +215,8 @@ export function computeStudentAttendanceMetrics(
 
   const totalDays = dateMap.size;
   const attendedDays = presentDays + lateDays;
-  const attendanceRate =
-    totalDays > 0 ? Number(((attendedDays / totalDays) * 100).toFixed(1)) : 0;
-  const tardinessRate =
-    totalDays > 0 ? Number(((lateDays / totalDays) * 100).toFixed(1)) : 0;
+  const attendanceRate = totalDays > 0 ? Number(((attendedDays / totalDays) * 100).toFixed(1)) : 0;
+  const tardinessRate = totalDays > 0 ? Number(((lateDays / totalDays) * 100).toFixed(1)) : 0;
 
   return {
     total_school_days: totalDays,
@@ -233,16 +229,12 @@ export function computeStudentAttendanceMetrics(
   };
 }
 
-export async function fetchStudentStatistics(
-  studentId: string
-): Promise<StudentAttendanceMetrics> {
+export async function fetchStudentStatistics(studentId: string): Promise<StudentAttendanceMetrics> {
   const history = await fetchAttendanceHistory(studentId);
   return computeStudentAttendanceMetrics(history);
 }
 
-export async function fetchStudentNotificationLogs(
-  studentId: string
-): Promise<NotificationLog[]> {
+export async function fetchStudentNotificationLogs(studentId: string): Promise<NotificationLog[]> {
   const cacheKey = `notifs_${studentId}`;
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {

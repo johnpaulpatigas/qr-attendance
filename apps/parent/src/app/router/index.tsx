@@ -4,15 +4,39 @@ import { ParentLayout } from '../../components/layout/ParentLayout';
 import { ProtectedRoute } from '../../features/auth/ProtectedRoute';
 import { LoadingState, ErrorBoundary } from '@qr-attendance/ui';
 
-const TodayAttendancePage = lazy(() => import('../../pages/TodayAttendancePage').then((m) => ({ default: m.TodayAttendancePage })));
-const AttendanceHistoryPage = lazy(() => import('../../pages/AttendanceHistoryPage').then((m) => ({ default: m.AttendanceHistoryPage })));
-const StatisticsPage = lazy(() => import('../../pages/StatisticsPage').then((m) => ({ default: m.StatisticsPage })));
-const NotificationsPage = lazy(() => import('../../pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
-const LoginPage = lazy(() => import('../../pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const TodayAttendancePage = lazy(() =>
+  import('../../pages/TodayAttendancePage').then((m) => ({
+    default: m.TodayAttendancePage,
+  }))
+);
+const AttendanceHistoryPage = lazy(() =>
+  import('../../pages/AttendanceHistoryPage').then((m) => ({
+    default: m.AttendanceHistoryPage,
+  }))
+);
+const StatisticsPage = lazy(() =>
+  import('../../pages/StatisticsPage').then((m) => ({
+    default: m.StatisticsPage,
+  }))
+);
+const NotificationsPage = lazy(() =>
+  import('../../pages/NotificationsPage').then((m) => ({
+    default: m.NotificationsPage,
+  }))
+);
+const LoginPage = lazy(() =>
+  import('../../pages/LoginPage').then((m) => ({ default: m.LoginPage }))
+);
 
 const SuspendedRoute = ({ children }: { children: React.ReactNode }) => (
   <ErrorBoundary>
-    <Suspense fallback={<div className="p-12"><LoadingState message="Loading module..." /></div>}>
+    <Suspense
+      fallback={
+        <div className="p-12">
+          <LoadingState message="Loading module..." />
+        </div>
+      }
+    >
       {children}
     </Suspense>
   </ErrorBoundary>
@@ -70,4 +94,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-

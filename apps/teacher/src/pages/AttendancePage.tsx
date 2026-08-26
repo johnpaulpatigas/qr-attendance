@@ -14,15 +14,7 @@ import {
   RefreshCw,
   CloudOff,
 } from 'lucide-react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Select,
-  Badge,
-} from '@qr-attendance/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Select, Badge } from '@qr-attendance/ui';
 import type {
   ClassSectionWithDetails,
   AttendanceSession,
@@ -221,7 +213,10 @@ export const AttendancePage: React.FC = () => {
       setFeedback({
         type: 'error',
         title: 'Sync Incomplete',
-        message: err instanceof Error ? err.message : 'Failed to sync all queued scans. Will retry automatically.',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to sync all queued scans. Will retry automatically.',
       });
     } finally {
       setIsSyncing(false);
@@ -262,8 +257,8 @@ export const AttendancePage: React.FC = () => {
         title: isOfflineQueued
           ? '✓ Saved Offline'
           : recordedStatus === 'late'
-          ? '✓ Marked Late'
-          : '✓ Attendance Recorded',
+            ? '✓ Marked Late'
+            : '✓ Attendance Recorded',
         message: response.message,
         studentName: studentFullName,
       });
@@ -278,7 +273,11 @@ export const AttendancePage: React.FC = () => {
 
       if (response.student) {
         const newRecord: AttendanceRecordWithStudent = {
-          id: response.attendance?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `offline_${Date.now()}`),
+          id:
+            response.attendance?.id ||
+            (typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `offline_${Date.now()}`),
           student_id: response.student.id,
           class_id: selectedClassId,
           attendance_session_id: activeSession.id,
@@ -293,7 +292,10 @@ export const AttendancePage: React.FC = () => {
           updated_at: new Date().toISOString(),
           student: response.student,
         };
-        setRecentRecords((prev) => [newRecord, ...prev.filter(r => r.student_id !== response.student?.id).slice(0, 9)]);
+        setRecentRecords((prev) => [
+          newRecord,
+          ...prev.filter((r) => r.student_id !== response.student?.id).slice(0, 9),
+        ]);
       }
     } else if (response.status === 'already_recorded') {
       playScanTone('duplicate');
@@ -326,13 +328,18 @@ export const AttendancePage: React.FC = () => {
                 <Wifi className="h-3 w-3" /> Online
               </Badge>
             ) : (
-              <Badge variant="danger" size="sm" className="flex items-center gap-1 font-semibold animate-pulse">
+              <Badge
+                variant="danger"
+                size="sm"
+                className="flex animate-pulse items-center gap-1 font-semibold"
+              >
                 <WifiOff className="h-3 w-3" /> Offline Mode
               </Badge>
             )}
           </div>
           <p className="text-sm text-slate-500">
-            Real-time QR barcode scanner for teacher-led classroom attendance with offline tolerance.
+            Real-time QR barcode scanner for teacher-led classroom attendance with offline
+            tolerance.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -377,7 +384,6 @@ export const AttendancePage: React.FC = () => {
                       value: s.id,
                       label: `${formatGradeSection(s.grade_level, s.section_name)}${s.my_role === 'adviser' ? ' (Adviser)' : s.my_subject ? ` (${s.my_subject})` : ''}`,
                     }))
-
                   : [{ value: '', label: 'No sections registered yet' }]
               }
             />
@@ -411,14 +417,14 @@ export const AttendancePage: React.FC = () => {
             />
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 Attendance Date
               </label>
               <input
                 type="date"
                 value={attendanceDate}
                 onChange={(e) => setAttendanceDate(e.target.value)}
-                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
               />
             </div>
 
@@ -427,7 +433,9 @@ export const AttendancePage: React.FC = () => {
                 className="w-full"
                 size="md"
                 variant={isScanning ? 'danger' : 'primary'}
-                leftIcon={isScanning ? <QrCode className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                leftIcon={
+                  isScanning ? <QrCode className="h-4 w-4" /> : <Play className="h-4 w-4" />
+                }
                 onClick={() => setIsScanning(!isScanning)}
                 disabled={!selectedClassId}
               >
@@ -441,14 +449,14 @@ export const AttendancePage: React.FC = () => {
       {/* Live Feedback Alert Banner */}
       {feedback && (
         <div
-          className={`flex items-center justify-between rounded-2xl p-5 shadow-lg transition-all animate-in fade-in slide-in-from-top-2 ${
+          className={`animate-in fade-in slide-in-from-top-2 flex items-center justify-between rounded-2xl p-5 shadow-lg transition-all ${
             feedback.type === 'success'
               ? 'bg-emerald-600 text-white'
               : feedback.type === 'offline'
-              ? 'bg-blue-600 text-white'
-              : feedback.type === 'duplicate'
-              ? 'bg-amber-600 text-white'
-              : 'bg-rose-600 text-white'
+                ? 'bg-blue-600 text-white'
+                : feedback.type === 'duplicate'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-rose-600 text-white'
           }`}
         >
           <div className="flex items-center gap-4">
@@ -470,7 +478,7 @@ export const AttendancePage: React.FC = () => {
           </div>
           <button
             onClick={() => setFeedback(null)}
-            className="text-xs uppercase font-bold tracking-wider text-white/80 hover:text-white px-3 py-1 bg-white/10 rounded-lg"
+            className="rounded-lg bg-white/10 px-3 py-1 text-xs font-bold tracking-wider text-white/80 uppercase hover:text-white"
           >
             Dismiss
           </button>
@@ -482,8 +490,8 @@ export const AttendancePage: React.FC = () => {
         {/* Camera Scanner Viewport */}
         <div className="lg:col-span-2">
           <Card className="h-full">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <QrCode className="h-5 w-5 text-blue-600" />
                 Live Camera Scanner
               </CardTitle>
@@ -502,7 +510,7 @@ export const AttendancePage: React.FC = () => {
           {/* Real-time Session Counters */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between text-base">
                 <span>Session Counters</span>
                 <span className="text-xs font-normal text-slate-400">Live</span>
               </CardTitle>
@@ -516,21 +524,21 @@ export const AttendancePage: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
+                <span className="flex items-center gap-2 text-sm font-medium text-emerald-600">
                   <CheckCircle2 className="h-4 w-4" /> Present
                 </span>
                 <span className="font-bold text-emerald-700">{summary.present_count}</span>
               </div>
 
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="flex items-center gap-2 text-sm text-amber-600 font-medium">
+                <span className="flex items-center gap-2 text-sm font-medium text-amber-600">
                   <Clock className="h-4 w-4" /> Late
                 </span>
                 <span className="font-bold text-amber-700">{summary.late_count}</span>
               </div>
 
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="flex items-center gap-2 text-sm text-rose-600 font-medium">
+                <span className="flex items-center gap-2 text-sm font-medium text-rose-600">
                   <XCircle className="h-4 w-4" /> Absent
                 </span>
                 <span className="font-bold text-rose-700">{summary.absent_count}</span>
@@ -548,7 +556,7 @@ export const AttendancePage: React.FC = () => {
           {/* Recent Scans Log */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between text-base">
                 <span>Recent Scans</span>
                 <Badge variant="outline" size="sm">
                   {recentRecords.length} recorded
@@ -561,11 +569,11 @@ export const AttendancePage: React.FC = () => {
                   No scans recorded yet in this session.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                <div className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
                   {recentRecords.slice(0, 6).map((rec) => (
                     <div key={rec.id} className="flex items-center justify-between p-3 text-xs">
                       <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px]">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-800">
                           <UserCheck className="h-3.5 w-3.5" />
                         </div>
                         <div>
@@ -574,19 +582,14 @@ export const AttendancePage: React.FC = () => {
                               ? `${rec.student.first_name} ${rec.student.last_name}`
                               : 'Student'}
                           </p>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            {rec.student?.lrn}
-                          </p>
+                          <p className="font-mono text-[10px] text-slate-400">{rec.student?.lrn}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge
-                          variant={rec.status === 'present' ? 'success' : 'warning'}
-                          size="sm"
-                        >
+                        <Badge variant={rec.status === 'present' ? 'success' : 'warning'} size="sm">
                           {rec.status}
                         </Badge>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
+                        <p className="mt-0.5 text-[10px] text-slate-400">
                           {new Date(rec.recorded_at).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit',

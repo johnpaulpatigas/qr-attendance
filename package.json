@@ -17,7 +17,10 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
-    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "cap:sync:teacher": "npm run build:teacher && npm run cap:sync --workspace=teacher",
     "cap:sync:parent": "npm run build:parent && npm run cap:sync --workspace=parent",
     "cap:sync": "npm run cap:sync:teacher && npm run cap:sync:parent",
@@ -28,11 +31,18 @@
     "db:combined": "node scripts/migrate.mjs --combined"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/pg": "^8.23.1",
     "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
+    "eslint": "^10.9.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
     "pg": "^8.23.0",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^2.1.8"
   },
   "engines": {
