@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { createQrPayload, parseQrPayload, formatGradeSection } from '@qr-attendance/validation';
 import type { StudentWithSection } from '@qr-attendance/types';
 
@@ -11,6 +10,7 @@ export function validateScannedQr(rawPayload: string) {
 }
 
 export async function generateQrDataUrl(payload: string, width = 200): Promise<string> {
+  const QRCode = (await import('qrcode')).default;
   return QRCode.toDataURL(payload, {
     width,
     margin: 1,

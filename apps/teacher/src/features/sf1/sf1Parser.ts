@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { parseFlexibleDate } from '@qr-attendance/validation';
 
 export interface RawSF1Record {
@@ -31,6 +30,7 @@ function findHeaderMatch(headers: string[], patterns: string[]): string | undefi
 }
 
 export async function parseSF1Spreadsheet(file: File): Promise<ParseSF1Result> {
+  const XLSX = await import('xlsx');
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 

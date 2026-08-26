@@ -1,8 +1,8 @@
-import * as XLSX from 'xlsx';
 import { cleanSectionName, formatGradeSection } from '@qr-attendance/validation';
 import type { SF2ReportData } from './reportService';
 
-export function exportSF2ToExcel(report: SF2ReportData) {
+export async function exportSF2ToExcel(report: SF2ReportData) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const rows: (string | number)[][] = [];

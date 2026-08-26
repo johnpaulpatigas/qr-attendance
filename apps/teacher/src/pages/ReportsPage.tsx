@@ -80,9 +80,9 @@ export const ReportsPage: React.FC = () => {
     loadReports();
   }, [loadReports]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!sf2Data) return;
-    exportSF2ToExcel(sf2Data);
+    await exportSF2ToExcel(sf2Data);
   };
 
   const handlePrintSF2 = () => {
