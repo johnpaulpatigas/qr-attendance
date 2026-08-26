@@ -345,12 +345,13 @@ export const ClassesPage: React.FC = () => {
                   )}
 
                   <div className="flex items-center gap-2">
-                    <Link to={`/students?section=${cls.id}`}>
+                    <Link to={`/students?section=${cls.id}&grade=${cls.grade_level}`}>
                       <Button variant="outline" size="sm">
                         Roster
                       </Button>
                     </Link>
                     <Link to={`/attendance`}>
+
                       <Button variant="primary" size="sm" leftIcon={<QrCode className="h-3.5 w-3.5" />}>
                         Scan
                       </Button>

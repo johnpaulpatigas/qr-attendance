@@ -358,14 +358,24 @@ export const DashboardPage: React.FC = () => {
                   className="flex items-center justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50 transition-colors"
                 >
                   <div>
-                    <h4 className="font-semibold text-slate-900">
+                    <Link
+                      to={`/students?section=${cls.id}&grade=${cls.grade_level}`}
+                      className="font-semibold text-slate-900 hover:text-blue-600 transition-colors"
+                    >
                       {formatGradeSection(cls.grade_level, cls.section_name)}
-                    </h4>
+                    </Link>
                     <p className="text-xs text-slate-500">
-                      {cls.student_count} Students {cls.room_number ? `• Room ${cls.room_number}` : ''}
+                      <Link
+                        to={`/students?section=${cls.id}&grade=${cls.grade_level}`}
+                        className="hover:underline hover:text-blue-600"
+                      >
+                        {cls.student_count} Students
+                      </Link>{' '}
+                      {cls.room_number ? `• Room ${cls.room_number}` : ''}
                     </p>
                   </div>
                   <Link to="/attendance">
+
                     <Button size="sm" variant="outline" rightIcon={<ArrowRight className="h-4 w-4" />}>
                       Take Attendance
                     </Button>
