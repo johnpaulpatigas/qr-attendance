@@ -43,6 +43,7 @@ import { syncOfflineQueue, cacheClassRoster } from '../features/attendance/offli
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useAppBackButton } from '../hooks/useAppBackButton';
 import { fetchStudents } from '../features/students/studentService';
+import { formatGradeSection } from '@qr-attendance/validation';
 import { ManualAttendanceModal } from '../features/attendance/ManualAttendanceModal';
 import { useAuth } from '../features/auth/AuthContext';
 import { getUtc8DateString } from '@qr-attendance/validation';
@@ -374,8 +375,9 @@ export const AttendancePage: React.FC = () => {
                 sections.length > 0
                   ? sections.map((s) => ({
                       value: s.id,
-                      label: `Grade ${s.grade_level} — ${s.section_name}${s.my_role === 'adviser' ? ' (Adviser)' : s.my_subject ? ` (${s.my_subject})` : ''}`,
+                      label: `${formatGradeSection(s.grade_level, s.section_name)}${s.my_role === 'adviser' ? ' (Adviser)' : s.my_subject ? ` (${s.my_subject})` : ''}`,
                     }))
+
                   : [{ value: '', label: 'No sections registered yet' }]
               }
             />

@@ -28,6 +28,7 @@ import {
 import {
   fetchClassSections,
 } from '../features/attendance/attendanceSessionService';
+import { formatGradeSection } from '@qr-attendance/validation';
 import {
   generateSF2Report,
   fetchDailyReport,
@@ -161,9 +162,10 @@ export const ReportsPage: React.FC = () => {
               onChange={(e) => setSelectedClassId(e.target.value)}
               options={sections.map((s) => ({
                 value: s.id,
-                label: `Grade ${s.grade_level} — ${s.section_name}`,
+                label: formatGradeSection(s.grade_level, s.section_name),
               }))}
             />
+
 
             {activeTab === 'sf2' ? (
               <>

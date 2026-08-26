@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { createQrPayload, parseQrPayload } from '@qr-attendance/validation';
+import { createQrPayload, parseQrPayload, formatGradeSection } from '@qr-attendance/validation';
 import type { StudentWithSection } from '@qr-attendance/types';
 
 export function getStudentQrPayload(qrIdentifier: string): string {
@@ -151,8 +151,9 @@ export async function printStudentQrCard(student: StudentWithSection) {
       </div>
       <div class="name">${fullName}</div>
       <div class="lrn">LRN: ${student.lrn}</div>
-      <div class="section">Grade ${student.grade_level} — ${student.section_name || 'Class Section'}</div>
+      <div class="section">${formatGradeSection(student.grade_level, student.section_name)}</div>
     </div>
+
     <script>
       function triggerPrint() {
         window.focus();
@@ -201,8 +202,9 @@ export async function printBatchStudentQrCards(students: StudentWithSection[]) {
           </div>
           <div class="name">${fullName}</div>
           <div class="lrn">LRN: ${student.lrn}</div>
-          <div class="section">Grade ${student.grade_level} — ${student.section_name || 'Section'}</div>
+          <div class="section">${formatGradeSection(student.grade_level, student.section_name)}</div>
         </div>
+
       `
     )
     .join('');

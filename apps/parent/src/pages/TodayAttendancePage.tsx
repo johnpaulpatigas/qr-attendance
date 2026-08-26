@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, XCircle, MapPin, User, AlertCircle, QrCode, WifiOff } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, LoadingState, EmptyState } from '@qr-attendance/ui';
+import { formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
@@ -77,9 +78,10 @@ const SessionCard: React.FC<SessionCardProps> = ({
             <MapPin className="h-4 w-4 text-slate-400" /> Section
           </span>
           <span className="font-medium text-slate-900">
-            Grade {gradeLevel} — {sectionName}
+            {formatGradeSection(gradeLevel, sectionName)}
           </span>
         </div>
+
 
         <div className="flex items-center justify-between">
           <span className="text-slate-500 flex items-center gap-2">
@@ -218,7 +220,7 @@ export const TodayAttendancePage: React.FC = () => {
                       : '—'}
                   </h3>
                   <p className="text-sm text-slate-600">
-                    Recorded by <span className="font-semibold text-slate-900">{status.recordedByTeacherName || 'Class Adviser'}</span> at Grade {activeChild.grade_level} — {activeChild.section_name}
+                    Recorded by <span className="font-semibold text-slate-900">{status.recordedByTeacherName || 'Class Adviser'}</span> at {formatGradeSection(activeChild.grade_level, activeChild.section_name)}
                   </p>
                 </div>
               </div>
@@ -251,11 +253,12 @@ export const TodayAttendancePage: React.FC = () => {
               No Attendance Scanned Yet Today
             </h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Attendance has not yet been taken for {childName} in Grade {activeChild.grade_level} {activeChild.section_name}. You will receive a notification as soon as the student is scanned.
+              Attendance has not yet been taken for {childName} in {formatGradeSection(activeChild.grade_level, activeChild.section_name)}. You will receive a notification as soon as the student is scanned.
             </p>
           </CardContent>
         </Card>
       )}
+
     </div>
   );
 };

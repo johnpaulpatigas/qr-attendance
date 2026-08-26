@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { cleanSectionName, formatGradeSection } from '@qr-attendance/validation';
 import type { SF2ReportData } from './reportService';
 
 export function exportSF2ToExcel(report: SF2ReportData) {
@@ -9,7 +10,7 @@ export function exportSF2ToExcel(report: SF2ReportData) {
   rows.push(['School Form 2 (SF2) Daily Attendance Report of Learners']);
   rows.push([`School Name: ${report.schoolName}`, '', `School ID: ${report.schoolId}`, '', `District: ${report.district}`]);
   rows.push([`Division: ${report.division}`, '', `Region: ${report.region}`, '', `School Year: ${report.schoolYear}`]);
-  rows.push([`Grade Level: ${report.gradeLevel}`, '', `Section: ${report.sectionName}`, '', `Month: ${report.monthName} ${report.year}`]);
+  rows.push([`Grade Level: ${report.gradeLevel}`, '', `Section: ${cleanSectionName(report.sectionName)}`, '', `Month: ${report.monthName} ${report.year}`]);
   rows.push([]); // blank
 
   // Table Headers
@@ -125,8 +126,9 @@ export function printSF2Document(report: SF2ReportData) {
           <div><strong>School ID:</strong> ${report.schoolId}</div>
           <div><strong>District:</strong> ${report.district}</div>
           <div><strong>Division:</strong> ${report.division}</div>
-          <div><strong>Grade & Section:</strong> Grade ${report.gradeLevel} — ${report.sectionName}</div>
+          <div><strong>Grade & Section:</strong> ${formatGradeSection(report.gradeLevel, report.sectionName)}</div>
           <div><strong>School Year:</strong> ${report.schoolYear}</div>
+
           <div><strong>Month:</strong> ${report.monthName} ${report.year}</div>
           <div><strong>Total Days:</strong> ${report.schoolDays.length}</div>
         </div>

@@ -16,6 +16,7 @@ import {
 } from '@qr-attendance/ui';
 import { getSupabaseClient } from '@qr-attendance/supabase';
 import type { ClassSectionWithDetails, SectionSubjectTeacher } from '@qr-attendance/types';
+import { formatGradeSection, cleanSectionName } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 import {
   fetchClassSections,
@@ -276,7 +277,7 @@ export const ClassesPage: React.FC = () => {
                         </Badge>
                       ) : null}
                     </div>
-                    <CardTitle className="text-lg">{cls.section_name}</CardTitle>
+                    <CardTitle className="text-lg">{cleanSectionName(cls.section_name)}</CardTitle>
                     {cls.room_number && (
                       <p className="text-xs text-slate-400 font-medium">Room {cls.room_number}</p>
                     )}
@@ -426,7 +427,7 @@ export const ClassesPage: React.FC = () => {
         <Modal
           isOpen={Boolean(selectedClassForSubjects)}
           onClose={() => setSelectedClassForSubjects(null)}
-          title={`Subject Teachers • Grade ${selectedClassForSubjects.grade_level} - ${selectedClassForSubjects.section_name}`}
+          title={`Subject Teachers • ${formatGradeSection(selectedClassForSubjects.grade_level, selectedClassForSubjects.section_name)}`}
           description="In high school (MNHS model), multiple teachers teach different subjects in this section."
         >
           <div className="space-y-5">

@@ -141,8 +141,12 @@ serve(async (req) => {
         .eq('id', student.section_id)
         .maybeSingle();
 
-      const actualSecName = actualSec ? `Grade ${actualSec.grade_level} - ${actualSec.section_name}` : 'another class section';
+      const cleanActualSec = actualSec?.section_name
+        ? actualSec.section_name.replace(/^(?:grade\s*\d+|gr\.\s*\d+|g\d+|\d+)\s*[-—–:]?\s*/i, '').trim() || actualSec.section_name
+        : '';
+      const actualSecName = actualSec ? `Grade ${actualSec.grade_level} — ${cleanActualSec}` : 'another class section';
       const studentFullName = `${student.first_name} ${student.last_name}`.trim();
+
 
       return new Response(
         JSON.stringify({

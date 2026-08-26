@@ -5,6 +5,7 @@ import { Modal, Button, Badge } from '@qr-attendance/ui';
 import type { StudentWithSection } from '@qr-attendance/types';
 import { getStudentQrPayload, downloadQrCode, printStudentQrCard } from './qrUtils';
 import { regenerateStudentQrIdentifier } from '../students/studentService';
+import { formatGradeSection } from '@qr-attendance/validation';
 
 export interface StudentQrModalProps {
   student: StudentWithSection | null;
@@ -120,9 +121,10 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
             <h4 className="text-base font-bold text-slate-900 leading-tight">{fullName}</h4>
             <p className="font-mono text-xs font-semibold text-slate-600">LRN: {student.lrn}</p>
             <p className="text-xs font-medium text-blue-600">
-              Grade {student.grade_level} — {student.section_name || 'Assigned Section'}
+              {formatGradeSection(student.grade_level, student.section_name)}
             </p>
           </div>
+
         </div>
 
         <div className="space-y-1 text-xs text-slate-400">

@@ -5,3 +5,4 @@ export * from './student';
 export * from './attendance';
 export * from './sf1';
 export * from './date';
+export * from './section';

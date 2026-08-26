@@ -27,6 +27,7 @@ import {
   LoadingState,
 } from '@qr-attendance/ui';
 import type { SF1ImportSummary } from '@qr-attendance/types';
+import { formatGradeSection } from '@qr-attendance/validation';
 import { parseSF1Spreadsheet, type ParseSF1Result } from '../features/sf1/sf1Parser';
 import { validateSF1Records, type SF1ValidationSummary } from '../features/sf1/sf1Validator';
 import { executeSF1Import } from '../features/sf1/sf1ImportService';
@@ -296,8 +297,9 @@ export const SF1ImportPage: React.FC = () => {
                         <TableCell className="font-medium text-slate-900">{fullName || '(Missing Name)'}</TableCell>
                         <TableCell className="text-xs">{r.data.sex}</TableCell>
                         <TableCell className="text-xs">
-                          Gr. {r.data.grade_level} — {r.data.section_name}
+                          {formatGradeSection(r.data.grade_level, r.data.section_name)}
                         </TableCell>
+
                         <TableCell className="text-xs">
                           {r.errors.length > 0 && (
                             <div className="space-y-0.5 text-rose-600 font-medium">

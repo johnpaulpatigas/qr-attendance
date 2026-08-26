@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, LoadingState } from '@qr-attendance/ui';
 import { getSupabaseClient } from '@qr-attendance/supabase';
-import { getUtc8DateString } from '@qr-attendance/validation';
+import { getUtc8DateString, formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 
 interface DashboardClass {
@@ -211,7 +211,7 @@ export const DashboardPage: React.FC = () => {
           <h2 className="text-2xl font-extrabold tracking-tight mt-1">Today's Attendance Overview</h2>
           <p className="mt-1 text-sm text-blue-100">
             {selectedClass
-              ? `Grade ${selectedClass.grade_level} — ${selectedClass.section_name} • ${metrics.totalEnrolled} Enrolled`
+              ? `${formatGradeSection(selectedClass.grade_level, selectedClass.section_name)} • ${metrics.totalEnrolled} Enrolled`
               : `${classes.length} Class Section${classes.length === 1 ? '' : 's'} • ${metrics.totalEnrolled} Total Enrolled`}
           </p>
         </div>
@@ -225,11 +225,12 @@ export const DashboardPage: React.FC = () => {
               <option value="all">All Classes</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
-                  Grade {c.grade_level} — {c.section_name}
+                  {formatGradeSection(c.grade_level, c.section_name)}
                 </option>
               ))}
             </select>
           )}
+
           <Link to="/attendance">
             <Button
               size="md"
@@ -358,7 +359,7 @@ export const DashboardPage: React.FC = () => {
                 >
                   <div>
                     <h4 className="font-semibold text-slate-900">
-                      Grade {cls.grade_level} — {cls.section_name}
+                      {formatGradeSection(cls.grade_level, cls.section_name)}
                     </h4>
                     <p className="text-xs text-slate-500">
                       {cls.student_count} Students {cls.room_number ? `• Room ${cls.room_number}` : ''}

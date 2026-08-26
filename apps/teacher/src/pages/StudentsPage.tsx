@@ -20,6 +20,7 @@ import {
   EmptyState,
 } from '@qr-attendance/ui';
 import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
+import { formatGradeSection } from '@qr-attendance/validation';
 import { fetchStudents } from '../features/students/studentService';
 import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { StudentQrModal } from '../features/qr/StudentQrModal';
@@ -146,7 +147,7 @@ export const StudentsPage: React.FC = () => {
                 { value: 'all', label: 'All Sections' },
                 ...sections.map((s) => ({
                   value: s.id,
-                  label: `Grade ${s.grade_level} — ${s.section_name}`,
+                  label: formatGradeSection(s.grade_level, s.section_name),
                 })),
               ]}
             />
@@ -202,9 +203,10 @@ export const StudentsPage: React.FC = () => {
                       <TableCell className="capitalize text-xs text-slate-600">
                         {student.sex.toLowerCase()}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        Grade {student.grade_level} — {student.section_name || 'Section'}
+                      <TableCell className="text-sm font-medium">
+                        {formatGradeSection(student.grade_level, student.section_name)}
                       </TableCell>
+
                       <TableCell>
                         <Badge variant="outline" size="sm" className="font-mono text-[10px] truncate max-w-[140px]">
                           ATTENDANCE:{student.qr_identifier.slice(0, 8)}...

@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@qr-attendance/supabase';
+import { cleanSectionName, extractGradeFromSection } from '@qr-attendance/validation';
 import type { SF1ImportSummary } from '@qr-attendance/types';
 import type { SF1ValidatedRecord } from './sf1Validator';
 
@@ -58,18 +59,20 @@ export async function executeSF1Import(
 
   for (const record of validRecords) {
     try {
-      const grade = record.data.grade_level;
-      const sectionName = record.data.section_name.trim();
-      const cacheKey = `${grade}_${sectionName.toLowerCase()}`;
+      const rawSection = record.data.section_name.trim();
+      const cleanedSection = cleanSectionName(rawSection) || rawSection;
+      const grade = record.data.grade_level || extractGradeFromSection(rawSection) || 10;
+      const cacheKey = `${grade}_${cleanedSection.toLowerCase()}`;
 
       let sectionId = sectionCache.get(cacheKey);
       if (!sectionId) {
+        // Try searching for either cleaned section name or raw section name
         const { data: existingSec } = await client
           .from('class_sections')
           .select('id')
           .eq('school_year_id', schoolYearId)
           .eq('grade_level', grade)
-          .ilike('section_name', sectionName)
+          .or(`section_name.ilike.${cleanedSection},section_name.ilike.${rawSection}`)
           .maybeSingle();
 
         if (existingSec) {
@@ -80,7 +83,7 @@ export async function executeSF1Import(
             .insert({
               school_year_id: schoolYearId,
               grade_level: grade,
-              section_name: sectionName,
+              section_name: cleanedSection,
               teacher_id: currentUserId,
             })
             .select()
@@ -91,6 +94,7 @@ export async function executeSF1Import(
         }
         sectionCache.set(cacheKey, sectionId as string);
       }
+
 
       const { data: existingStudent } = await client
         .from('students')

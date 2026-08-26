@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, LoadingState, Badge } from '@qr-attendance/ui';
+import { formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth/AuthContext';
 import { fetchStudentStatistics, type StudentAttendanceMetrics } from '../features/attendance/parentAttendanceService';
 import { CheckCircle2, Clock, XCircle, Award } from 'lucide-react';
@@ -124,9 +125,10 @@ export const StatisticsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>
-                Student is currently enrolled in <strong>Grade {activeChild.grade_level} — {activeChild.section_name}</strong> for School Year 2026-2027.
+                Student is currently enrolled in <strong>{formatGradeSection(activeChild.grade_level, activeChild.section_name)}</strong> for School Year 2026-2027.
               </p>
               <p>
+
                 MNHS standard requires students to maintain above 80% attendance throughout the school year. Current attendance rate is <strong>{metrics.attendance_rate_percentage}%</strong>.
               </p>
             </CardContent>
