@@ -67,9 +67,10 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Student Attendance QR Pass"
-      description="MNHS standard QR attendance identifier for scanning"
+      title="Student QR Attendance Card"
+      description="Official student QR identifier for classroom attendance."
       size="md"
+
       footer={
         <div className="flex w-full items-center justify-between gap-2">
           <Button
@@ -108,9 +109,9 @@ export const StudentQrModal: React.FC<StudentQrModalProps> = ({
         {/* Printable Card Frame */}
         <div className="w-full max-w-xs rounded-2xl border-2 border-slate-200 bg-gradient-to-b from-blue-50/50 to-white p-6 shadow-md">
           <div className="text-xs font-bold tracking-wider text-blue-700 uppercase">
-            Department of Education
+            Student Attendance Pass
           </div>
-          <p className="mb-3 text-[11px] text-slate-500">Attendance QR Identification</p>
+          <p className="mb-3 text-[11px] text-slate-500">Official QR Identification</p>
 
           <div className="my-2 flex justify-center rounded-xl border border-slate-100 bg-white p-4 shadow-xs">
             <QRCodeCanvas

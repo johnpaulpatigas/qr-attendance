@@ -103,10 +103,10 @@ export const SF1ImportPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">MNHS SF1 Importer</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Import Students from Spreadsheet</h2>
           <p className="text-sm text-slate-500">
-            Import official School Form 1 (SF1) student lists (.xlsx, .xls, .csv) into Marigondon
-            NHS sections.
+            Import student rosters from Excel or CSV spreadsheets (.xlsx, .xls, .csv) into class
+            sections.
           </p>
         </div>
         {validationSummary && (
@@ -132,9 +132,9 @@ export const SF1ImportPage: React.FC = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>1. Upload MNHS / DepEd SF1 Spreadsheet</CardTitle>
+              <CardTitle>1. Upload Student Roster Spreadsheet</CardTitle>
               <CardDescription>
-                Upload your class SF1 file. The system will automatically detect student names,
+                Upload your spreadsheet file. The system will automatically detect student names,
                 12-digit LRNs, sex, birth dates, and section info.
               </CardDescription>
             </CardHeader>
@@ -160,11 +160,12 @@ export const SF1ImportPage: React.FC = () => {
                   <UploadCloud className="h-8 w-8" />
                 </div>
                 <h4 className="text-base font-semibold text-slate-800">
-                  Click to select file or drag & drop MNHS SF1 here
+                  Click to select file or drag & drop spreadsheet here
                 </h4>
                 <p className="mt-1 text-xs text-slate-500">
-                  Accepts standard School Form 1 (.xlsx, .xls, .csv)
+                  Accepts Excel and CSV spreadsheets (.xlsx, .xls, .csv)
                 </p>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -384,8 +385,9 @@ export const SF1ImportPage: React.FC = () => {
               <CheckCircle2 className="h-7 w-7" />
             </div>
             <CardTitle className="text-xl text-emerald-900">
-              SF1 Import Completed Successfully
+              Import Completed Successfully
             </CardTitle>
+
             <CardDescription className="text-emerald-700">
               Student identities and QR identifiers have been generated and recorded.
             </CardDescription>

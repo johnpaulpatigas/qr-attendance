@@ -137,7 +137,7 @@ export function printSF2Document(report: SF2ReportData) {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>DepEd SF2 — ${report.sectionName} — ${report.monthName} ${report.year}</title>
+        <title>Monthly Attendance Register — ${report.sectionName} — ${report.monthName} ${report.year}</title>
         <style>
           @page { size: A4 landscape; margin: 10mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #0f172a; }
@@ -154,9 +154,10 @@ export function printSF2Document(report: SF2ReportData) {
       </head>
       <body>
         <div class="header">
-          <h2>Department of Education</h2>
-          <h3>School Form 2 (SF2) Daily Attendance Report of Learners</h3>
+          <h2>${report.schoolName || 'Attendance Management System'}</h2>
+          <h3>Monthly Attendance Register</h3>
         </div>
+
 
         <div class="meta-grid">
           <div><strong>School:</strong> ${report.schoolName}</div>

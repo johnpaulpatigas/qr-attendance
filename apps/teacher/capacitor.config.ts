@@ -2,7 +2,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.johnpaulpatigas.qrattendance.teacher',
-  appName: 'MNHS Teacher Attendance',
+  appName: 'Teacher Attendance',
+
   webDir: 'dist',
   server: {
     androidScheme: 'https',

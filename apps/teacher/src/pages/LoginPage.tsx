@@ -91,10 +91,8 @@ export const LoginPage: React.FC = () => {
           <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl">
             <QrCode className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">MNHS Teacher Portal</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Marigondon National High School • Attendance Management System
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">Teacher Portal</h1>
+          <p className="mt-1 text-sm text-slate-500">Classroom Attendance System</p>
         </div>
 
         <Card className="border-slate-200 shadow-lg">
@@ -102,7 +100,7 @@ export const LoginPage: React.FC = () => {
             <CardTitle>{isResetMode ? 'Reset Password' : 'Sign In'}</CardTitle>
             <CardDescription>
               {isResetMode
-                ? 'Enter your registered MNHS teacher email to receive a recovery link'
+                ? 'Enter your registered email to receive a recovery link'
                 : 'Enter your teacher credentials to continue'}
             </CardDescription>
           </CardHeader>
@@ -130,9 +128,9 @@ export const LoginPage: React.FC = () => {
                 )}
 
                 <Input
-                  label="MNHS / DepEd Email"
+                  label="Email Address"
                   type="email"
-                  placeholder="teacher@mnhs.edu.ph"
+                  placeholder="teacher@school.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   leftIcon={<Mail className="h-4 w-4" />}
@@ -168,14 +166,15 @@ export const LoginPage: React.FC = () => {
                   </div>
                 )}
                 <Input
-                  label="MNHS / DepEd Email"
+                  label="Email Address"
                   type="email"
-                  placeholder="teacher@mnhs.edu.ph"
+                  placeholder="teacher@school.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   leftIcon={<Mail className="h-4 w-4" />}
                   required
                 />
+
                 <Input
                   label="Password"
                   type="password"

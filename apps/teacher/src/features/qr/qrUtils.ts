@@ -145,9 +145,10 @@ export async function printStudentQrCard(student: StudentWithSection) {
   </head>
   <body>
     <div class="card">
-      <div class="header">Department of Education</div>
-      <div class="sub">Student Attendance Pass</div>
+      <div class="header">Student Attendance Pass</div>
+      <div class="sub">Official QR Identification</div>
       <div class="qr-container">
+
         <img src="${qrDataUrl}" alt="Student QR Code" class="qr-image" />
       </div>
       <div class="name">${fullName}</div>
@@ -197,9 +198,10 @@ export async function printBatchStudentQrCards(students: StudentWithSection[]) {
     .map(
       ({ student, fullName, qrDataUrl }) => `
         <div class="card">
-          <div class="header">Department of Education</div>
-          <div class="sub">Student Attendance Pass</div>
+          <div class="header">Student Attendance Pass</div>
+          <div class="sub">Official QR Identification</div>
           <div class="qr-container">
+
             <img src="${qrDataUrl}" alt="Student QR Code" class="qr-image" />
           </div>
           <div class="name">${fullName}</div>

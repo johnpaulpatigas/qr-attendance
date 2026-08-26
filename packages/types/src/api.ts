@@ -14,7 +14,6 @@ export interface RecordAttendancePayload {
   client_event_id?: string; // Idempotency key
 }
 
-
 export interface RecordAttendanceResponse {
   success: boolean;
   status:

@@ -95,10 +95,11 @@ export const ReportsPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">MNHS Attendance Reports & SF2</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Attendance Reports & Monthly Register
+          </h2>
           <p className="text-sm text-slate-500">
-            Generate monthly School Form 2 (SF2) registers and daily attendance audits for
-            Marigondon NHS.
+            Generate monthly attendance registers and daily classroom attendance summaries.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -110,7 +111,7 @@ export const ReportsPage: React.FC = () => {
                 leftIcon={<Printer className="h-4 w-4" />}
                 onClick={handlePrintSF2}
               >
-                Print SF2 Register
+                Print Register
               </Button>
               <Button
                 variant="primary"
@@ -118,7 +119,7 @@ export const ReportsPage: React.FC = () => {
                 leftIcon={<Download className="h-4 w-4" />}
                 onClick={handleExportExcel}
               >
-                Export SF2 (.xlsx)
+                Export Excel (.xlsx)
               </Button>
             </>
           )}
@@ -136,7 +137,7 @@ export const ReportsPage: React.FC = () => {
           }`}
         >
           <FileSpreadsheet className="h-4 w-4" />
-          DepEd School Form 2 (Monthly SF2)
+          Monthly Attendance Register
         </button>
         <button
           onClick={() => setActiveTab('daily')}
@@ -268,15 +269,16 @@ export const ReportsPage: React.FC = () => {
             </Card>
           </div>
 
-          {/* DepEd SF2 Interactive Table Preview */}
+          {/* Monthly Register Interactive Table Preview */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
                 <CardTitle className="text-base">
-                  School Form 2 (SF2) — {sf2Data.sectionName} ({sf2Data.monthName} {sf2Data.year})
+                  Monthly Attendance Register — {sf2Data.sectionName} ({sf2Data.monthName}{' '}
+                  {sf2Data.year})
                 </CardTitle>
                 <p className="text-xs text-slate-400">
-                  {sf2Data.schoolDays.length} School Days &bull; DepEd Standard Form
+                  {sf2Data.schoolDays.length} School Days &bull; Monthly Summary
                 </p>
               </div>
               <Badge variant="info" size="sm">
@@ -289,7 +291,8 @@ export const ReportsPage: React.FC = () => {
                   <TableRow>
                     <TableHead className="w-10">#</TableHead>
                     <TableHead className="w-28">LRN</TableHead>
-                    <TableHead className="min-w-[180px]">Learner's Name</TableHead>
+                    <TableHead className="min-w-[180px]">Student's Name</TableHead>
+
                     {sf2Data.schoolDays.slice(0, 15).map((d) => (
                       <TableHead key={d} className="w-7 p-1 text-center text-[10px]">
                         {d}

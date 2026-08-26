@@ -140,8 +140,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Add New Student"
-      description="Register student in class section and generate unique QR identifier"
+      title="Add Student"
+      description="Register a student in a class section and generate their QR attendance card."
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -157,9 +157,10 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
             placeholder="12 numeric digits"
             value={lrn}
             onChange={(e) => setLrn(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            helperText="MNHS 12-digit student identifier (LRN)"
+            helperText="12-digit student identifier (LRN)"
             required
           />
+
           <Select
             label="Sex"
             value={sex}

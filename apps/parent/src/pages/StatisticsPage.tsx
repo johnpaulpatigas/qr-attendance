@@ -53,7 +53,7 @@ export const StatisticsPage: React.FC = () => {
                 <div className="text-4xl font-extrabold">{metrics.attendance_rate_percentage}%</div>
                 <p className="text-xs text-blue-100">
                   {metrics.attendance_rate_percentage >= 95
-                    ? 'Outstanding! Meets MNHS honors attendance standard.'
+                    ? 'Outstanding attendance standing.'
                     : 'Good attendance standing.'}
                 </p>
               </CardContent>
@@ -121,7 +121,7 @@ export const StatisticsPage: React.FC = () => {
           {/* Summary Details */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">MNHS Academic Standing Summary</CardTitle>
+              <CardTitle className="text-base">Attendance Standing Summary</CardTitle>
               <Badge variant="success" size="sm">
                 Good Standing
               </Badge>
@@ -135,8 +135,8 @@ export const StatisticsPage: React.FC = () => {
                 for School Year 2026-2027.
               </p>
               <p>
-                MNHS standard requires students to maintain above 80% attendance throughout the
-                school year. Current attendance rate is{' '}
+                Students are recommended to maintain at least 80% attendance throughout the school
+                year. Current attendance rate is{' '}
                 <strong>{metrics.attendance_rate_percentage}%</strong>.
               </p>
             </CardContent>

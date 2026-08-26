@@ -228,9 +228,9 @@ export const ClassesPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">High School Classes & Sections</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Classes & Sections</h2>
           <p className="text-sm text-slate-500">
-            Manage your homeroom advisory sections and subject teaching assignments (MNHS Model).
+            Manage your homeroom advisory sections and subject teaching assignments.
           </p>
         </div>
         <Button
@@ -244,7 +244,7 @@ export const ClassesPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <LoadingState message="Loading high school class sections from database..." />
+        <LoadingState message="Loading class sections..." />
       ) : classes.length === 0 ? (
         <EmptyState
           title="No Class Sections Registered"
@@ -383,8 +383,8 @@ export const ClassesPage: React.FC = () => {
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Add High School Class Section"
-        description="Register a new grade level and section. You will be set as the Class Adviser."
+        title="Add Class Section"
+        description="Register a new section and assign the class adviser."
       >
         <form onSubmit={handleCreateClass} className="space-y-4">
           {formError && (
@@ -444,7 +444,7 @@ export const ClassesPage: React.FC = () => {
           isOpen={Boolean(selectedClassForSubjects)}
           onClose={() => setSelectedClassForSubjects(null)}
           title={`Subject Teachers • ${formatGradeSection(selectedClassForSubjects.grade_level, selectedClassForSubjects.section_name)}`}
-          description="In high school (MNHS model), multiple teachers teach different subjects in this section."
+          description="Assign subject teachers and class schedules for this section."
         >
           <div className="space-y-5">
             {/* List of current subject assignments */}

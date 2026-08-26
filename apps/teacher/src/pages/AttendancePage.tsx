@@ -338,8 +338,7 @@ export const AttendancePage: React.FC = () => {
             )}
           </div>
           <p className="text-sm text-slate-500">
-            Real-time QR barcode scanner for teacher-led classroom attendance with offline
-            tolerance.
+            Take classroom attendance by scanning student QR codes.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -393,7 +392,8 @@ export const AttendancePage: React.FC = () => {
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               options={[
-                { value: '', label: '📋 Daily Homeroom (DepEd SF2)' },
+                { value: '', label: '📋 Daily Homeroom / General Attendance' },
+
                 { value: 'Mathematics', label: '📐 Mathematics' },
                 { value: 'Science', label: '🔬 Science' },
                 { value: 'English', label: '📖 English' },

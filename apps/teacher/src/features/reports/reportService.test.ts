@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateSF2Report } from './reportService';
 
-describe('DepEd SF2 Report Service', () => {
+describe('Monthly Attendance Register Report Service', () => {
   it('correctly calculates school days (excluding Saturdays and Sundays) for a given month', async () => {
     // August 2026 has 31 days. August 1 is Saturday, August 2 is Sunday.
     // 31 days - 9 weekend days (1, 2, 8, 9, 15, 16, 22, 23, 29, 30) = 21 school days
