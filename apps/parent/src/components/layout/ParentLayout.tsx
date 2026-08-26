@@ -64,7 +64,7 @@ export const ParentLayout: React.FC = () => {
             <UserCheck className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">DepEd QR</h1>
+            <h1 className="text-base font-bold text-slate-900 leading-tight">MNHS Attendance</h1>
             <p className="text-xs font-medium text-slate-500">Parent & Student Portal</p>
           </div>
         </div>

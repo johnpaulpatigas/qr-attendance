@@ -52,8 +52,8 @@ export const TeacherLayout: React.FC = () => {
             <QrCode className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">DepEd QR</h1>
-            <p className="text-xs font-medium text-slate-500">Teacher Portal</p>
+            <h1 className="text-base font-bold text-slate-900 leading-tight">MNHS Attendance</h1>
+            <p className="text-xs font-medium text-slate-500">Marigondon NHS • Teacher</p>
           </div>
         </div>
 

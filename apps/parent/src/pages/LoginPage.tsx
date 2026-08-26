@@ -138,9 +138,9 @@ export const LoginPage: React.FC = () => {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-xl mb-3">
             <UserCheck className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Parent & Student Portal</h1>
+          <h1 className="text-2xl font-bold text-slate-900">MNHS Parent & Student Portal</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Real-time attendance tracker, daily scan history, and instant alerts.
+            Marigondon National High School • Real-time attendance tracker and instant alerts.
           </p>
         </div>
 

@@ -83,9 +83,9 @@ export const LoginPage: React.FC = () => {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl mb-3">
             <QrCode className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Teacher Portal</h1>
+          <h1 className="text-2xl font-bold text-slate-900">MNHS Teacher Portal</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Sign in to manage classes, scan attendance, and generate reports.
+            Marigondon National High School • Attendance Management System
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export const LoginPage: React.FC = () => {
             <CardTitle>{isResetMode ? 'Reset Password' : 'Sign In'}</CardTitle>
             <CardDescription>
               {isResetMode
-                ? 'Enter your registered DepEd email to receive a recovery link'
+                ? 'Enter your registered MNHS teacher email to receive a recovery link'
                 : 'Enter your teacher credentials to continue'}
             </CardDescription>
           </CardHeader>
@@ -112,9 +112,9 @@ export const LoginPage: React.FC = () => {
                   </div>
                 )}
                 <Input
-                  label="DepEd Email"
+                  label="MNHS / DepEd Email"
                   type="email"
-                  placeholder="teacher@deped.gov.ph"
+                  placeholder="teacher@mnhs.edu.ph"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   leftIcon={<Mail className="h-4 w-4" />}
@@ -145,9 +145,9 @@ export const LoginPage: React.FC = () => {
                   </div>
                 )}
                 <Input
-                  label="DepEd Email"
+                  label="MNHS / DepEd Email"
                   type="email"
-                  placeholder="teacher@deped.gov.ph"
+                  placeholder="teacher@mnhs.edu.ph"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   leftIcon={<Mail className="h-4 w-4" />}

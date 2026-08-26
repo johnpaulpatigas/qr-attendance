@@ -1,6 +1,6 @@
-# QR-Based School Attendance System
+# MNHS QR-Based School Attendance System
 
-A production-grade, full-stack monorepo for automated school attendance management designed for Philippine public and private schools, adhering to Department of Education (DepEd) standards.
+A production-grade, full-stack monorepo for automated school attendance management designed for **Marigondon National High School (MNHS)**, supporting High School multi-subject teachers, Class Advisers, and DepEd standards (SF1 / SF2).
 
 ---
 
@@ -11,15 +11,15 @@ The system is built as a single Git monorepo using npm workspaces, React 18, Typ
 ```
 qr-attendance/
 ├── apps/
-│   ├── teacher/              # Teacher PWA (QR Scanner, SF1 Importer, SF2 Reports, Student Directory)
-│   └── parent/               # Parent & Student Portal (Live Daily Status, History, Stats, Alerts)
+│   ├── teacher/              # MNHS Teacher Portal (QR Scanner, SF1 Importer, SF2 Reports, High School Subjects)
+│   └── parent/               # MNHS Parent & Student Portal (Live Daily Status, History, Stats, Alerts)
 ├── packages/
 │   ├── types/                # Domain TypeScript interfaces and database models
 │   ├── validation/           # Zod schemas, 12-digit LRN rules, QR payload validators
 │   ├── ui/                   # Shared reusable design system (Button, Modal, Table, Badge, Card, etc.)
 │   └── supabase/             # Typed Supabase client singleton & auth helpers
 └── supabase/
-    ├── migrations/           # 5 modular PostgreSQL schema & RLS migrations
+    ├── migrations/           # Modular PostgreSQL schema & RLS migrations
     └── functions/
         ├── record-attendance/     # Edge Function: server-side JWT auth, enrollment checks, duplicate prevention
         └── send-fcm-notification/ # Edge Function: FCM push dispatch to linked parents & delivery audit logs
@@ -30,11 +30,12 @@ qr-attendance/
 ## Key Features
 
 ### 1. Teacher Application (apps/teacher — Port 3000)
-- **High-Speed QR Barcode Scanner:** Real-time mobile back-camera and desktop webcam stream with animated laser viewfinder, 2-second debounce filter, and synthesized Web Audio scan chimes.
-- **Instant Attendance Feedback:** Visual alert banners (Present, Late, Already Recorded, Invalid QR, Student Not Enrolled).
+- **High-Speed QR Barcode Scanner:** Real-time mobile back-camera and desktop webcam stream with animated laser viewfinder, 2-second debounce filter, synthesized Web Audio scan chimes, and automatic cross-section protection.
+- **High School Multi-Subject & Adviser Support:** Separate homeroom (DepEd SF2) and subject-level attendance (Mathematics, Science, English, etc.) with class claiming and multi-teacher access.
+- **Instant Attendance Feedback:** Visual alert banners (Present, Late, Already Recorded, Invalid QR, Student Not Enrolled with enrolled section info).
 - **Live Session Metrics:** Real-time counters for Present, Late, Absent, and Unrecorded students.
-- **DepEd School Form 1 (SF1) Importer:** Parses .xlsx, .xls, and .csv files; auto-detects headers; validates 12-digit LRNs; detects duplicate LRN collisions; and auto-generates QR identifiers.
-- **DepEd School Form 2 (SF2) Generator:** Generates monthly attendance registers segregated by Male/Female learners with official codes (/, T, X), Average Daily Attendance (ADA), attendance rate percentages, .xlsx spreadsheet export, and landscape A4 printable registers.
+- **MNHS / DepEd School Form 1 (SF1) Importer:** Parses .xlsx, .xls, and .csv files; auto-detects headers; validates 12-digit LRNs; detects duplicate LRN collisions; and auto-generates QR identifiers.
+- **School Form 2 (SF2) Generator:** Generates monthly attendance registers segregated by Male/Female learners with official codes (/, T, X), Average Daily Attendance (ADA), attendance rate percentages, .xlsx spreadsheet export, and landscape A4 printable registers.
 - **Offline Scan Queue & Auto-Reconciliation:** Tolerates spotty or disconnected school Wi-Fi by caching enrolled student rosters and queueing scans locally with client UUID idempotency keys. Automatically flushes and syncs to Supabase upon reconnection with live connection badges.
 - **Student QR ID Passes:** Single-student printable ID badges with QR codes and whole-class batch printing.
 - **Manual Attendance & Audit Trails:** Manual status corrections requiring explicit reason logs persisted in attendance_events.

@@ -117,7 +117,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
             placeholder="12 numeric digits"
             value={lrn}
             onChange={(e) => setLrn(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            helperText="DepEd 12-digit student identifier"
+            helperText="MNHS 12-digit student identifier (LRN)"
             required
           />
           <Select

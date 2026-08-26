@@ -101,9 +101,9 @@ export const SF1ImportPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">DepEd SF1 Importer</h2>
+          <h2 className="text-2xl font-bold text-slate-900">MNHS SF1 Importer</h2>
           <p className="text-sm text-slate-500">
-            Import official DepEd School Form 1 (SF1) student lists (.xlsx, .xls, .csv).
+            Import official School Form 1 (SF1) student lists (.xlsx, .xls, .csv) into Marigondon NHS sections.
           </p>
         </div>
         {validationSummary && (
@@ -124,7 +124,7 @@ export const SF1ImportPage: React.FC = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>1. Upload DepEd SF1 Spreadsheet</CardTitle>
+              <CardTitle>1. Upload MNHS / DepEd SF1 Spreadsheet</CardTitle>
               <CardDescription>
                 Upload your class SF1 file. The system will automatically detect student names, 12-digit LRNs, sex, birth dates, and section info.
               </CardDescription>
@@ -151,10 +151,10 @@ export const SF1ImportPage: React.FC = () => {
                   <UploadCloud className="h-8 w-8" />
                 </div>
                 <h4 className="text-base font-semibold text-slate-800">
-                  Click to select file or drag & drop DepEd SF1 here
+                  Click to select file or drag & drop MNHS SF1 here
                 </h4>
                 <p className="mt-1 text-xs text-slate-500">
-                  Accepts standard DepEd School Form 1 (.xlsx, .xls, .csv)
+                  Accepts standard School Form 1 (.xlsx, .xls, .csv)
                 </p>
                 <Button size="sm" variant="outline" className="mt-5" leftIcon={<FileSpreadsheet className="h-4 w-4" />}>
                   Select File

@@ -69,7 +69,7 @@ export const LinkStudentModal: React.FC<LinkStudentModalProps> = ({ isOpen, onCl
           value={lrn}
           onChange={(e) => setLrn(e.target.value.replace(/\D/g, '').slice(0, 12))}
           leftIcon={<Hash className="h-4 w-4" />}
-          helperText="Found on the student's ID badge or DepEd Form 137 / 138"
+          helperText="Found on the student's ID badge or Form 137 / 138"
           required
         />
 

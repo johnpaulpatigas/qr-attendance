@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">DepEd Teacher Attendance</string>
-    <string name="title_activity_main">DepEd Teacher Attendance</string>
+    <string name="app_name">MNHS Teacher Attendance</string>
+    <string name="title_activity_main">MNHS Teacher Attendance</string>
     <string name="package_name">com.johnpaulpatigas.qrattendance.teacher</string>
     <string name="custom_url_scheme">com.johnpaulpatigas.qrattendance.teacher</string>
 </resources>

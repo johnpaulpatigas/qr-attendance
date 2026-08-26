@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">DepEd Parent Attendance</string>
-    <string name="title_activity_main">DepEd Parent Attendance</string>
+    <string name="app_name">MNHS Parent Attendance</string>
+    <string name="title_activity_main">MNHS Parent Attendance</string>
     <string name="package_name">com.johnpaulpatigas.qrattendance.parent</string>
     <string name="custom_url_scheme">com.johnpaulpatigas.qrattendance.parent</string>
 </resources>

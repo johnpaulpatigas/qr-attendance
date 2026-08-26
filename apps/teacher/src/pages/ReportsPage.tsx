@@ -96,9 +96,9 @@ export const ReportsPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Attendance Reports & DepEd SF2</h2>
+          <h2 className="text-2xl font-bold text-slate-900">MNHS Attendance Reports & SF2</h2>
           <p className="text-sm text-slate-500">
-            Generate monthly DepEd School Form 2 (SF2) registers and daily attendance audits.
+            Generate monthly School Form 2 (SF2) registers and daily attendance audits for Marigondon NHS.
           </p>
         </div>
         <div className="flex items-center gap-2">

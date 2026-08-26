@@ -49,7 +49,7 @@ export const StatisticsPage: React.FC = () => {
                 <div className="text-4xl font-extrabold">{metrics.attendance_rate_percentage}%</div>
                 <p className="text-xs text-blue-100">
                   {metrics.attendance_rate_percentage >= 95
-                    ? 'Outstanding! Meets DepEd honors attendance standard.'
+                    ? 'Outstanding! Meets MNHS honors attendance standard.'
                     : 'Good attendance standing.'}
                 </p>
               </CardContent>
@@ -119,7 +119,7 @@ export const StatisticsPage: React.FC = () => {
           {/* Summary Details */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">DepEd Academic Standing Summary</CardTitle>
+              <CardTitle className="text-base">MNHS Academic Standing Summary</CardTitle>
               <Badge variant="success" size="sm">Good Standing</Badge>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-600">
@@ -127,7 +127,7 @@ export const StatisticsPage: React.FC = () => {
                 Student is currently enrolled in <strong>Grade {activeChild.grade_level} — {activeChild.section_name}</strong> for School Year 2026-2027.
               </p>
               <p>
-                DepEd standard requires students to maintain above 80% attendance throughout the school year. Current attendance rate is <strong>{metrics.attendance_rate_percentage}%</strong>.
+                MNHS standard requires students to maintain above 80% attendance throughout the school year. Current attendance rate is <strong>{metrics.attendance_rate_percentage}%</strong>.
               </p>
             </CardContent>
           </Card>

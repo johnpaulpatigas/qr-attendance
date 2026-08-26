@@ -246,11 +246,11 @@ export async function generateSF2Report(
   const attendancePercentage = totalEnrollment > 0 ? Number((((ada / totalEnrollment) * 100)).toFixed(1)) : 0;
 
   return {
-    schoolName: 'DepEd School',
-    schoolId: '301234',
-    district: 'District II',
-    division: 'Division of Schools',
-    region: 'Region',
+    schoolName: 'Marigondon National High School',
+    schoolId: '303180',
+    district: 'District 5',
+    division: 'SDO Lapu-Lapu City',
+    region: 'Region VII (Central Visayas)',
     gradeLevel,
     sectionName,
     schoolYear: schoolYearName,

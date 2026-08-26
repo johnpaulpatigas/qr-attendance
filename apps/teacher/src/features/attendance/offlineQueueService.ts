@@ -2,8 +2,9 @@ import type { RecordAttendancePayload, RecordAttendanceResponse, QueuedAttendanc
 import { parseQrPayload } from "@qr-attendance/validation";
 import { getSupabaseClient } from "@qr-attendance/supabase";
 
-const QUEUE_STORAGE_KEY = "deped_qr_attendance_offline_queue";
-const ROSTER_CACHE_KEY_PREFIX = "deped_qr_roster_cache_";
+const QUEUE_STORAGE_KEY = "mnhs_qr_attendance_offline_queue";
+const ROSTER_CACHE_KEY_PREFIX = "mnhs_qr_roster_cache_";
+const MASTER_INDEX_KEY = "mnhs_qr_master_students_index";
 
 export interface CachedStudent {
   id: string;
@@ -18,7 +19,7 @@ export interface CachedStudent {
 
 export function getQueuedScans(): QueuedAttendanceScan[] {
   try {
-    const stored = localStorage.getItem(QUEUE_STORAGE_KEY);
+    const stored = localStorage.getItem(QUEUE_STORAGE_KEY) || localStorage.getItem("deped_qr_attendance_offline_queue");
     if (!stored) return [];
     return JSON.parse(stored) as QueuedAttendanceScan[];
   } catch (err) {
@@ -64,14 +65,14 @@ export function cacheClassRoster(classId: string, students: CachedStudent[]): vo
   try {
     localStorage.setItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`, JSON.stringify(students));
     // Also keep a master lookup index for instant offline resolution
-    const masterIndexStr = localStorage.getItem('deped_qr_master_students_index');
+    const masterIndexStr = localStorage.getItem(MASTER_INDEX_KEY) || localStorage.getItem('deped_qr_master_students_index');
     const masterIndex: Record<string, CachedStudent> = masterIndexStr ? JSON.parse(masterIndexStr) : {};
     students.forEach((s) => {
       masterIndex[s.qr_identifier] = s;
       masterIndex[s.id] = s;
       masterIndex[s.lrn] = s;
     });
-    localStorage.setItem('deped_qr_master_students_index', JSON.stringify(masterIndex));
+    localStorage.setItem(MASTER_INDEX_KEY, JSON.stringify(masterIndex));
   } catch (err) {
     console.warn("Failed to cache class roster:", err);
   }
@@ -79,7 +80,7 @@ export function cacheClassRoster(classId: string, students: CachedStudent[]): vo
 
 export function getCachedClassRoster(classId: string): CachedStudent[] {
   try {
-    const stored = localStorage.getItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`);
+    const stored = localStorage.getItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`) || localStorage.getItem(`deped_qr_roster_cache_${classId}`);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -101,7 +102,7 @@ export function findCachedStudent(classId: string, rawQrPayload: string): Cached
 
   // 2. Search master student index
   try {
-    const masterIndexStr = localStorage.getItem('deped_qr_master_students_index');
+    const masterIndexStr = localStorage.getItem(MASTER_INDEX_KEY) || localStorage.getItem('deped_qr_master_students_index');
     if (masterIndexStr) {
       const masterIndex = JSON.parse(masterIndexStr);
       if (masterIndex[targetId]) return masterIndex[targetId];
@@ -110,11 +111,11 @@ export function findCachedStudent(classId: string, rawQrPayload: string): Cached
     // Ignore
   }
 
-  // 3. Fallback: Search all localStorage keys starting with deped_qr_roster_cache_
+  // 3. Fallback: Search all localStorage keys starting with mnhs_qr_roster_cache_ or deped_qr_roster_cache_
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(ROSTER_CACHE_KEY_PREFIX)) {
+      if (key && (key.startsWith(ROSTER_CACHE_KEY_PREFIX) || key.startsWith("deped_qr_roster_cache_"))) {
         const listStr = localStorage.getItem(key);
         if (listStr) {
           const list = JSON.parse(listStr) as CachedStudent[];
