@@ -39,8 +39,11 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
     currentUserId = offlineUser?.userId;
   }
 
+  const cachedProf = AppStorage.getJSON<{ id?: string; role?: string } | null>(
+    'teacher_auth_profile',
+    null
+  );
   if (!currentUserId) {
-    const cachedProf = AppStorage.getJSON<{ id?: string } | null>('teacher_auth_profile', null);
     currentUserId = cachedProf?.id;
   }
 
@@ -119,8 +122,8 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
             | null;
         }
 
-        const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map(
-          (d) => {
+        const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[])
+          .map((d) => {
             const isAdviser = Boolean(
               currentUserId && (d.adviser_id === currentUserId || d.teacher_id === currentUserId)
             );
@@ -128,6 +131,11 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
               (st) => st.teacher_id === currentUserId
             );
             const isSubjectTeacher = mySubjectAssignments.length > 0;
+            const myRole: 'adviser' | 'subject_teacher' | undefined = isAdviser
+              ? 'adviser'
+              : isSubjectTeacher
+                ? 'subject_teacher'
+                : undefined;
 
             return {
               id: d.id,
@@ -142,12 +150,17 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
               school_year_name: d.school_years?.name || 'Active SY',
               student_count: Array.isArray(d.students) ? d.students.length : 0,
               subject_teachers: d.section_subject_teachers || [],
-              my_role: isAdviser ? 'adviser' : isSubjectTeacher ? 'subject_teacher' : undefined,
+              my_role: myRole,
               my_subject:
                 mySubjectAssignments.map((st) => st.subject_name).join(', ') || undefined,
             };
-          }
-        );
+          })
+          .filter((s) => {
+            // Admins can see all sections; teachers only see sections they advise or teach
+            if (cachedProf?.role === 'admin') return true;
+            if (currentUserId) return s.my_role !== undefined;
+            return true;
+          });
 
         // Cache sections under storage and SQLite
         AppStorage.setJSON(userCacheKey, sections);

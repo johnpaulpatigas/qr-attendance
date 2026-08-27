@@ -1,4 +1,4 @@
-import { getSupabaseClient } from '@qr-attendance/supabase';
+import { getSupabaseClient, getStoredOfflineUser, AppStorage } from '@qr-attendance/supabase';
 import { cleanSectionName, extractGradeFromSection } from '@qr-attendance/validation';
 import type { SF1ImportSummary } from '@qr-attendance/types';
 import type { SF1ValidatedRecord } from './sf1Validator';
@@ -53,8 +53,23 @@ export async function executeSF1Import(records: SF1ValidatedRecord[]): Promise<S
     );
   }
 
-  const { data: authData } = await client.auth.getUser();
-  const currentUserId = authData.user?.id || null;
+  let currentUserId: string | null = null;
+  try {
+    const { data: authData } = await client.auth.getUser();
+    currentUserId = authData.user?.id || null;
+  } catch {
+    // Ignore
+  }
+
+  if (!currentUserId) {
+    const offlineUser = getStoredOfflineUser('teacher');
+    currentUserId = offlineUser?.userId || null;
+  }
+
+  if (!currentUserId) {
+    const cachedProf = AppStorage.getJSON<{ id?: string } | null>('teacher_auth_profile', null);
+    currentUserId = cachedProf?.id || null;
+  }
 
   const sectionCache = new Map<string, string>();
 
@@ -70,7 +85,7 @@ export async function executeSF1Import(records: SF1ValidatedRecord[]): Promise<S
         // Try searching for either cleaned section name or raw section name
         const { data: existingSec } = await client
           .from('class_sections')
-          .select('id')
+          .select('id, teacher_id, adviser_id')
           .eq('school_year_id', schoolYearId)
           .eq('grade_level', grade)
           .or(`section_name.ilike.${cleanedSection},section_name.ilike.${rawSection}`)
@@ -78,6 +93,12 @@ export async function executeSF1Import(records: SF1ValidatedRecord[]): Promise<S
 
         if (existingSec) {
           sectionId = existingSec.id;
+          if (currentUserId && (!existingSec.adviser_id || !existingSec.teacher_id)) {
+            await client
+              .from('class_sections')
+              .update({ adviser_id: currentUserId, teacher_id: currentUserId })
+              .eq('id', existingSec.id);
+          }
         } else {
           const { data: createdSec, error: secErr } = await client
             .from('class_sections')
@@ -86,6 +107,7 @@ export async function executeSF1Import(records: SF1ValidatedRecord[]): Promise<S
               grade_level: grade,
               section_name: cleanedSection,
               teacher_id: currentUserId,
+              adviser_id: currentUserId,
             })
             .select()
             .single();

@@ -3,6 +3,7 @@ import type { StudentWithSection } from '@qr-attendance/types';
 import type { CreateStudentInput, UpdateStudentInput } from '@qr-attendance/validation';
 import { cacheClassRoster, getCachedClassRoster } from '../attendance/offlineQueueService';
 import { isNetworkOnline } from '../attendance/networkManager';
+import { fetchClassSections } from '../attendance/attendanceSessionService';
 
 export interface StudentFilters {
   search?: string;
@@ -16,6 +17,16 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
   const client = getSupabaseClient();
   const secId = filters?.sectionId;
   const cacheKey = `${STUDENTS_CACHE_PREFIX}${secId || 'all'}`;
+
+  // Get teacher's assigned sections for strict data isolation
+  const mySections = await fetchClassSections();
+  const teacherSectionIds = mySections.map((s) => s.id);
+  const teacherSectionIdSet = new Set(teacherSectionIds);
+
+  // If teacher has no assigned classes, they cannot see any student records
+  if (teacherSectionIds.length === 0) {
+    return [];
+  }
 
   if (isNetworkOnline()) {
     try {
@@ -35,7 +46,14 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
         .order('last_name', { ascending: true });
 
       if (secId && secId !== 'all') {
+        // Verify that requested section belongs to teacher
+        if (!teacherSectionIdSet.has(secId)) {
+          return [];
+        }
         query = query.eq('section_id', secId);
+      } else {
+        // Strict scope to only the teacher's assigned classes
+        query = query.in('section_id', teacherSectionIds);
       }
 
       if (filters?.gradeLevel) {
@@ -72,13 +90,15 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
           } | null;
         }
 
-        const students: StudentWithSection[] = (data as unknown as StudentJoinRow[]).map((d) => ({
-          ...d,
-          created_at: d.created_at || new Date().toISOString(),
-          updated_at: d.updated_at || new Date().toISOString(),
-          section_name: d.class_sections?.section_name || 'Unassigned',
-          school_year_name: d.school_years?.name || 'Active Year',
-        }));
+        const students: StudentWithSection[] = (data as unknown as StudentJoinRow[])
+          .filter((d) => teacherSectionIdSet.has(d.section_id))
+          .map((d) => ({
+            ...d,
+            created_at: d.created_at || new Date().toISOString(),
+            updated_at: d.updated_at || new Date().toISOString(),
+            section_name: d.class_sections?.section_name || 'Unassigned',
+            school_year_name: d.school_years?.name || 'Active Year',
+          }));
 
         AppStorage.setJSON(cacheKey, students);
 
@@ -134,34 +154,55 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
 
   // Offline Fallback 2: If searching a specific section and cacheKey was empty, check class roster
   if ((!cached || cached.length === 0) && secId && secId !== 'all') {
-    const cachedRoster = getCachedClassRoster(secId);
-    if (cachedRoster.length > 0) {
-      cached = cachedRoster.map((s) => ({
-        ...s,
-        sex: 'MALE' as const,
-        birth_date: '2000-01-01',
-        grade_level: filters?.gradeLevel || 10,
-        school_year_id: 'default',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        section_name: 'Enrolled',
-        school_year_name: 'Current SY',
-      }));
+    if (teacherSectionIdSet.has(secId)) {
+      const cachedRoster = getCachedClassRoster(secId);
+      if (cachedRoster.length > 0) {
+        cached = cachedRoster.map((s) => ({
+          ...s,
+          sex: 'MALE' as const,
+          birth_date: '2000-01-01',
+          grade_level: filters?.gradeLevel || 10,
+          school_year_id: 'default',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          section_name: mySections.find((sec) => sec.id === secId)?.section_name || 'Enrolled',
+          school_year_name: 'Current SY',
+        }));
+      }
     }
   }
 
-  // Offline Fallback 3: If 'all' was queried and was empty, collect from all cached sections
+  // Offline Fallback 3: If 'all' was queried, only collect from the teacher's assigned section rosters
   if (!cached || cached.length === 0) {
     const allStudentsMap = new Map<string, StudentWithSection>();
-    try {
-      const keys = AppStorage.findKeysStartingWith(STUDENTS_CACHE_PREFIX);
-      for (const k of keys) {
-        if (k.endsWith('_all')) continue;
-        const list = AppStorage.getJSON<StudentWithSection[]>(k, []);
-        list.forEach((s) => allStudentsMap.set(s.id, s));
+    for (const sectionId of teacherSectionIds) {
+      const list = AppStorage.getJSON<StudentWithSection[]>(
+        `${STUDENTS_CACHE_PREFIX}${sectionId}`,
+        []
+      );
+      if (list.length > 0) {
+        list.forEach((s) => {
+          if (teacherSectionIdSet.has(s.section_id)) {
+            allStudentsMap.set(s.id, s);
+          }
+        });
+      } else {
+        const roster = getCachedClassRoster(sectionId);
+        const sectionName = mySections.find((sec) => sec.id === sectionId)?.section_name || 'Enrolled';
+        roster.forEach((s) => {
+          allStudentsMap.set(s.id, {
+            ...s,
+            sex: 'MALE' as const,
+            birth_date: '2000-01-01',
+            grade_level: s.grade_level || 10,
+            school_year_id: 'default',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            section_name: sectionName,
+            school_year_name: 'Current SY',
+          });
+        });
       }
-    } catch {
-      // Ignore
     }
     if (allStudentsMap.size > 0) {
       cached = Array.from(allStudentsMap.values());
@@ -169,7 +210,9 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
   }
 
   if (cached && cached.length > 0) {
-    let list = cached;
+    // Strictly filter out any students that do not belong to teacher's classes
+    let list = cached.filter((st) => teacherSectionIdSet.has(st.section_id));
+
     if (filters?.gradeLevel) {
       list = list.filter((st) => Number(st.grade_level) === Number(filters.gradeLevel));
     }

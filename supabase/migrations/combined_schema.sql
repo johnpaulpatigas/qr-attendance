@@ -1307,7 +1307,6 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         AND (
           teacher_id = (SELECT auth.uid())
           OR adviser_id = (SELECT auth.uid())
-          OR (teacher_id IS NULL AND adviser_id IS NULL)
         )
     )
     OR EXISTS (
@@ -1329,7 +1328,6 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         AND (
           teacher_id = (SELECT auth.uid())
           OR adviser_id = (SELECT auth.uid())
-          OR (teacher_id IS NULL AND adviser_id IS NULL)
         )
     )
   );

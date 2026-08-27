@@ -66,38 +66,15 @@ export const DashboardPage: React.FC = () => {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
-        // 1. Fetch Teacher's Class Sections
-        const { data: sectionData } = await client
-          .from('class_sections')
-          .select(
-            `
-            id,
-            grade_level,
-            section_name,
-            room_number,
-            students (
-              id
-            )
-          `
-          )
-          .order('grade_level', { ascending: true });
+        // 1. Fetch Teacher's Assigned Class Sections (Strict Teacher Isolation)
+        const mySections = await fetchClassSections();
 
-        interface SectionJoinRow {
-          id: string;
-          grade_level: number;
-          section_name: string;
-          room_number: string | null;
-          students?: { id: string }[] | null;
-        }
-
-        const mappedClasses: DashboardClass[] = (
-          (sectionData as unknown as SectionJoinRow[]) || []
-        ).map((s) => ({
+        const mappedClasses: DashboardClass[] = mySections.map((s) => ({
           id: s.id,
           grade_level: s.grade_level,
           section_name: s.section_name,
-          room_number: s.room_number,
-          student_count: Array.isArray(s.students) ? s.students.length : 0,
+          room_number: s.room_number || null,
+          student_count: s.student_count || 0,
         }));
 
         setClasses(mappedClasses);
