@@ -1,4 +1,13 @@
-import { getSupabaseClient } from '@qr-attendance/supabase';
+import {
+  getSupabaseClient,
+  AppStorage,
+  getStoredOfflineUser,
+  withNetworkTimeout,
+  saveCachedSections,
+  saveCachedSession,
+  saveCachedRecords,
+  getCachedRecords,
+} from '@qr-attendance/supabase';
 import type {
   AttendanceSession,
   AttendanceSummary,
@@ -8,6 +17,7 @@ import type {
   SessionType,
 } from '@qr-attendance/types';
 import { getCachedClassRoster, getQueuedScans } from './offlineQueueService';
+import { isNetworkOnline } from './networkManager';
 
 const SECTIONS_CACHE_KEY = 'teacher_cached_sections';
 const SESSION_CACHE_PREFIX = 'teacher_cached_session_';
@@ -15,108 +25,166 @@ const RECORDS_CACHE_PREFIX = 'teacher_cached_records_';
 
 export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
-  const { data: sessionData } = await client.auth.getSession();
-  const currentUserId = sessionData.session?.user?.id;
+  let currentUserId: string | undefined;
+
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    currentUserId = sessionData.session?.user?.id;
+  } catch {
+    // Ignore
+  }
+
+  if (!currentUserId) {
+    const offlineUser = getStoredOfflineUser('teacher');
+    currentUserId = offlineUser?.userId;
+  }
+
+  if (!currentUserId) {
+    const cachedProf = AppStorage.getJSON<{ id?: string } | null>('teacher_auth_profile', null);
+    currentUserId = cachedProf?.id;
+  }
+
   const userCacheKey = currentUserId
     ? `${SECTIONS_CACHE_KEY}_${currentUserId}`
     : SECTIONS_CACHE_KEY;
 
-  try {
-    const { data, error } = await client
-      .from('class_sections')
-      .select(
-        `
-        *,
-        school_years (
-          name
-        ),
-        students (
-          id
-        ),
-        section_subject_teachers (
-          id,
-          class_id,
-          subject_name,
-          teacher_id,
-          schedule_time
-        )
-      `
-      )
-      .order('grade_level', { ascending: false });
+  if (isNetworkOnline()) {
+    try {
+      const { data, error } = await withNetworkTimeout(
+        client
+          .from('class_sections')
+          .select(
+            `
+            *,
+            school_years (
+              name
+            ),
+            students (
+              id,
+              lrn,
+              first_name,
+              last_name,
+              middle_name,
+              suffix,
+              qr_identifier,
+              section_id
+            ),
+            section_subject_teachers (
+              id,
+              class_id,
+              subject_name,
+              teacher_id,
+              schedule_time
+            )
+          `
+          )
+          .order('grade_level', { ascending: false }),
+        4000
+      );
 
-    if (!error && data) {
-      if (data.length === 0) {
-        localStorage.removeItem(userCacheKey);
-        return [];
-      }
+      if (!error && data) {
+        if (data.length === 0) {
+          return [];
+        }
 
-      interface SectionJoinRow {
-        id: string;
-        grade_level: number;
-        section_name: string;
-        room_number: string | null;
-        school_year_id: string;
-        teacher_id: string | null;
-        adviser_id?: string | null;
-        created_at: string;
-        updated_at: string;
-        school_years?: { name: string } | null;
-        students?: { id: string }[] | null;
-        section_subject_teachers?:
-          | {
-              id: string;
-              class_id: string;
-              subject_name: string;
-              teacher_id: string;
-              schedule_time?: string | null;
-            }[]
-          | null;
-      }
+        interface SectionJoinRow {
+          id: string;
+          grade_level: number;
+          section_name: string;
+          room_number: string | null;
+          school_year_id: string;
+          teacher_id: string | null;
+          adviser_id?: string | null;
+          created_at: string;
+          updated_at: string;
+          school_years?: { name: string } | null;
+          students?: {
+            id: string;
+            lrn?: string;
+            first_name?: string;
+            last_name?: string;
+            middle_name?: string | null;
+            suffix?: string | null;
+            qr_identifier?: string;
+            section_id?: string;
+          }[] | null;
+          section_subject_teachers?:
+            | {
+                id: string;
+                class_id: string;
+                subject_name: string;
+                teacher_id: string;
+                schedule_time?: string | null;
+              }[]
+            | null;
+        }
 
-      const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map((d) => {
-        const isAdviser = Boolean(
-          currentUserId && (d.adviser_id === currentUserId || d.teacher_id === currentUserId)
+        const sections: ClassSectionWithDetails[] = (data as unknown as SectionJoinRow[]).map(
+          (d) => {
+            const isAdviser = Boolean(
+              currentUserId && (d.adviser_id === currentUserId || d.teacher_id === currentUserId)
+            );
+            const mySubjectAssignments = (d.section_subject_teachers || []).filter(
+              (st) => st.teacher_id === currentUserId
+            );
+            const isSubjectTeacher = mySubjectAssignments.length > 0;
+
+            return {
+              id: d.id,
+              grade_level: d.grade_level,
+              section_name: d.section_name,
+              room_number: d.room_number,
+              school_year_id: d.school_year_id,
+              teacher_id: d.teacher_id,
+              adviser_id: d.adviser_id || d.teacher_id,
+              created_at: d.created_at,
+              updated_at: d.updated_at,
+              school_year_name: d.school_years?.name || 'Active SY',
+              student_count: Array.isArray(d.students) ? d.students.length : 0,
+              subject_teachers: d.section_subject_teachers || [],
+              my_role: isAdviser ? 'adviser' : isSubjectTeacher ? 'subject_teacher' : undefined,
+              my_subject:
+                mySubjectAssignments.map((st) => st.subject_name).join(', ') || undefined,
+            };
+          }
         );
-        const mySubjectAssignments = (d.section_subject_teachers || []).filter(
-          (st) => st.teacher_id === currentUserId
-        );
-        const isSubjectTeacher = mySubjectAssignments.length > 0;
 
-        return {
-          id: d.id,
-          grade_level: d.grade_level,
-          section_name: d.section_name,
-          room_number: d.room_number,
-          school_year_id: d.school_year_id,
-          teacher_id: d.teacher_id,
-          adviser_id: d.adviser_id || d.teacher_id,
-          created_at: d.created_at,
-          updated_at: d.updated_at,
-          school_year_name: d.school_years?.name || 'Active SY',
-          student_count: Array.isArray(d.students) ? d.students.length : 0,
-          subject_teachers: d.section_subject_teachers || [],
-          my_role: isAdviser ? 'adviser' : isSubjectTeacher ? 'subject_teacher' : undefined,
-          my_subject: mySubjectAssignments.map((st) => st.subject_name).join(', ') || undefined,
-        };
-      });
+        // Cache sections under storage and SQLite
+        AppStorage.setJSON(userCacheKey, sections);
+        AppStorage.setJSON(SECTIONS_CACHE_KEY, sections);
+        saveCachedSections(sections).catch(() => {});
 
-      try {
-        localStorage.setItem(userCacheKey, JSON.stringify(sections));
-      } catch {
-        // Storage write ignored
+        return sections;
       }
-
-      return sections;
+    } catch {
+      // Fall back to local storage cache if offline or network error
     }
-  } catch {
-    // Fall back to local storage cache if offline
   }
 
+  // Fallback 1: User specific cache key
+  const userCached = AppStorage.getJSON<ClassSectionWithDetails[] | null>(userCacheKey, null);
+  if (userCached && userCached.length > 0) {
+    return userCached;
+  }
+
+  // Fallback 2: General cache key
+  const generalCached = AppStorage.getJSON<ClassSectionWithDetails[] | null>(
+    SECTIONS_CACHE_KEY,
+    null
+  );
+  if (generalCached && generalCached.length > 0) {
+    return generalCached;
+  }
+
+  // Fallback 3: Any key starting with SECTIONS_CACHE_KEY
   try {
-    const cached = localStorage.getItem(userCacheKey);
-    if (cached) return JSON.parse(cached) as ClassSectionWithDetails[];
+    const keys = AppStorage.findKeysStartingWith(SECTIONS_CACHE_KEY);
+    for (const key of keys) {
+      const list = AppStorage.getJSON<ClassSectionWithDetails[] | null>(key, null);
+      if (list && list.length > 0) return list;
+    }
   } catch {
-    // Storage read ignored
+    // Ignore
   }
 
   return [];
@@ -134,79 +202,85 @@ export async function getOrCreateAttendanceSession(
   const subjPart = subjectName ? `_${subjectName.replace(/\s+/g, '_')}` : '';
   const cacheKey = `${SESSION_CACHE_PREFIX}${classId}_${attendanceDate}_${sessionType}${subjPart}`;
 
-  // 1. Resolve authentic teacher ID from session if not provided
   let resolvedTeacherId = teacherId && teacherId.trim() !== '' ? teacherId.trim() : null;
   if (!resolvedTeacherId) {
-    const { data: sessionData } = await client.auth.getSession();
-    resolvedTeacherId = sessionData.session?.user?.id || null;
+    try {
+      const { data: sessionData } = await client.auth.getSession();
+      resolvedTeacherId = sessionData.session?.user?.id || null;
+    } catch {
+      // Ignore
+    }
+  }
+  if (!resolvedTeacherId) {
+    const offlineUser = getStoredOfflineUser('teacher');
+    resolvedTeacherId = offlineUser?.userId || null;
   }
 
-  try {
-    let query = client
-      .from('attendance_sessions')
-      .select('*')
-      .eq('class_id', classId)
-      .eq('attendance_date', attendanceDate)
-      .eq('session_type', sessionType);
-
-    if (subjectName) {
-      query = query.eq('subject_name', subjectName);
-    } else {
-      query = query.is('subject_name', null);
-    }
-
-    const { data: existing, error: findError } = await query.maybeSingle();
-
-    if (!findError && existing) {
-      const session = existing;
-      localStorage.setItem(cacheKey, JSON.stringify(session));
-      return session;
-    }
-
-    if (resolvedTeacherId) {
-      const newSession = {
-        class_id: classId,
-        teacher_id: resolvedTeacherId,
-        attendance_date: attendanceDate,
-        session_type: sessionType,
-        subject_name: subjectName || null,
-        started_at: new Date().toISOString(),
-      };
-
-      const { data: created, error: createError } = await client
+  if (isNetworkOnline()) {
+    try {
+      let query = client
         .from('attendance_sessions')
-        .insert(newSession)
-        .select()
-        .maybeSingle();
+        .select('*')
+        .eq('class_id', classId)
+        .eq('attendance_date', attendanceDate)
+        .eq('session_type', sessionType);
 
-      if (createError) {
-        if (createError.code === '23503') {
-          console.warn(`Class section ${classId} does not exist in database.`);
-          return null;
-        }
-      } else if (created) {
-        const session = created;
-        localStorage.setItem(cacheKey, JSON.stringify(session));
+      if (subjectName) {
+        query = query.eq('subject_name', subjectName);
+      } else {
+        query = query.is('subject_name', null);
+      }
+
+      const { data: existing, error: findError } = await withNetworkTimeout(
+        query.maybeSingle(),
+        3500
+      );
+
+      if (!findError && existing) {
+        const session = existing;
+        AppStorage.setJSON(cacheKey, session);
+        saveCachedSession(session).catch(() => {});
         return session;
       }
+
+      if (resolvedTeacherId) {
+        const newSession = {
+          class_id: classId,
+          teacher_id: resolvedTeacherId,
+          attendance_date: attendanceDate,
+          session_type: sessionType,
+          subject_name: subjectName || null,
+          started_at: new Date().toISOString(),
+        };
+
+        const { data: created, error: createError } = await withNetworkTimeout(
+          client.from('attendance_sessions').insert(newSession).select().maybeSingle(),
+          3500
+        );
+
+        if (createError) {
+          if (createError.code === '23503') {
+            console.warn(`Class section ${classId} does not exist in database.`);
+            return null;
+          }
+        } else if (created) {
+          const session = created;
+          AppStorage.setJSON(cacheKey, session);
+          saveCachedSession(session).catch(() => {});
+          return session;
+        }
+      }
+    } catch {
+      // Network offline fallback
     }
-  } catch {
-    // Network offline fallback
   }
 
   // Offline fallback: check local cache or construct offline session object
-  try {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached) as AttendanceSession;
-  } catch {
-    // Ignore
-  }
+  const cached = AppStorage.getJSON<AttendanceSession | null>(cacheKey, null);
+  if (cached) return cached;
 
   const offlineSession: AttendanceSession = {
-    id:
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : '00000000-0000-0000-0000-000000000000',
+    id: `offline_sess_${classId}_${attendanceDate}_${sessionType}${subjPart}`,
     class_id: classId,
     teacher_id: resolvedTeacherId || '',
     attendance_date: attendanceDate,
@@ -217,12 +291,8 @@ export async function getOrCreateAttendanceSession(
     created_at: new Date().toISOString(),
   };
 
-  try {
-    localStorage.setItem(cacheKey, JSON.stringify(offlineSession));
-  } catch {
-    // Ignore
-  }
-
+  AppStorage.setJSON(cacheKey, offlineSession);
+  saveCachedSession(offlineSession).catch(() => {});
   return offlineSession;
 }
 
@@ -234,14 +304,17 @@ export async function assignSubjectTeacher(
 ): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
   try {
-    const { error } = await client.from('section_subject_teachers').upsert(
-      {
-        class_id: classId,
-        subject_name: subjectName.trim(),
-        teacher_id: teacherId,
-        schedule_time: scheduleTime?.trim() || null,
-      },
-      { onConflict: 'class_id,subject_name,teacher_id' }
+    const { error } = await withNetworkTimeout(
+      client.from('section_subject_teachers').upsert(
+        {
+          class_id: classId,
+          subject_name: subjectName.trim(),
+          teacher_id: teacherId,
+          schedule_time: scheduleTime?.trim() || null,
+        },
+        { onConflict: 'class_id,subject_name,teacher_id' }
+      ),
+      3500
     );
 
     if (error) return { success: false, error: error.message };
@@ -259,7 +332,10 @@ export async function removeSubjectTeacher(
 ): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
   try {
-    const { error } = await client.from('section_subject_teachers').delete().eq('id', assignmentId);
+    const { error } = await withNetworkTimeout(
+      client.from('section_subject_teachers').delete().eq('id', assignmentId),
+      3500
+    );
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -275,15 +351,30 @@ export async function claimClassSection(
   classId: string
 ): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
-  const { data: authData } = await client.auth.getUser();
-  const userId = authData.user?.id;
+  let userId: string | undefined;
+
+  try {
+    const { data: authData } = await client.auth.getUser();
+    userId = authData.user?.id;
+  } catch {
+    // Ignore
+  }
+
+  if (!userId) {
+    const offlineUser = getStoredOfflineUser('teacher');
+    userId = offlineUser?.userId;
+  }
+
   if (!userId) return { success: false, error: 'User not authenticated' };
 
   try {
-    const { error } = await client
-      .from('class_sections')
-      .update({ adviser_id: userId, teacher_id: userId })
-      .eq('id', classId);
+    const { error } = await withNetworkTimeout(
+      client
+        .from('class_sections')
+        .update({ adviser_id: userId, teacher_id: userId })
+        .eq('id', classId),
+      3500
+    );
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -301,37 +392,35 @@ export async function fetchSessionRecords(
   const client = getSupabaseClient();
   const cacheKey = `${RECORDS_CACHE_PREFIX}${sessionId}`;
 
-  const isValidUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) &&
-    sessionId !== '00000000-0000-0000-0000-000000000000';
+  const isSyntheticOffline = sessionId.startsWith('offline_sess_') || sessionId === '00000000-0000-0000-0000-000000000000';
 
-  if (!isValidUuid || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-    try {
-      const cached = localStorage.getItem(cacheKey);
-      return cached ? (JSON.parse(cached) as AttendanceRecordWithStudent[]) : [];
-    } catch {
-      return [];
-    }
+  if (isSyntheticOffline || !isNetworkOnline()) {
+    const memRecords = AppStorage.getJSON<AttendanceRecordWithStudent[]>(cacheKey, []);
+    if (memRecords.length > 0) return memRecords;
+    return getCachedRecords(sessionId);
   }
 
   try {
-    const { data, error } = await client
-      .from('attendance')
-      .select(
+    const { data, error } = await withNetworkTimeout(
+      client
+        .from('attendance')
+        .select(
+          `
+          *,
+          students (
+            id,
+            lrn,
+            first_name,
+            last_name,
+            middle_name,
+            suffix
+          )
         `
-        *,
-        students (
-          id,
-          lrn,
-          first_name,
-          last_name,
-          middle_name,
-          suffix
         )
-      `
-      )
-      .eq('attendance_session_id', sessionId)
-      .order('recorded_at', { ascending: false });
+        .eq('attendance_session_id', sessionId)
+        .order('recorded_at', { ascending: false }),
+      4000
+    );
 
     if (!error && data) {
       interface AttendanceRecordJoinRow extends AttendanceRecord {
@@ -352,24 +441,17 @@ export async function fetchSessionRecords(
         student: d.students || undefined,
       }));
 
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(records));
-      } catch {
-        // Storage write ignored
-      }
-
+      AppStorage.setJSON(cacheKey, records);
+      saveCachedRecords(sessionId, records).catch(() => {});
       return records;
     }
   } catch {
-    // Fall back to local storage cache if offline
+    // Fall back to local storage cache if offline or timeout
   }
 
-  try {
-    const cached = localStorage.getItem(cacheKey);
-    return cached ? (JSON.parse(cached) as AttendanceRecordWithStudent[]) : [];
-  } catch {
-    return [];
-  }
+  const memRecords = AppStorage.getJSON<AttendanceRecordWithStudent[]>(cacheKey, []);
+  if (memRecords.length > 0) return memRecords;
+  return getCachedRecords(sessionId);
 }
 
 export async function fetchAttendanceSummary(
@@ -409,24 +491,27 @@ export async function fetchAttendanceSummary(
 
   // Query actual student count for class section
   let total = 0;
-  try {
-    const { count, error } = await client
-      .from('students')
-      .select('*', { count: 'exact', head: true })
-      .eq('section_id', classId);
+  if (isNetworkOnline()) {
+    try {
+      const { count, error } = await withNetworkTimeout(
+        client
+          .from('students')
+          .select('*', { count: 'exact', head: true })
+          .eq('section_id', classId),
+        3000
+      );
 
-    if (!error && typeof count === 'number') {
-      total = count;
+      if (!error && typeof count === 'number') {
+        total = count;
+      }
+    } catch {
+      // Offline fallback
     }
-  } catch {
-    // If offline, get count from cached roster
-    const cachedRoster = getCachedClassRoster(classId);
-    total = cachedRoster.length > 0 ? cachedRoster.length : records.length + queuedScans.length;
   }
 
   if (total === 0) {
     const cachedRoster = getCachedClassRoster(classId);
-    if (cachedRoster.length > 0) total = cachedRoster.length;
+    total = cachedRoster.length > 0 ? cachedRoster.length : records.length + queuedScans.length;
   }
 
   const recorded = present + late + absent;

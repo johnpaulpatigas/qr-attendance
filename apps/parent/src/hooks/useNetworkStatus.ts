@@ -1,33 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Network } from '@capacitor/network';
+import { isNetworkOnline, onNetworkStatusChange } from '../features/attendance/networkManager';
 
 export function useNetworkStatus(): boolean {
-  const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
-  );
+  const [isOnline, setIsOnline] = useState<boolean>(() => isNetworkOnline());
 
   useEffect(() => {
-    Network.getStatus()
-      .then((status) => {
-        setIsOnline(status.connected);
-      })
-      .catch(() => {
-        setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
-      });
+    setIsOnline(isNetworkOnline());
 
-    const handlerPromise = Network.addListener('networkStatusChange', (status) => {
-      setIsOnline(status.connected);
+    const unsubscribe = onNetworkStatusChange((online) => {
+      setIsOnline(online);
     });
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     return () => {
-      handlerPromise.then((h) => h.remove?.()).catch(() => {});
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      unsubscribe();
     };
   }, []);
 

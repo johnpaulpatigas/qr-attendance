@@ -1,6 +1,7 @@
-import { getSupabaseClient } from '@qr-attendance/supabase';
+import { getSupabaseClient, AppStorage, withNetworkTimeout } from '@qr-attendance/supabase';
 import { getUtc8DateString } from '@qr-attendance/validation';
 import type { AttendanceRecord, AttendanceStatus, NotificationLog } from '@qr-attendance/types';
+import { isNetworkOnline } from './networkManager';
 
 export interface AttendanceRecordWithTeacher extends AttendanceRecord {
   teacher_name?: string | null;
@@ -28,20 +29,11 @@ export interface StudentAttendanceMetrics {
 const CACHE_PREFIX = 'deped_parent_cache_';
 
 export function getCachedItem<T>(key: string): T | null {
-  try {
-    const data = localStorage.getItem(`${CACHE_PREFIX}${key}`);
-    return data ? (JSON.parse(data) as T) : null;
-  } catch {
-    return null;
-  }
+  return AppStorage.getJSON<T | null>(`${CACHE_PREFIX}${key}`, null);
 }
 
 export function setCachedItem<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(value));
-  } catch (err) {
-    console.warn('Failed to save parent cache:', err);
-  }
+  AppStorage.setJSON(`${CACHE_PREFIX}${key}`, value);
 }
 
 export async function fetchTodayAttendance(
@@ -52,7 +44,7 @@ export async function fetchTodayAttendance(
   const cacheKey = `today_${studentId}_${targetDate}`;
 
   // If offline, return immediately from cache if present
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (!isNetworkOnline()) {
     const cached = getCachedItem<TodayStudentStatus>(cacheKey);
     if (cached) return cached;
   }
@@ -60,18 +52,21 @@ export async function fetchTodayAttendance(
   const client = getSupabaseClient();
 
   try {
-    const { data, error } = await client
-      .from('attendance')
-      .select(
+    const { data, error } = await withNetworkTimeout(
+      client
+        .from('attendance')
+        .select(
+          `
+          *,
+          profiles:recorded_by (
+            full_name
+          )
         `
-        *,
-        profiles:recorded_by (
-          full_name
         )
-      `
-      )
-      .eq('student_id', studentId)
-      .eq('attendance_date', targetDate);
+        .eq('student_id', studentId)
+        .eq('attendance_date', targetDate),
+      4000
+    );
 
     if (error) {
       const cached = getCachedItem<TodayStudentStatus>(cacheKey);
@@ -146,18 +141,21 @@ export async function fetchTodayAttendance(
 export async function fetchAttendanceHistory(studentId: string): Promise<AttendanceRecord[]> {
   const cacheKey = `history_${studentId}`;
 
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (!isNetworkOnline()) {
     const cached = getCachedItem<AttendanceRecord[]>(cacheKey);
     if (cached) return cached;
   }
 
   const client = getSupabaseClient();
   try {
-    const { data, error } = await client
-      .from('attendance')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('attendance_date', { ascending: false });
+    const { data, error } = await withNetworkTimeout(
+      client
+        .from('attendance')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('attendance_date', { ascending: false }),
+      4000
+    );
 
     if (error || !data) {
       const cached = getCachedItem<AttendanceRecord[]>(cacheKey);
@@ -237,18 +235,21 @@ export async function fetchStudentStatistics(studentId: string): Promise<Student
 export async function fetchStudentNotificationLogs(studentId: string): Promise<NotificationLog[]> {
   const cacheKey = `notifs_${studentId}`;
 
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (!isNetworkOnline()) {
     const cached = getCachedItem<NotificationLog[]>(cacheKey);
     if (cached) return cached;
   }
 
   const client = getSupabaseClient();
   try {
-    const { data, error } = await client
-      .from('notification_logs')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await withNetworkTimeout(
+      client
+        .from('notification_logs')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false }),
+      4000
+    );
 
     if (error || !data) {
       const cached = getCachedItem<NotificationLog[]>(cacheKey);

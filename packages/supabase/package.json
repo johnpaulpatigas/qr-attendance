@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capacitor-community/sqlite": "^8.0.0",
     "@qr-attendance/types": "*",
     "@supabase/supabase-js": "^2.47.10"
   },

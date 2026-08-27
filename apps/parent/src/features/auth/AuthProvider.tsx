@@ -7,9 +7,12 @@ import {
   verifyOfflineAuthCredentials,
   getStoredOfflineUser,
   clearOfflineAuthSession,
+  AppStorage,
+  withNetworkTimeout,
 } from '@qr-attendance/supabase';
 import type { UserProfile, LinkedStudent } from '@qr-attendance/types';
 import { AuthContext, type SignUpParentParams } from './AuthContext';
+import { isNetworkOnline } from '../attendance/networkManager';
 
 const PARENT_PROFILE_KEY = 'parent_auth_profile';
 const PARENT_CHILDREN_KEY = 'parent_auth_children';
@@ -36,36 +39,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (offlineUser) {
       return offlineUser.profile;
     }
-    try {
-      const cached = localStorage.getItem(PARENT_PROFILE_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch {
-      return null;
-    }
+    const cached = AppStorage.getJSON<UserProfile | null>(PARENT_PROFILE_KEY, null);
+    return cached;
   });
 
   const [session, setSession] = useState<Session | null>(null);
   const [isOfflineAuth, setIsOfflineAuth] = useState(false);
   const [linkedChildren, setLinkedChildren] = useState<LinkedStudent[]>(() => {
-    try {
-      const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
+    return AppStorage.getJSON<LinkedStudent[]>(PARENT_CHILDREN_KEY, []);
   });
 
   const [activeChildId, setActiveChildId] = useState<string | null>(() => {
-    try {
-      const cached = localStorage.getItem(PARENT_CHILDREN_KEY);
-      if (cached) {
-        const list = JSON.parse(cached);
-        return list[0]?.student_id || null;
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    const cached = AppStorage.getJSON<LinkedStudent[]>(PARENT_CHILDREN_KEY, []);
+    return cached[0]?.student_id || null;
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -79,12 +65,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       lastResolvedUserIdRef.current = userId;
-      try {
+
+      if (isNetworkOnline()) {
         try {
-          const p = await getCurrentUserProfile(client, userId);
+          const p = await withNetworkTimeout(getCurrentUserProfile(client, userId), 3500);
           if (p) {
             setProfile(p);
-            localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(p));
+            AppStorage.setJSON(PARENT_PROFILE_KEY, p);
           } else {
             const fallbackProfile: UserProfile = {
               id: userId,
@@ -95,108 +82,110 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               updated_at: new Date().toISOString(),
             };
             setProfile(fallbackProfile);
-            localStorage.setItem(PARENT_PROFILE_KEY, JSON.stringify(fallbackProfile));
+            AppStorage.setJSON(PARENT_PROFILE_KEY, fallbackProfile);
           }
-        } catch {
-          const cached = localStorage.getItem(PARENT_PROFILE_KEY);
-          if (cached) setProfile(JSON.parse(cached));
-        }
 
-        const { data: parentRecord } = await client
-          .from('parents')
-          .select('id')
-          .eq('profile_id', userId)
-          .maybeSingle();
+          const { data: parentRecord } = await withNetworkTimeout(
+            client
+              .from('parents')
+              .select('id')
+              .eq('profile_id', userId)
+              .maybeSingle(),
+            3500
+          );
 
-        if (parentRecord) {
-          const { data: relations } = await client
-            .from('student_parents')
-            .select(
+          if (parentRecord) {
+            const { data: relations } = await withNetworkTimeout(
+              client
+                .from('student_parents')
+                .select(
+                  `
+                relationship,
+                is_primary,
+                students (
+                  id,
+                  lrn,
+                  first_name,
+                  last_name,
+                  middle_name,
+                  suffix,
+                  grade_level,
+                  class_sections (
+                    section_name
+                  )
+                )
               `
-            relationship,
-            is_primary,
-            students (
-              id,
-              lrn,
-              first_name,
-              last_name,
-              middle_name,
-              suffix,
-              grade_level,
-              class_sections (
-                section_name
-              )
-            )
-          `
-            )
-            .eq('parent_id', parentRecord.id);
+                )
+                .eq('parent_id', parentRecord.id),
+              3500
+            );
 
-          if (relations && relations.length > 0) {
-            interface StudentParentJoinRow {
-              relationship: string;
-              is_primary: boolean;
-              students: {
-                id: string;
-                lrn: string;
-                first_name: string;
-                last_name: string;
-                middle_name: string | null;
-                suffix: string | null;
-                grade_level: number;
-                class_sections?: {
-                  section_name: string;
+            if (relations && relations.length > 0) {
+              interface StudentParentJoinRow {
+                relationship: string;
+                is_primary: boolean;
+                students: {
+                  id: string;
+                  lrn: string;
+                  first_name: string;
+                  last_name: string;
+                  middle_name: string | null;
+                  suffix: string | null;
+                  grade_level: number;
+                  class_sections?: {
+                    section_name: string;
+                  } | null;
                 } | null;
-              } | null;
-            }
+              }
 
-            const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
-              .filter(
-                (
-                  rel
-                ): rel is StudentParentJoinRow & {
-                  students: NonNullable<StudentParentJoinRow['students']>;
-                } => Boolean(rel.students)
-              )
-              .map((rel) => ({
-                student_id: rel.students.id,
-                lrn: rel.students.lrn,
-                first_name: rel.students.first_name,
-                last_name: rel.students.last_name,
-                middle_name: rel.students.middle_name,
-                suffix: rel.students.suffix,
-                grade_level: rel.students.grade_level,
-                section_name: rel.students.class_sections?.section_name || 'Unassigned',
-                relationship: rel.relationship || 'Guardian',
-                is_primary: rel.is_primary || false,
-              }));
+              const children: LinkedStudent[] = (relations as unknown as StudentParentJoinRow[])
+                .filter(
+                  (
+                    rel
+                  ): rel is StudentParentJoinRow & {
+                    students: NonNullable<StudentParentJoinRow['students']>;
+                  } => Boolean(rel.students)
+                )
+                .map((rel) => ({
+                  student_id: rel.students.id,
+                  lrn: rel.students.lrn,
+                  first_name: rel.students.first_name,
+                  last_name: rel.students.last_name,
+                  middle_name: rel.students.middle_name,
+                  suffix: rel.students.suffix,
+                  grade_level: rel.students.grade_level,
+                  section_name: rel.students.class_sections?.section_name || 'Unassigned',
+                  relationship: rel.relationship || 'Guardian',
+                  is_primary: rel.is_primary || false,
+                }));
 
-            setLinkedChildren(children);
-            localStorage.setItem(PARENT_CHILDREN_KEY, JSON.stringify(children));
-            if (children.length > 0) {
-              setActiveChildId((prev) =>
-                prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
-              );
-            } else {
-              setActiveChildId(null);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Network error loading parent data, using cache:', err);
-        try {
-          const cachedChildren = localStorage.getItem(PARENT_CHILDREN_KEY);
-          if (cachedChildren) {
-            const children = JSON.parse(cachedChildren) as LinkedStudent[];
-            setLinkedChildren(children);
-            if (children.length > 0) {
-              setActiveChildId((prev) =>
-                prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
-              );
+              setLinkedChildren(children);
+              AppStorage.setJSON(PARENT_CHILDREN_KEY, children);
+              if (children.length > 0) {
+                setActiveChildId((prev) =>
+                  prev && children.some((c) => c.student_id === prev) ? prev : children[0].student_id
+                );
+              } else {
+                setActiveChildId(null);
+              }
+              return;
             }
           }
         } catch {
-          // Cached read error ignored
+          // Network timeout or offline fallback
         }
+      }
+
+      // Offline fallback: load from AppStorage
+      const cachedProfile = AppStorage.getJSON<UserProfile | null>(PARENT_PROFILE_KEY, null);
+      if (cachedProfile) setProfile(cachedProfile);
+
+      const cachedChildren = AppStorage.getJSON<LinkedStudent[]>(PARENT_CHILDREN_KEY, []);
+      if (cachedChildren.length > 0) {
+        setLinkedChildren(cachedChildren);
+        setActiveChildId((prev) =>
+          prev && cachedChildren.some((c) => c.student_id === prev) ? prev : cachedChildren[0].student_id
+        );
       }
     },
     [client]
@@ -257,7 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadProfileAndChildren(session.user.id, session.user.email);
       } else if (!isOfflineAuth) {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-        if (offlineUser && typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (offlineUser) {
           setUser({
             id: offlineUser.userId,
             email: offlineUser.email,
@@ -268,12 +257,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } as User);
           setProfile(offlineUser.profile);
           setIsOfflineAuth(true);
-        } else {
-          setProfile(null);
-          setLinkedChildren([]);
-          setActiveChildId(null);
-          localStorage.removeItem(PARENT_PROFILE_KEY);
-          localStorage.removeItem(PARENT_CHILDREN_KEY);
         }
       }
       setIsLoading(false);
@@ -288,10 +271,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     pass: string
   ): Promise<{ error: Error | null }> => {
-    const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
     // 1. Direct offline verification if network is disconnected
-    if (isDeviceOffline) {
+    if (!isNetworkOnline()) {
       const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
       if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
         const syntheticUser = {
@@ -305,6 +286,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUser(syntheticUser);
         setProfile(offlineRes.profile);
+        AppStorage.setJSON(PARENT_PROFILE_KEY, offlineRes.profile);
         setIsOfflineAuth(true);
         return { error: null };
       }
@@ -315,16 +297,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Online verification with Supabase Auth
     try {
-      const { data, error } = await client.auth.signInWithPassword({
-        email: email.trim(),
-        password: pass,
-      });
+      const { data, error } = await withNetworkTimeout(
+        client.auth.signInWithPassword({
+          email: email.trim(),
+          password: pass,
+        }),
+        4000
+      );
 
       if (error) {
         if (
           error.message.includes('fetch') ||
           error.message.includes('network') ||
-          error.message.includes('Failed to fetch')
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('timed out')
         ) {
           const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
           if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
@@ -337,6 +323,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               created_at: new Date().toISOString(),
             } as User);
             setProfile(offlineRes.profile);
+            AppStorage.setJSON(PARENT_PROFILE_KEY, offlineRes.profile);
             setIsOfflineAuth(true);
             return { error: null };
           }
@@ -361,6 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resolvedProfile,
           data.user.id
         );
+        AppStorage.setJSON(PARENT_PROFILE_KEY, resolvedProfile);
         setIsOfflineAuth(false);
       }
 
@@ -377,6 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           created_at: new Date().toISOString(),
         } as User);
         setProfile(offlineRes.profile);
+        AppStorage.setJSON(PARENT_PROFILE_KEY, offlineRes.profile);
         setIsOfflineAuth(true);
         return { error: null };
       }
@@ -393,9 +382,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const trimmedLrn = params.studentLrn.trim();
 
       try {
-        const { data: verifyRes, error: verifyErr } = await client.rpc('verify_student_lrn', {
-          target_lrn: trimmedLrn,
-        });
+        const { data: verifyRes, error: verifyErr } = await withNetworkTimeout(
+          client.rpc('verify_student_lrn', {
+            target_lrn: trimmedLrn,
+          }),
+          3500
+        );
         if (!verifyErr && verifyRes && verifyRes.exists === false) {
           return {
             error: new Error(
@@ -407,26 +399,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Continue if verification RPC is unreachable
       }
 
-      const { data: authData, error: signUpError } = await client.auth.signUp({
-        email: params.email.trim(),
-        password: params.password,
-        options: {
-          data: {
-            full_name: params.fullName.trim(),
-            role: 'parent',
-            student_lrn: trimmedLrn,
-            relationship: params.relationship || 'Parent',
+      const { data: authData, error: signUpError } = await withNetworkTimeout(
+        client.auth.signUp({
+          email: params.email.trim(),
+          password: params.password,
+          options: {
+            data: {
+              full_name: params.fullName.trim(),
+              role: 'parent',
+              student_lrn: trimmedLrn,
+              relationship: params.relationship || 'Parent',
+            },
           },
-        },
-      });
+        }),
+        5000
+      );
 
       if (signUpError) return { error: signUpError };
 
       if (!authData.session) {
-        const { data: signInData, error: signInErr } = await client.auth.signInWithPassword({
-          email: params.email.trim(),
-          password: params.password,
-        });
+        const { data: signInData, error: signInErr } = await withNetworkTimeout(
+          client.auth.signInWithPassword({
+            email: params.email.trim(),
+            password: params.password,
+          }),
+          4000
+        );
 
         if (!signInErr && signInData.user) {
           await loadProfileAndChildren(signInData.user.id, params.email.trim());
@@ -462,10 +460,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const trimmedLrn = studentLrn.trim();
 
-      const { data: rpcRes, error: rpcErr } = await client.rpc('link_student_to_parent', {
-        target_lrn: trimmedLrn,
-        relation_name: relationship,
-      });
+      const { data: rpcRes, error: rpcErr } = await withNetworkTimeout(
+        client.rpc('link_student_to_parent', {
+          target_lrn: trimmedLrn,
+          relation_name: relationship,
+        }),
+        3500
+      );
 
       if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
         const res = rpcRes as { success: boolean; message: string };
@@ -475,11 +476,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return res;
       }
 
-      const { data: student, error: studentError } = await client
-        .from('students')
-        .select('id, first_name, last_name')
-        .eq('lrn', trimmedLrn)
-        .maybeSingle();
+      const { data: student, error: studentError } = await withNetworkTimeout(
+        client
+          .from('students')
+          .select('id, first_name, last_name')
+          .eq('lrn', trimmedLrn)
+          .maybeSingle(),
+        3500
+      );
 
       if (studentError || !student) {
         return {
@@ -489,33 +493,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       let parentId: string;
-      const { data: existingParent } = await client
-        .from('parents')
-        .select('id')
-        .eq('profile_id', user.id)
-        .maybeSingle();
+      const { data: existingParent } = await withNetworkTimeout(
+        client
+          .from('parents')
+          .select('id')
+          .eq('profile_id', user.id)
+          .maybeSingle(),
+        3500
+      );
 
       if (existingParent) {
         parentId = existingParent.id;
       } else {
-        const { data: newParent, error: parentErr } = await client
-          .from('parents')
-          .insert({ profile_id: user.id })
-          .select('id')
-          .single();
+        const { data: newParent, error: parentErr } = await withNetworkTimeout(
+          client
+            .from('parents')
+            .insert({ profile_id: user.id })
+            .select('id')
+            .single(),
+          3500
+        );
 
         if (parentErr) throw new Error(parentErr.message);
         parentId = newParent.id;
       }
 
-      const { error: linkErr } = await client.from('student_parents').upsert(
-        {
-          student_id: student.id,
-          parent_id: parentId,
-          relationship,
-          is_primary: true,
-        },
-        { onConflict: 'student_id,parent_id' }
+      const { error: linkErr } = await withNetworkTimeout(
+        client.from('student_parents').upsert(
+          {
+            student_id: student.id,
+            parent_id: parentId,
+            relationship,
+            is_primary: true,
+          },
+          { onConflict: 'student_id,parent_id' }
+        ),
+        3500
       );
 
       if (linkErr) throw new Error(linkErr.message);
@@ -537,7 +550,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     lastResolvedUserIdRef.current = null;
     clearOfflineAuthSession(STORAGE_PREFIX);
-    await client.auth.signOut();
+    AppStorage.removeItem(PARENT_PROFILE_KEY);
+    AppStorage.removeItem(PARENT_CHILDREN_KEY);
+    try {
+      await client.auth.signOut();
+    } catch {
+      // Ignore
+    }
     setUser(null);
     setProfile(null);
     setSession(null);
@@ -548,9 +567,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string): Promise<{ error: Error | null }> => {
     try {
-      const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await withNetworkTimeout(
+        client.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+        4000
+      );
       return { error: error ? new Error(error.message) : null };
     } catch (err: unknown) {
       return {

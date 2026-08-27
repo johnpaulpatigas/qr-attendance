@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FileSpreadsheet,
   Printer,
@@ -38,9 +39,16 @@ import type { ClassSectionWithDetails } from '@qr-attendance/types';
 import { getUtc8DateString } from '@qr-attendance/validation';
 
 export const ReportsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSection =
+    searchParams.get('section') ||
+    searchParams.get('class_id') ||
+    searchParams.get('classId') ||
+    '';
+
   const [activeTab, setActiveTab] = useState<'sf2' | 'daily'>('sf2');
   const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(urlSection);
   const [selectedMonth, setSelectedMonth] = useState('8'); // August
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedDate, setSelectedDate] = useState(getUtc8DateString());
@@ -52,11 +60,19 @@ export const ReportsPage: React.FC = () => {
   useEffect(() => {
     fetchClassSections().then((secs) => {
       setSections(secs);
+      const querySection =
+        searchParams.get('section') ||
+        searchParams.get('class_id') ||
+        searchParams.get('classId');
       if (secs.length > 0) {
-        setSelectedClassId((prev) => prev || secs[0].id);
+        if (querySection && secs.some((s) => s.id === querySection)) {
+          setSelectedClassId(querySection);
+        } else {
+          setSelectedClassId((prev) => (secs.some((s) => s.id === prev) ? prev : secs[0].id));
+        }
       }
     });
-  }, []);
+  }, [searchParams]);
 
   const loadReports = useCallback(async () => {
     if (!selectedClassId) return;
@@ -159,7 +175,14 @@ export const ReportsPage: React.FC = () => {
             <Select
               label="Select Class / Section"
               value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedClassId(val);
+                const nextParams = new URLSearchParams(searchParams);
+                if (val) nextParams.set('section', val);
+                else nextParams.delete('section');
+                setSearchParams(nextParams, { replace: true });
+              }}
               options={sections.map((s) => ({
                 value: s.id,
                 label: formatGradeSection(s.grade_level, s.section_name),

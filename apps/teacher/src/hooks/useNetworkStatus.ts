@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Network } from '@capacitor/network';
+import { isNetworkOnline, onNetworkStatusChange } from '../features/attendance/networkManager';
 import { getQueuedCount, onQueueChange } from '../features/attendance/offlineQueueService';
 
 export interface NetworkStatus {
@@ -8,37 +8,22 @@ export interface NetworkStatus {
 }
 
 export function useNetworkStatus(): NetworkStatus {
-  const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
-  );
+  const [isOnline, setIsOnline] = useState<boolean>(() => isNetworkOnline());
   const [queuedCount, setQueuedCount] = useState<number>(() => getQueuedCount());
 
   useEffect(() => {
-    Network.getStatus()
-      .then((status) => {
-        setIsOnline(status.connected);
-      })
-      .catch(() => {
-        setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
-      });
+    setIsOnline(isNetworkOnline());
 
-    const handlerPromise = Network.addListener('networkStatusChange', (status) => {
-      setIsOnline(status.connected);
+    const unsubscribeNetwork = onNetworkStatusChange((online) => {
+      setIsOnline(online);
     });
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
 
     const unsubscribeQueue = onQueueChange((count) => {
       setQueuedCount(count);
     });
 
     return () => {
-      handlerPromise.then((h) => h.remove?.()).catch(() => {});
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      unsubscribeNetwork();
       unsubscribeQueue();
     };
   }, []);

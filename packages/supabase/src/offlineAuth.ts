@@ -1,4 +1,5 @@
 import type { UserProfile } from '@qr-attendance/types';
+import { AppStorage } from './storage';
 
 /**
  * Computes a SHA-256 hexadecimal hash string for offline credential verification.
@@ -43,8 +44,6 @@ export async function saveOfflineAuthCredentials(
   profile: UserProfile,
   userId: string
 ): Promise<void> {
-  if (typeof localStorage === 'undefined') return;
-
   try {
     const cleanEmail = email.trim().toLowerCase();
     const salt =
@@ -62,8 +61,8 @@ export async function saveOfflineAuthCredentials(
       lastSavedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(`${storagePrefix}_offline_auth_record`, JSON.stringify(record));
-    localStorage.setItem(`${storagePrefix}_offline_session_active`, 'true');
+    AppStorage.setJSON(`${storagePrefix}_offline_auth_record`, record);
+    AppStorage.setItem(`${storagePrefix}_offline_session_active`, 'true');
   } catch (err) {
     console.warn('Could not cache offline auth credentials:', err);
   }
@@ -74,16 +73,12 @@ export async function verifyOfflineAuthCredentials(
   email: string,
   password: string
 ): Promise<{ success: boolean; profile?: UserProfile; userId?: string; error?: string }> {
-  if (typeof localStorage === 'undefined') {
-    return {
-      success: false,
-      error: 'Offline storage unavailable on this device.',
-    };
-  }
-
   try {
-    const raw = localStorage.getItem(`${storagePrefix}_offline_auth_record`);
-    if (!raw) {
+    const record = AppStorage.getJSON<OfflineAuthRecord | null>(
+      `${storagePrefix}_offline_auth_record`,
+      null
+    );
+    if (!record) {
       return {
         success: false,
         error:
@@ -91,7 +86,6 @@ export async function verifyOfflineAuthCredentials(
       };
     }
 
-    const record = JSON.parse(raw) as OfflineAuthRecord;
     const cleanEmail = email.trim().toLowerCase();
 
     if (cleanEmail !== record.email) {
@@ -111,7 +105,7 @@ export async function verifyOfflineAuthCredentials(
     }
 
     // Mark session active
-    localStorage.setItem(`${storagePrefix}_offline_session_active`, 'true');
+    AppStorage.setItem(`${storagePrefix}_offline_session_active`, 'true');
 
     return {
       success: true,
@@ -129,16 +123,16 @@ export async function verifyOfflineAuthCredentials(
 export function getStoredOfflineUser(
   storagePrefix: string
 ): { userId: string; email: string; profile: UserProfile } | null {
-  if (typeof localStorage === 'undefined') return null;
-
   try {
-    const isActive = localStorage.getItem(`${storagePrefix}_offline_session_active`) === 'true';
+    const isActive = AppStorage.getItem(`${storagePrefix}_offline_session_active`) === 'true';
     if (!isActive) return null;
 
-    const raw = localStorage.getItem(`${storagePrefix}_offline_auth_record`);
-    if (!raw) return null;
+    const record = AppStorage.getJSON<OfflineAuthRecord | null>(
+      `${storagePrefix}_offline_auth_record`,
+      null
+    );
+    if (!record) return null;
 
-    const record = JSON.parse(raw) as OfflineAuthRecord;
     return {
       userId: record.userId,
       email: record.email,
@@ -150,9 +144,8 @@ export function getStoredOfflineUser(
 }
 
 export function clearOfflineAuthSession(storagePrefix: string): void {
-  if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.removeItem(`${storagePrefix}_offline_session_active`);
+    AppStorage.removeItem(`${storagePrefix}_offline_session_active`);
   } catch {
     // Ignore
   }

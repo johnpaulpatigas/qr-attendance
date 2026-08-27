@@ -362,7 +362,13 @@ export const ClassesPage: React.FC = () => {
                         Roster
                       </Button>
                     </Link>
-                    <Link to={`/attendance`}>
+                    <Link
+                      to={`/attendance?section=${cls.id}&grade=${cls.grade_level}${
+                        cls.my_subject
+                          ? `&subject=${encodeURIComponent(cls.my_subject.split(',')[0].trim())}`
+                          : ''
+                      }`}
+                    >
                       <Button
                         variant="primary"
                         size="sm"

@@ -7,9 +7,12 @@ import {
   verifyOfflineAuthCredentials,
   getStoredOfflineUser,
   clearOfflineAuthSession,
+  AppStorage,
+  withNetworkTimeout,
 } from '@qr-attendance/supabase';
 import type { UserProfile } from '@qr-attendance/types';
 import { AuthContext } from './AuthContext';
+import { isNetworkOnline } from '../attendance/networkManager';
 
 const CACHE_PROFILE_KEY = 'teacher_auth_profile';
 const STORAGE_PREFIX = 'teacher';
@@ -35,12 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (offlineUser) {
       return offlineUser.profile;
     }
-    try {
-      const cached = localStorage.getItem(CACHE_PROFILE_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch {
-      return null;
-    }
+    const cached = AppStorage.getJSON<UserProfile | null>(CACHE_PROFILE_KEY, null);
+    return cached;
   });
 
   const [session, setSession] = useState<Session | null>(null);
@@ -56,51 +55,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       lastResolvedUserIdRef.current = userId;
-      try {
-        const p = await getCurrentUserProfile(client, userId);
-        if (p && (p.role === 'teacher' || p.role === 'admin')) {
-          setProfile(p);
-          localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(p));
-        } else if (p) {
-          setProfile(null);
-          localStorage.removeItem(CACHE_PROFILE_KEY);
-          await client.auth.signOut();
-        } else {
-          const cached = localStorage.getItem(CACHE_PROFILE_KEY);
-          if (cached) {
-            setProfile(JSON.parse(cached));
-          } else {
-            const fallbackProfile: UserProfile = {
-              id: userId,
-              role: 'teacher',
-              full_name: email?.split('@')[0] || 'Teacher',
-              email: email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            setProfile(fallbackProfile);
-            localStorage.setItem(CACHE_PROFILE_KEY, JSON.stringify(fallbackProfile));
-          }
-        }
-      } catch {
-        // Offline fallback: load from localStorage
+
+      if (isNetworkOnline()) {
         try {
-          const cached = localStorage.getItem(CACHE_PROFILE_KEY);
-          if (cached) {
-            setProfile(JSON.parse(cached));
-          } else {
-            setProfile({
-              id: userId,
-              role: 'teacher',
-              full_name: email?.split('@')[0] || 'Teacher',
-              email: email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
+          const p = await withNetworkTimeout(getCurrentUserProfile(client, userId), 3500);
+          if (p && (p.role === 'teacher' || p.role === 'admin')) {
+            setProfile(p);
+            AppStorage.setJSON(CACHE_PROFILE_KEY, p);
+            return;
+          } else if (p) {
+            setProfile(null);
+            AppStorage.removeItem(CACHE_PROFILE_KEY);
+            await client.auth.signOut();
+            return;
           }
         } catch {
-          // Ignore
+          // Network timeout or error
         }
+      }
+
+      // Offline fallback: load from AppStorage
+      const cached = AppStorage.getJSON<UserProfile | null>(CACHE_PROFILE_KEY, null);
+      if (cached) {
+        setProfile(cached);
+      } else {
+        const fallbackProfile: UserProfile = {
+          id: userId,
+          role: 'teacher',
+          full_name: email?.split('@')[0] || 'Teacher',
+          email: email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setProfile(fallbackProfile);
+        AppStorage.setJSON(CACHE_PROFILE_KEY, fallbackProfile);
       }
     },
     [client]
@@ -164,8 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await handleProfileResolution(session.user.id, session.user.email);
       } else if (!isOfflineAuth) {
         const offlineUser = getStoredOfflineUser(STORAGE_PREFIX);
-        if (offlineUser && typeof navigator !== 'undefined' && !navigator.onLine) {
-          // Keep offline session alive during network disconnection
+        if (offlineUser) {
+          // Keep offline session alive
           setUser({
             id: offlineUser.userId,
             email: offlineUser.email,
@@ -176,9 +164,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } as User);
           setProfile(offlineUser.profile);
           setIsOfflineAuth(true);
-        } else {
-          setProfile(null);
-          localStorage.removeItem(CACHE_PROFILE_KEY);
         }
       }
       setIsLoading(false);
@@ -193,10 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     pass: string
   ): Promise<{ error: Error | null }> => {
-    const isDeviceOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
     // 1. Direct offline verification if network is disconnected
-    if (isDeviceOffline) {
+    if (!isNetworkOnline()) {
       const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
       if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
         const syntheticUser = {
@@ -210,6 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUser(syntheticUser);
         setProfile(offlineRes.profile);
+        AppStorage.setJSON(CACHE_PROFILE_KEY, offlineRes.profile);
         setIsOfflineAuth(true);
         return { error: null };
       }
@@ -220,17 +204,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Online verification with Supabase Auth
     try {
-      const { data, error } = await client.auth.signInWithPassword({
-        email: email.trim(),
-        password: pass,
-      });
+      const { data, error } = await withNetworkTimeout(
+        client.auth.signInWithPassword({
+          email: email.trim(),
+          password: pass,
+        }),
+        4000
+      );
 
       if (error) {
         // If server network error or fetch failure, attempt offline fallback
         if (
           error.message.includes('fetch') ||
           error.message.includes('network') ||
-          error.message.includes('Failed to fetch')
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('timed out')
         ) {
           const offlineRes = await verifyOfflineAuthCredentials(STORAGE_PREFIX, email, pass);
           if (offlineRes.success && offlineRes.profile && offlineRes.userId) {
@@ -243,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               created_at: new Date().toISOString(),
             } as User);
             setProfile(offlineRes.profile);
+            AppStorage.setJSON(CACHE_PROFILE_KEY, offlineRes.profile);
             setIsOfflineAuth(true);
             return { error: null };
           }
@@ -251,7 +240,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        const p = await getCurrentUserProfile(client, data.user.id);
+        const p = await withNetworkTimeout(getCurrentUserProfile(client, data.user.id), 3500).catch(
+          () => null
+        );
+
         if (p && p.role !== 'teacher' && p.role !== 'admin') {
           await client.auth.signOut();
           return {
@@ -280,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
 
         setProfile(resolvedProfile);
+        AppStorage.setJSON(CACHE_PROFILE_KEY, resolvedProfile);
         setIsOfflineAuth(false);
       }
 
@@ -297,6 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           created_at: new Date().toISOString(),
         } as User);
         setProfile(offlineRes.profile);
+        AppStorage.setJSON(CACHE_PROFILE_KEY, offlineRes.profile);
         setIsOfflineAuth(true);
         return { error: null };
       }
@@ -309,7 +303,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     lastResolvedUserIdRef.current = null;
     clearOfflineAuthSession(STORAGE_PREFIX);
-    await client.auth.signOut();
+    AppStorage.removeItem(CACHE_PROFILE_KEY);
+    try {
+      await client.auth.signOut();
+    } catch {
+      // Ignore
+    }
     setUser(null);
     setProfile(null);
     setSession(null);
@@ -318,9 +317,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string): Promise<{ error: Error | null }> => {
     try {
-      const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await withNetworkTimeout(
+        client.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+        4000
+      );
       return { error: error ? new Error(error.message) : null };
     } catch (err: unknown) {
       return {

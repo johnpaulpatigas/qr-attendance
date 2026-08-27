@@ -297,7 +297,13 @@ export const DashboardPage: React.FC = () => {
             </select>
           )}
 
-          <Link to="/attendance">
+          <Link
+            to={
+              selectedClassId && selectedClassId !== 'all'
+                ? `/attendance?section=${selectedClassId}`
+                : '/attendance'
+            }
+          >
             <Button
               size="md"
               className="shrink-0 bg-white font-bold text-blue-700 shadow-md hover:bg-blue-50"
@@ -448,7 +454,7 @@ export const DashboardPage: React.FC = () => {
                       {cls.room_number ? `• Room ${cls.room_number}` : ''}
                     </p>
                   </div>
-                  <Link to="/attendance">
+                  <Link to={`/attendance?section=${cls.id}&grade=${cls.grade_level}`}>
                     <Button
                       size="sm"
                       variant="outline"

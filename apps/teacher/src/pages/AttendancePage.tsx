@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   QrCode,
   Play,
@@ -81,14 +82,31 @@ function playScanTone(type: 'success' | 'duplicate' | 'error') {
 
 export const AttendancePage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const urlSection =
+    searchParams.get('section') ||
+    searchParams.get('class_id') ||
+    searchParams.get('classId') ||
+    '';
+  const urlSubject = searchParams.get('subject');
+  const urlSession =
+    searchParams.get('session') ||
+    searchParams.get('session_type') ||
+    searchParams.get('sessionType');
+  const urlDate = searchParams.get('date');
+  const autoScan = searchParams.get('scan') === 'true' || searchParams.get('start') === 'true';
+
   const { isOnline, queuedCount } = useNetworkStatus();
   const [isSyncing, setIsSyncing] = useState(false);
   const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [sessionType, setSessionType] = useState<SessionType>('morning');
-  const [attendanceDate, setAttendanceDate] = useState(getUtc8DateString());
+  const [selectedClassId, setSelectedClassId] = useState(urlSection);
+  const [sessionType, setSessionType] = useState<SessionType>(
+    urlSession === 'morning' || urlSession === 'afternoon' ? urlSession : 'morning'
+  );
+  const [attendanceDate, setAttendanceDate] = useState(urlDate || getUtc8DateString());
 
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState<string>(urlSubject || '');
 
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [summary, setSummary] = useState<AttendanceSummary>({
@@ -100,7 +118,7 @@ export const AttendancePage: React.FC = () => {
   });
 
   const [recentRecords, setRecentRecords] = useState<AttendanceRecordWithStudent[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanning, setIsScanning] = useState(autoScan);
   const [studentsInClass, setStudentsInClass] = useState<StudentWithSection[]>([]);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
@@ -131,23 +149,119 @@ export const AttendancePage: React.FC = () => {
   useEffect(() => {
     fetchClassSections().then((secs) => {
       setSections(secs);
+      const querySection =
+        searchParams.get('section') ||
+        searchParams.get('class_id') ||
+        searchParams.get('classId');
+
       if (secs.length > 0) {
-        setSelectedClassId((prev) => (secs.some((s) => s.id === prev) ? prev : secs[0].id));
+        if (querySection && secs.some((s) => s.id === querySection)) {
+          setSelectedClassId(querySection);
+        } else {
+          setSelectedClassId((prev) => (secs.some((s) => s.id === prev) ? prev : secs[0].id));
+        }
       } else {
         setSelectedClassId('');
       }
     });
-  }, []);
+  }, [searchParams]);
 
-  // Update default subject when selected class changes
+  // Sync state when URL params change
   useEffect(() => {
+    const querySection =
+      searchParams.get('section') ||
+      searchParams.get('class_id') ||
+      searchParams.get('classId');
+    const querySubject = searchParams.get('subject');
+    const querySession =
+      searchParams.get('session') ||
+      searchParams.get('session_type') ||
+      searchParams.get('sessionType');
+    const queryDate = searchParams.get('date');
+
+    if (querySection && sections.some((s) => s.id === querySection)) {
+      setSelectedClassId(querySection);
+    }
+    if (querySubject !== null && querySubject !== undefined) {
+      setSelectedSubject(querySubject);
+    }
+    if (querySession === 'morning' || querySession === 'afternoon') {
+      setSessionType(querySession);
+    }
+    if (queryDate) {
+      setAttendanceDate(queryDate);
+    }
+  }, [searchParams, sections]);
+
+  // Update default subject when selected class changes if not specified in searchParams
+  useEffect(() => {
+    if (!selectedClassId || sections.length === 0) return;
+    const querySubject = searchParams.get('subject');
+    if (querySubject !== null && querySubject !== undefined) {
+      setSelectedSubject(querySubject);
+      return;
+    }
+
     const activeSec = sections.find((s) => s.id === selectedClassId);
     if (activeSec?.my_subject) {
       setSelectedSubject(activeSec.my_subject.split(',')[0].trim());
     } else if (activeSec?.my_role === 'adviser') {
       setSelectedSubject('');
     }
-  }, [selectedClassId, sections]);
+  }, [selectedClassId, sections, searchParams]);
+
+  const handleClassChange = (newClassId: string) => {
+    setSelectedClassId(newClassId);
+    const activeSec = sections.find((s) => s.id === newClassId);
+    const defaultSubj = activeSec?.my_subject ? activeSec.my_subject.split(',')[0].trim() : '';
+    setSelectedSubject(defaultSubj);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (newClassId) {
+      nextParams.set('section', newClassId);
+      if (activeSec?.grade_level) {
+        nextParams.set('grade', String(activeSec.grade_level));
+      }
+    } else {
+      nextParams.delete('section');
+      nextParams.delete('grade');
+    }
+    if (defaultSubj) {
+      nextParams.set('subject', defaultSubj);
+    } else {
+      nextParams.delete('subject');
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleSubjectChange = (newSubject: string) => {
+    setSelectedSubject(newSubject);
+    const nextParams = new URLSearchParams(searchParams);
+    if (newSubject) {
+      nextParams.set('subject', newSubject);
+    } else {
+      nextParams.delete('subject');
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleSessionTypeChange = (newSession: SessionType) => {
+    setSessionType(newSession);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('session', newSession);
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setAttendanceDate(newDate);
+    const nextParams = new URLSearchParams(searchParams);
+    if (newDate) {
+      nextParams.set('date', newDate);
+    } else {
+      nextParams.delete('date');
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   // Initialize active session and load students when section/date/sessionType/subject changes
   const initSession = useCallback(async () => {
@@ -384,7 +498,7 @@ export const AttendancePage: React.FC = () => {
             <Select
               label="Select Class / Section"
               value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
+              onChange={(e) => handleClassChange(e.target.value)}
               options={
                 sections.length > 0
                   ? sections.map((s) => ({
@@ -398,25 +512,53 @@ export const AttendancePage: React.FC = () => {
             <Select
               label="Subject / Attendance Mode"
               value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              options={[
-                { value: '', label: 'Daily Homeroom / General Attendance' },
-                { value: 'Mathematics', label: 'Mathematics' },
-                { value: 'Science', label: 'Science' },
-                { value: 'English', label: 'English' },
-                { value: 'Filipino', label: 'Filipino' },
-                { value: 'Araling Panlipunan', label: 'Araling Panlipunan (AP)' },
-                { value: 'MAPEH', label: 'MAPEH' },
-                { value: 'TLE', label: 'TLE / TVL' },
-                { value: 'EsP', label: 'Edukasyon sa Pagpapakatao (EsP)' },
-                { value: 'Homeroom Guidance', label: 'Homeroom Guidance' },
-              ]}
+              onChange={(e) => handleSubjectChange(e.target.value)}
+              options={
+                selectedSubject &&
+                ![
+                  '',
+                  'Mathematics',
+                  'Science',
+                  'English',
+                  'Filipino',
+                  'Araling Panlipunan',
+                  'MAPEH',
+                  'TLE',
+                  'EsP',
+                  'Homeroom Guidance',
+                ].includes(selectedSubject)
+                  ? [
+                      { value: '', label: 'Daily Homeroom / General Attendance' },
+                      { value: 'Mathematics', label: 'Mathematics' },
+                      { value: 'Science', label: 'Science' },
+                      { value: 'English', label: 'English' },
+                      { value: 'Filipino', label: 'Filipino' },
+                      { value: 'Araling Panlipunan', label: 'Araling Panlipunan (AP)' },
+                      { value: 'MAPEH', label: 'MAPEH' },
+                      { value: 'TLE', label: 'TLE / TVL' },
+                      { value: 'EsP', label: 'Edukasyon sa Pagpapakatao (EsP)' },
+                      { value: 'Homeroom Guidance', label: 'Homeroom Guidance' },
+                      { value: selectedSubject, label: selectedSubject },
+                    ]
+                  : [
+                      { value: '', label: 'Daily Homeroom / General Attendance' },
+                      { value: 'Mathematics', label: 'Mathematics' },
+                      { value: 'Science', label: 'Science' },
+                      { value: 'English', label: 'English' },
+                      { value: 'Filipino', label: 'Filipino' },
+                      { value: 'Araling Panlipunan', label: 'Araling Panlipunan (AP)' },
+                      { value: 'MAPEH', label: 'MAPEH' },
+                      { value: 'TLE', label: 'TLE / TVL' },
+                      { value: 'EsP', label: 'Edukasyon sa Pagpapakatao (EsP)' },
+                      { value: 'Homeroom Guidance', label: 'Homeroom Guidance' },
+                    ]
+              }
             />
 
             <Select
               label="Session Type"
               value={sessionType}
-              onChange={(e) => setSessionType(e.target.value as SessionType)}
+              onChange={(e) => handleSessionTypeChange(e.target.value as SessionType)}
               options={[
                 { value: 'morning', label: 'Morning Session' },
                 { value: 'afternoon', label: 'Afternoon Session' },
@@ -430,7 +572,7 @@ export const AttendancePage: React.FC = () => {
               <input
                 type="date"
                 value={attendanceDate}
-                onChange={(e) => setAttendanceDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
               />
             </div>

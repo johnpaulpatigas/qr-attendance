@@ -14,8 +14,10 @@ import {
 import { loginSchema, passwordResetSchema } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth';
 import { useAppBackButton } from '../hooks/useAppBackButton';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 export const LoginPage: React.FC = () => {
+  const isOnline = useNetworkStatus();
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
 
   const [email, setEmail] = useState('');
@@ -207,7 +209,7 @@ export const LoginPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {typeof navigator !== 'undefined' && !navigator.onLine && (
+            {!isOnline && (
               <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500"></span>
                 <span>

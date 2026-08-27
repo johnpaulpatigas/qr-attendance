@@ -5,7 +5,17 @@ import type {
   OfflineSyncSummary,
 } from '@qr-attendance/types';
 import { parseQrPayload } from '@qr-attendance/validation';
-import { getSupabaseClient } from '@qr-attendance/supabase';
+import {
+  getSupabaseClient,
+  AppStorage,
+  withNetworkTimeout,
+  enqueueOfflineScan,
+  removeQueuedOfflineScan,
+  clearQueuedOfflineScans as clearSqliteQueue,
+  saveCachedStudents,
+  findCachedStudentByQr,
+} from '@qr-attendance/supabase';
+import { isNetworkOnline } from './networkManager';
 
 const QUEUE_STORAGE_KEY = 'mnhs_qr_attendance_offline_queue';
 const ROSTER_CACHE_KEY_PREFIX = 'mnhs_qr_roster_cache_';
@@ -18,6 +28,7 @@ export interface CachedStudent {
   last_name: string;
   middle_name: string | null;
   suffix: string | null;
+  grade_level?: number;
   qr_identifier: string;
   section_id: string;
 }
@@ -25,22 +36,22 @@ export interface CachedStudent {
 export function getQueuedScans(): QueuedAttendanceScan[] {
   try {
     const stored =
-      localStorage.getItem(QUEUE_STORAGE_KEY) ||
-      localStorage.getItem('deped_qr_attendance_offline_queue');
+      AppStorage.getItem(QUEUE_STORAGE_KEY) ||
+      AppStorage.getItem('deped_qr_attendance_offline_queue');
     if (!stored) return [];
     return JSON.parse(stored) as QueuedAttendanceScan[];
   } catch (err) {
-    console.error('Failed to parse offline scans from localStorage:', err);
+    console.error('Failed to parse offline scans from storage:', err);
     return [];
   }
 }
 
 export function saveQueuedScans(scans: QueuedAttendanceScan[]): void {
   try {
-    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(scans));
+    AppStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(scans));
     notifyQueueChange(scans.filter((s) => s.status === 'pending').length);
   } catch (err) {
-    console.error('Failed to save offline scans to localStorage:', err);
+    console.error('Failed to save offline scans to storage:', err);
   }
 }
 
@@ -73,31 +84,37 @@ export function onQueueChange(callback: (count: number) => void): () => void {
 }
 
 export function cacheClassRoster(classId: string, students: CachedStudent[]): void {
+  if (!classId || !students || students.length === 0) return;
   try {
-    localStorage.setItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`, JSON.stringify(students));
-    // Also keep a master lookup index for instant offline resolution
-    const masterIndexStr =
-      localStorage.getItem(MASTER_INDEX_KEY) ||
-      localStorage.getItem('deped_qr_master_students_index');
-    const masterIndex: Record<string, CachedStudent> = masterIndexStr
-      ? JSON.parse(masterIndexStr)
-      : {};
+    // 1. Save specific class roster cache in storage
+    AppStorage.setItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`, JSON.stringify(students));
+    AppStorage.setItem(`teacher_cached_students_${classId}`, JSON.stringify(students));
+
+    // 2. Keep a master lookup index for instant offline resolution
+    const masterIndex = AppStorage.getJSON<Record<string, CachedStudent>>(MASTER_INDEX_KEY, {});
     students.forEach((s) => {
-      masterIndex[s.qr_identifier] = s;
-      masterIndex[s.id] = s;
-      masterIndex[s.lrn] = s;
+      if (s.qr_identifier) masterIndex[s.qr_identifier] = s;
+      if (s.id) masterIndex[s.id] = s;
+      if (s.lrn) masterIndex[s.lrn] = s;
     });
-    localStorage.setItem(MASTER_INDEX_KEY, JSON.stringify(masterIndex));
+    AppStorage.setJSON(MASTER_INDEX_KEY, masterIndex);
+
+    // 3. Persist into SQLite table in background
+    saveCachedStudents(students).catch((err) => {
+      console.warn('Background SQLite cache failed:', err);
+    });
   } catch (err) {
     console.warn('Failed to cache class roster:', err);
   }
 }
 
 export function getCachedClassRoster(classId: string): CachedStudent[] {
+  if (!classId) return [];
   try {
     const stored =
-      localStorage.getItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`) ||
-      localStorage.getItem(`deped_qr_roster_cache_${classId}`);
+      AppStorage.getItem(`${ROSTER_CACHE_KEY_PREFIX}${classId}`) ||
+      AppStorage.getItem(`teacher_cached_students_${classId}`) ||
+      AppStorage.getItem(`deped_qr_roster_cache_${classId}`);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -106,53 +123,55 @@ export function getCachedClassRoster(classId: string): CachedStudent[] {
 
 export function findCachedStudent(classId: string, rawQrPayload: string): CachedStudent | null {
   const parsed = parseQrPayload(rawQrPayload);
-  if (!parsed.success || !parsed.identifier) return null;
-
-  const targetId = parsed.identifier;
+  const targetId = parsed.success && parsed.identifier ? parsed.identifier : rawQrPayload.replace(/^ATTENDANCE:/i, '').trim();
+  if (!targetId) return null;
 
   // 1. Search specific class roster
-  const roster = getCachedClassRoster(classId);
-  const foundInClass = roster.find(
-    (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
-  );
-  if (foundInClass) return foundInClass;
+  if (classId) {
+    const roster = getCachedClassRoster(classId);
+    const foundInClass = roster.find(
+      (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
+    );
+    if (foundInClass) return foundInClass;
+  }
 
   // 2. Search master student index
   try {
-    const masterIndexStr =
-      localStorage.getItem(MASTER_INDEX_KEY) ||
-      localStorage.getItem('deped_qr_master_students_index');
-    if (masterIndexStr) {
-      const masterIndex = JSON.parse(masterIndexStr);
-      if (masterIndex[targetId]) return masterIndex[targetId];
-    }
+    const masterIndex = AppStorage.getJSON<Record<string, CachedStudent>>(MASTER_INDEX_KEY, {});
+    if (masterIndex[targetId]) return masterIndex[targetId];
   } catch {
     // Ignore
   }
 
-  // 3. Fallback: Search all localStorage keys starting with mnhs_qr_roster_cache_ or deped_qr_roster_cache_
+  // 3. Fallback: Search all keys starting with mnhs_qr_roster_cache_ or teacher_cached_students_
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (
-        key &&
-        (key.startsWith(ROSTER_CACHE_KEY_PREFIX) || key.startsWith('deped_qr_roster_cache_'))
-      ) {
-        const listStr = localStorage.getItem(key);
-        if (listStr) {
-          const list = JSON.parse(listStr) as CachedStudent[];
-          const match = list.find(
-            (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
-          );
-          if (match) return match;
-        }
-      }
+    const keys = AppStorage.findKeysStartingWith(ROSTER_CACHE_KEY_PREFIX).concat(
+      AppStorage.findKeysStartingWith('teacher_cached_students_')
+    );
+    for (const key of keys) {
+      const list = AppStorage.getJSON<CachedStudent[]>(key, []);
+      const match = list.find(
+        (s) => s.qr_identifier === targetId || s.id === targetId || s.lrn === targetId
+      );
+      if (match) return match;
     }
   } catch {
     // Ignore
   }
 
   return null;
+}
+
+export async function findCachedStudentAsync(
+  classId: string,
+  rawQrPayload: string
+): Promise<CachedStudent | null> {
+  const syncResult = findCachedStudent(classId, rawQrPayload);
+  if (syncResult) return syncResult;
+
+  const parsed = parseQrPayload(rawQrPayload);
+  const targetId = parsed.success && parsed.identifier ? parsed.identifier : rawQrPayload.replace(/^ATTENDANCE:/i, '').trim();
+  return findCachedStudentByQr(targetId, classId);
 }
 
 export function enqueueScan(
@@ -196,21 +215,29 @@ export function enqueueScan(
 
   queue.push(newScan);
   saveQueuedScans(queue);
+
+  // Background persist to SQLite
+  enqueueOfflineScan(newScan).catch((err) => {
+    console.warn('Background SQLite enqueue failed:', err);
+  });
+
   return newScan;
 }
 
 export function removeQueuedScan(id: string): void {
   const queue = getQueuedScans().filter((s) => s.id !== id);
   saveQueuedScans(queue);
+  removeQueuedOfflineScan(id).catch(() => {});
 }
 
 export function clearQueuedScans(): void {
   saveQueuedScans([]);
+  clearSqliteQueue().catch(() => {});
 }
 
 /**
  * Synchronizes pending offline scans to Supabase.
- * Handles Edge Function calls and direct database fallback.
+ * Handles Edge Function calls and direct database fallback with timeout guards.
  */
 export async function syncOfflineQueue(
   onProgress?: (synced: number, total: number) => void
@@ -229,6 +256,11 @@ export async function syncOfflineQueue(
     return summary;
   }
 
+  if (!isNetworkOnline()) {
+    summary.errors.push('Device is currently offline.');
+    return summary;
+  }
+
   const client = getSupabaseClient();
   const remainingQueue: QueuedAttendanceScan[] = queue.filter((s) => s.status !== 'pending');
 
@@ -239,28 +271,34 @@ export async function syncOfflineQueue(
     try {
       if (!item.payload.session_id || item.payload.session_id.startsWith('offline_sess_')) {
         try {
-          const { data: serverSession } = await client
-            .from('attendance_sessions')
-            .select('id')
-            .eq('class_id', item.payload.class_id)
-            .eq('attendance_date', item.payload.attendance_date)
-            .eq('session_type', item.payload.session_type)
-            .maybeSingle();
+          const { data: serverSession } = await withNetworkTimeout(
+            client
+              .from('attendance_sessions')
+              .select('id')
+              .eq('class_id', item.payload.class_id)
+              .eq('attendance_date', item.payload.attendance_date)
+              .eq('session_type', item.payload.session_type)
+              .maybeSingle(),
+            3000
+          );
 
           if (serverSession) {
             item.payload.session_id = serverSession.id;
           } else {
-            const { data: newSess } = await client
-              .from('attendance_sessions')
-              .insert({
-                class_id: item.payload.class_id,
-                teacher_id: item.payload.recorded_by || '',
-                attendance_date: item.payload.attendance_date,
-                session_type: item.payload.session_type,
-                started_at: item.scanned_at || new Date().toISOString(),
-              })
-              .select('id')
-              .maybeSingle();
+            const { data: newSess } = await withNetworkTimeout(
+              client
+                .from('attendance_sessions')
+                .insert({
+                  class_id: item.payload.class_id,
+                  teacher_id: item.payload.recorded_by || '',
+                  attendance_date: item.payload.attendance_date,
+                  session_type: item.payload.session_type,
+                  started_at: item.scanned_at || new Date().toISOString(),
+                })
+                .select('id')
+                .maybeSingle(),
+              3000
+            );
             if (newSess) item.payload.session_id = newSess.id;
           }
         } catch {
@@ -268,9 +306,11 @@ export async function syncOfflineQueue(
         }
       }
 
-      const { data, error } = await client.functions.invoke<RecordAttendanceResponse>(
-        'record-attendance',
-        { body: item.payload }
+      const { data, error } = await withNetworkTimeout(
+        client.functions.invoke<RecordAttendanceResponse>('record-attendance', {
+          body: item.payload,
+        }),
+        3500
       );
 
       if (!error && data) {
@@ -288,29 +328,38 @@ export async function syncOfflineQueue(
         }
       } else {
         const parsedQr = parseQrPayload(item.payload.qr_payload);
-        if (parsedQr.success && parsedQr.identifier) {
-          const { data: studentData } = await client
-            .from('students')
-            .select('id, section_id')
-            .or(`qr_identifier.eq.${parsedQr.identifier},id.eq.${parsedQr.identifier}`)
-            .maybeSingle();
+        const identifier = parsedQr.success && parsedQr.identifier ? parsedQr.identifier : item.payload.qr_payload.replace(/^ATTENDANCE:/i, '').trim();
+
+        if (identifier) {
+          const { data: studentData } = await withNetworkTimeout(
+            client
+              .from('students')
+              .select('id, section_id')
+              .or(`qr_identifier.eq.${identifier},id.eq.${identifier}`)
+              .maybeSingle(),
+            3000
+          );
 
           const student = studentData as {
             id: string;
             section_id: string;
           } | null;
+
           if (student) {
-            const { error: insertError } = await client.from('attendance').insert({
-              student_id: student.id,
-              class_id: item.payload.class_id || student.section_id,
-              attendance_session_id: item.payload.session_id,
-              attendance_date: item.payload.attendance_date,
-              attendance_type: item.payload.session_type,
-              status: item.payload.status || 'present',
-              recorded_by: item.payload.recorded_by || '',
-              recorded_at: item.scanned_at,
-              source: 'qr_scan',
-            });
+            const { error: insertError } = await withNetworkTimeout(
+              client.from('attendance').insert({
+                student_id: student.id,
+                class_id: item.payload.class_id || student.section_id,
+                attendance_session_id: item.payload.session_id,
+                attendance_date: item.payload.attendance_date,
+                attendance_type: item.payload.session_type,
+                status: item.payload.status || 'present',
+                recorded_by: item.payload.recorded_by || '',
+                recorded_at: item.scanned_at,
+                source: 'qr_scan',
+              }),
+              3000
+            );
 
             if (insertError) {
               if (insertError.code === '23505') {
@@ -330,12 +379,13 @@ export async function syncOfflineQueue(
       }
     } catch (syncErr: unknown) {
       const errObj = syncErr as { message?: string };
-      const isNetworkError =
-        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      const isNetworkErr =
+        !isNetworkOnline() ||
         errObj?.message?.includes('Failed to fetch') ||
-        errObj?.message?.includes('NetworkError');
+        errObj?.message?.includes('NetworkError') ||
+        errObj?.message?.includes('timed out');
 
-      if (isNetworkError) {
+      if (isNetworkErr) {
         item.status = 'pending';
         remainingQueue.push(item, ...pendingScans.slice(i + 1));
         summary.errors.push('Network offline. Paused sync queue.');
