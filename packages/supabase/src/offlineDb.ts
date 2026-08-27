@@ -143,6 +143,30 @@ export async function initOfflineDatabase(): Promise<SQLiteDBConnection | null> 
       await dbConnection.open();
       await dbConnection.execute(DB_SCHEMA);
       isInitialized = true;
+
+      // Hydrate storage queue from SQLite on boot to protect against Webview restarts
+      try {
+        const res = await dbConnection.query(
+          'SELECT payload_json FROM local_offline_queue WHERE status = ? ORDER BY scanned_at ASC;',
+          ['pending']
+        );
+        if (res.values && res.values.length > 0) {
+          const sqliteScans: QueuedAttendanceScan[] = res.values.map((v: { payload_json: string }) =>
+            JSON.parse(v.payload_json)
+          );
+          const storageScans = AppStorage.getJSON<QueuedAttendanceScan[]>(
+            'mnhs_qr_attendance_offline_queue',
+            []
+          );
+          const mergedMap = new Map<string, QueuedAttendanceScan>();
+          sqliteScans.forEach((s) => mergedMap.set(s.id, s));
+          storageScans.forEach((s) => mergedMap.set(s.id, s));
+          AppStorage.setJSON('mnhs_qr_attendance_offline_queue', Array.from(mergedMap.values()));
+        }
+      } catch (hydrateErr) {
+        console.warn('Queue hydration notice:', hydrateErr);
+      }
+
       return dbConnection;
     }
   } catch (err) {

@@ -69,7 +69,12 @@ function handleOfflineQueueing(
     minute: '2-digit',
   });
 
-  enqueueScan(payload, {
+  const updatedPayload: RecordAttendancePayload = {
+    ...payload,
+    status: finalStatus,
+  };
+
+  enqueueScan(updatedPayload, {
     name: studentName,
     lrn: cachedStudent?.lrn,
   });
@@ -88,6 +93,22 @@ function handleOfflineQueueing(
           suffix: cachedStudent.suffix,
         }
       : undefined,
+    attendance: {
+      id: `offline_att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      student_id: cachedStudent?.id || '',
+      class_id: payload.class_id,
+      attendance_session_id: payload.session_id,
+      attendance_date: payload.attendance_date,
+      attendance_type: payload.session_type,
+      subject_name: payload.subject_name || null,
+      status: finalStatus,
+      recorded_by: payload.recorded_by || '',
+      recorded_at: scanTime.toISOString(),
+      source: 'qr_scan',
+      notes: 'Recorded offline',
+      created_at: scanTime.toISOString(),
+      updated_at: scanTime.toISOString(),
+    },
   };
 }
 

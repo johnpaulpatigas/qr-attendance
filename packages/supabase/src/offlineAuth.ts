@@ -124,20 +124,34 @@ export function getStoredOfflineUser(
   storagePrefix: string
 ): { userId: string; email: string; profile: UserProfile } | null {
   try {
-    const isActive = AppStorage.getItem(`${storagePrefix}_offline_session_active`) === 'true';
-    if (!isActive) return null;
+    const isActive = AppStorage.getItem(`${storagePrefix}_offline_session_active`);
+    if (isActive === 'false') return null;
 
     const record = AppStorage.getJSON<OfflineAuthRecord | null>(
       `${storagePrefix}_offline_auth_record`,
       null
     );
-    if (!record) return null;
+    if (record && record.userId && record.profile) {
+      return {
+        userId: record.userId,
+        email: record.email,
+        profile: record.profile,
+      };
+    }
 
-    return {
-      userId: record.userId,
-      email: record.email,
-      profile: record.profile,
-    };
+    const cachedProf = AppStorage.getJSON<UserProfile | null>(
+      `${storagePrefix}_auth_profile`,
+      null
+    );
+    if (cachedProf && cachedProf.id) {
+      return {
+        userId: cachedProf.id,
+        email: cachedProf.email || '',
+        profile: cachedProf,
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -145,7 +159,10 @@ export function getStoredOfflineUser(
 
 export function clearOfflineAuthSession(storagePrefix: string): void {
   try {
+    AppStorage.setItem(`${storagePrefix}_offline_session_active`, 'false');
     AppStorage.removeItem(`${storagePrefix}_offline_session_active`);
+    AppStorage.removeItem(`${storagePrefix}_offline_auth_record`);
+    AppStorage.removeItem(`${storagePrefix}_auth_profile`);
   } catch {
     // Ignore
   }

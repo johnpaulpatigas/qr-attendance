@@ -235,6 +235,8 @@ export function clearQueuedScans(): void {
   clearSqliteQueue().catch(() => {});
 }
 
+let isSyncInProgress = false;
+
 /**
  * Synchronizes pending offline scans to Supabase.
  * Handles Edge Function calls and direct database fallback with timeout guards.
@@ -242,6 +244,18 @@ export function clearQueuedScans(): void {
 export async function syncOfflineQueue(
   onProgress?: (synced: number, total: number) => void
 ): Promise<OfflineSyncSummary> {
+  if (isSyncInProgress) {
+    const queue = getQueuedScans();
+    const pendingScans = queue.filter((s) => s.status === 'pending');
+    return {
+      total: pendingScans.length,
+      synced: 0,
+      duplicates: 0,
+      failed: 0,
+      errors: ['Sync already in progress'],
+    };
+  }
+
   const queue = getQueuedScans();
   const pendingScans = queue.filter((s) => s.status === 'pending');
   const summary: OfflineSyncSummary = {
@@ -261,147 +275,219 @@ export async function syncOfflineQueue(
     return summary;
   }
 
+  isSyncInProgress = true;
   const client = getSupabaseClient();
   const remainingQueue: QueuedAttendanceScan[] = queue.filter((s) => s.status !== 'pending');
 
-  for (let i = 0; i < pendingScans.length; i++) {
-    const item = pendingScans[i];
-    item.status = 'syncing';
+  let currentAuthUserId: string | null = null;
+  try {
+    const { data: authData } = await client.auth.getUser();
+    currentAuthUserId = authData?.user?.id || null;
+  } catch {
+    // Ignore
+  }
 
-    try {
-      if (!item.payload.session_id || item.payload.session_id.startsWith('offline_sess_')) {
-        try {
-          const { data: serverSession } = await withNetworkTimeout(
-            client
+  try {
+    for (let i = 0; i < pendingScans.length; i++) {
+      const item = pendingScans[i];
+      item.status = 'syncing';
+
+      try {
+        let serverSessionId = item.payload.session_id;
+
+        // 1. Resolve or create attendance_sessions record on server if missing or offline-generated
+        if (!serverSessionId || serverSessionId.startsWith('offline_sess_')) {
+          try {
+            let sessionQuery = client
               .from('attendance_sessions')
               .select('id')
               .eq('class_id', item.payload.class_id)
               .eq('attendance_date', item.payload.attendance_date)
-              .eq('session_type', item.payload.session_type)
-              .maybeSingle(),
-            3000
+              .eq('session_type', item.payload.session_type);
+
+            if (item.payload.subject_name) {
+              sessionQuery = sessionQuery.eq('subject_name', item.payload.subject_name);
+            } else {
+              sessionQuery = sessionQuery.is('subject_name', null);
+            }
+
+            const { data: serverSession } = await withNetworkTimeout(
+              sessionQuery.maybeSingle(),
+              3500
+            );
+
+            if (serverSession) {
+              serverSessionId = serverSession.id;
+              item.payload.session_id = serverSession.id;
+            } else {
+              const teacherId =
+                item.payload.recorded_by || currentAuthUserId || '00000000-0000-0000-0000-000000000000';
+              const { data: newSess, error: sessErr } = await withNetworkTimeout(
+                client
+                  .from('attendance_sessions')
+                  .insert({
+                    class_id: item.payload.class_id,
+                    teacher_id: teacherId,
+                    attendance_date: item.payload.attendance_date,
+                    session_type: item.payload.session_type,
+                    subject_name: item.payload.subject_name || null,
+                    started_at: item.scanned_at || new Date().toISOString(),
+                  })
+                  .select('id')
+                  .single(),
+                3500
+              );
+
+              if (!sessErr && newSess) {
+                serverSessionId = newSess.id;
+                item.payload.session_id = newSess.id;
+              }
+            }
+          } catch (sessionErr) {
+            console.warn('Session resolution network notice:', sessionErr);
+          }
+        }
+
+        let isSynced = false;
+
+        // 2. Try Edge Function record-attendance
+        try {
+          const { data, error } = await withNetworkTimeout(
+            client.functions.invoke<RecordAttendanceResponse>('record-attendance', {
+              body: item.payload,
+            }),
+            3500
           );
 
-          if (serverSession) {
-            item.payload.session_id = serverSession.id;
-          } else {
-            const { data: newSess } = await withNetworkTimeout(
-              client
-                .from('attendance_sessions')
-                .insert({
-                  class_id: item.payload.class_id,
-                  teacher_id: item.payload.recorded_by || '',
-                  attendance_date: item.payload.attendance_date,
-                  session_type: item.payload.session_type,
-                  started_at: item.scanned_at || new Date().toISOString(),
-                })
-                .select('id')
-                .maybeSingle(),
-              3000
-            );
-            if (newSess) item.payload.session_id = newSess.id;
+          if (!error && data) {
+            if (data.status === 'recorded') {
+              summary.synced++;
+              isSynced = true;
+            } else if (data.status === 'already_recorded') {
+              summary.duplicates++;
+              isSynced = true;
+            } else if (!data.success) {
+              summary.failed++;
+              summary.errors.push(`${item.student_name || 'Student'}: ${data.message}`);
+              item.status = 'failed';
+              item.last_error = data.message;
+              remainingQueue.push(item);
+              continue;
+            }
           }
         } catch {
-          // Session resolution network error
+          // Edge function unavailable, proceed to direct database insert
         }
-      }
 
-      const { data, error } = await withNetworkTimeout(
-        client.functions.invoke<RecordAttendanceResponse>('record-attendance', {
-          body: item.payload,
-        }),
-        3500
-      );
+        // 3. Direct database fallback if edge function was unavailable
+        if (!isSynced) {
+          const parsedQr = parseQrPayload(item.payload.qr_payload);
+          const identifier =
+            parsedQr.success && parsedQr.identifier
+              ? parsedQr.identifier
+              : item.payload.qr_payload.replace(/^ATTENDANCE:/i, '').trim();
 
-      if (!error && data) {
-        if (data.status === 'recorded') {
-          summary.synced++;
-        } else if (data.status === 'already_recorded') {
-          summary.duplicates++;
-        } else if (!data.success) {
-          summary.failed++;
-          summary.errors.push(`${item.student_name || 'Student'}: ${data.message}`);
-          item.status = 'failed';
-          item.last_error = data.message;
-          remainingQueue.push(item);
-          continue;
-        }
-      } else {
-        const parsedQr = parseQrPayload(item.payload.qr_payload);
-        const identifier = parsedQr.success && parsedQr.identifier ? parsedQr.identifier : item.payload.qr_payload.replace(/^ATTENDANCE:/i, '').trim();
-
-        if (identifier) {
-          const { data: studentData } = await withNetworkTimeout(
-            client
+          if (identifier) {
+            const isUuid =
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+            let studentQuery = client
               .from('students')
-              .select('id, section_id')
-              .or(`qr_identifier.eq.${identifier},id.eq.${identifier}`)
-              .maybeSingle(),
-            3000
-          );
+              .select('id, section_id, lrn, first_name, last_name');
 
-          const student = studentData as {
-            id: string;
-            section_id: string;
-          } | null;
+            if (isUuid) {
+              studentQuery = studentQuery.or(`id.eq.${identifier},qr_identifier.eq.${identifier}`);
+            } else {
+              studentQuery = studentQuery.or(`qr_identifier.eq.${identifier},lrn.eq.${identifier}`);
+            }
 
-          if (student) {
-            const { error: insertError } = await withNetworkTimeout(
-              client.from('attendance').insert({
-                student_id: student.id,
-                class_id: item.payload.class_id || student.section_id,
-                attendance_session_id: item.payload.session_id,
-                attendance_date: item.payload.attendance_date,
-                attendance_type: item.payload.session_type,
-                status: item.payload.status || 'present',
-                recorded_by: item.payload.recorded_by || '',
-                recorded_at: item.scanned_at,
-                source: 'qr_scan',
-              }),
-              3000
+            const { data: studentData, error: stdErr } = await withNetworkTimeout(
+              studentQuery.maybeSingle(),
+              3500
             );
 
-            if (insertError) {
-              if (insertError.code === '23505') {
-                summary.duplicates++;
+            const student = studentData as {
+              id: string;
+              section_id: string;
+            } | null;
+
+            if (student) {
+              const { error: insertError } = await withNetworkTimeout(
+                client.from('attendance').insert({
+                  student_id: student.id,
+                  class_id: item.payload.class_id || student.section_id,
+                  attendance_session_id: serverSessionId,
+                  attendance_date: item.payload.attendance_date,
+                  attendance_type: item.payload.session_type,
+                  subject_name: item.payload.subject_name || null,
+                  status: item.payload.status || 'present',
+                  recorded_by: item.payload.recorded_by || currentAuthUserId || '',
+                  recorded_at: item.scanned_at,
+                  source: 'qr_scan',
+                }),
+                3500
+              );
+
+              if (insertError) {
+                if (insertError.code === '23505') {
+                  summary.duplicates++;
+                  isSynced = true;
+                } else {
+                  throw insertError;
+                }
               } else {
-                throw insertError;
+                summary.synced++;
+                isSynced = true;
               }
+            } else if (stdErr) {
+              throw stdErr;
             } else {
-              summary.synced++;
+              // Student not found
+              summary.failed++;
+              summary.errors.push(`${item.student_name || 'Student'}: Student record not found on server.`);
+              item.status = 'failed';
+              item.last_error = 'Student record not found on server';
+              remainingQueue.push(item);
+              continue;
             }
           }
         }
-      }
 
-      if (onProgress) {
-        onProgress(summary.synced + summary.duplicates + summary.failed, summary.total);
-      }
-    } catch (syncErr: unknown) {
-      const errObj = syncErr as { message?: string };
-      const isNetworkErr =
-        !isNetworkOnline() ||
-        errObj?.message?.includes('Failed to fetch') ||
-        errObj?.message?.includes('NetworkError') ||
-        errObj?.message?.includes('timed out');
+        // Successfully synced or already recorded: clean up from SQLite and queue
+        if (isSynced) {
+          removeQueuedOfflineScan(item.id).catch(() => {});
+        }
 
-      if (isNetworkErr) {
-        item.status = 'pending';
-        remainingQueue.push(item, ...pendingScans.slice(i + 1));
-        summary.errors.push('Network offline. Paused sync queue.');
-        break;
-      }
+        if (onProgress) {
+          onProgress(summary.synced + summary.duplicates + summary.failed, summary.total);
+        }
+      } catch (syncErr: unknown) {
+        const errObj = syncErr as { message?: string };
+        const isNetworkErr =
+          !isNetworkOnline() ||
+          errObj?.message?.includes('Failed to fetch') ||
+          errObj?.message?.includes('NetworkError') ||
+          errObj?.message?.includes('timed out');
 
-      const msg = errObj?.message || 'Sync failed';
-      item.status = 'failed';
-      item.retry_count = (item.retry_count || 0) + 1;
-      item.last_error = msg;
-      remainingQueue.push(item);
-      summary.failed++;
-      summary.errors.push(`${item.student_name || 'Student'}: ${msg}`);
+        if (isNetworkErr) {
+          item.status = 'pending';
+          remainingQueue.push(item, ...pendingScans.slice(i + 1));
+          summary.errors.push('Network connection interrupted. Paused sync queue.');
+          break;
+        }
+
+        const msg = errObj?.message || 'Sync failed';
+        item.status = 'failed';
+        item.retry_count = (item.retry_count || 0) + 1;
+        item.last_error = msg;
+        remainingQueue.push(item);
+        summary.failed++;
+        summary.errors.push(`${item.student_name || 'Student'}: ${msg}`);
+      }
     }
+  } finally {
+    isSyncInProgress = false;
+    saveQueuedScans(remainingQueue);
   }
 
-  saveQueuedScans(remainingQueue);
   return summary;
 }

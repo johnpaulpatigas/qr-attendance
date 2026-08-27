@@ -14,6 +14,19 @@ function notifyListeners(online: boolean) {
       console.warn('Error in network listener:', err);
     }
   });
+
+  if (online && typeof window !== 'undefined') {
+    // Automatically trigger offline queue synchronization upon reconnection
+    import('./offlineQueueService')
+      .then(({ syncOfflineQueue, getQueuedCount }) => {
+        if (getQueuedCount() > 0) {
+          syncOfflineQueue().catch((err) => {
+            console.warn('Auto-sync on network reconnect notice:', err);
+          });
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 // Initialize Capacitor Network listener on module load
@@ -27,6 +40,7 @@ if (typeof window !== 'undefined') {
       .catch(() => {
         // Fallback to navigator
         cachedOnlineStatus = navigator.onLine;
+        notifyListeners(navigator.onLine);
       });
 
     Network.addListener('networkStatusChange', (status) => {
