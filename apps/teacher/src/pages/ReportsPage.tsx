@@ -26,8 +26,11 @@ import {
   TableCell,
   LoadingState,
 } from '@qr-attendance/ui';
-import { fetchClassSections } from '../features/attendance/attendanceSessionService';
 import { formatGradeSection } from '@qr-attendance/validation';
+import {
+  fetchClassSections,
+  getCachedSectionsSync,
+} from '../features/attendance/attendanceSessionService';
 import {
   generateSF2Report,
   fetchDailyReport,
@@ -46,9 +49,12 @@ export const ReportsPage: React.FC = () => {
     searchParams.get('classId') ||
     '';
 
+  const initialSections = getCachedSectionsSync();
   const [activeTab, setActiveTab] = useState<'sf2' | 'daily'>('sf2');
-  const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState(urlSection);
+  const [sections, setSections] = useState<ClassSectionWithDetails[]>(initialSections);
+  const [selectedClassId, setSelectedClassId] = useState(
+    urlSection || (initialSections.length > 0 ? initialSections[0].id : '')
+  );
   const [selectedMonth, setSelectedMonth] = useState('8'); // August
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedDate, setSelectedDate] = useState(getUtc8DateString());

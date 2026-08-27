@@ -23,6 +23,39 @@ const SECTIONS_CACHE_KEY = 'teacher_cached_sections';
 const SESSION_CACHE_PREFIX = 'teacher_cached_session_';
 const RECORDS_CACHE_PREFIX = 'teacher_cached_records_';
 
+let inMemorySectionsCache: ClassSectionWithDetails[] | null = null;
+
+export function getCachedSectionsSync(): ClassSectionWithDetails[] {
+  if (inMemorySectionsCache && inMemorySectionsCache.length > 0) {
+    return inMemorySectionsCache;
+  }
+  const cachedProf = AppStorage.getJSON<{ id?: string; role?: string } | null>(
+    'teacher_auth_profile',
+    null
+  );
+  const currentUserId = cachedProf?.id;
+  const userCacheKey = currentUserId
+    ? `${SECTIONS_CACHE_KEY}_${currentUserId}`
+    : SECTIONS_CACHE_KEY;
+
+  const userCached = AppStorage.getJSON<ClassSectionWithDetails[] | null>(userCacheKey, null);
+  if (userCached && userCached.length > 0) {
+    inMemorySectionsCache = userCached;
+    return userCached;
+  }
+
+  const generalCached = AppStorage.getJSON<ClassSectionWithDetails[] | null>(
+    SECTIONS_CACHE_KEY,
+    null
+  );
+  if (generalCached && generalCached.length > 0) {
+    inMemorySectionsCache = generalCached;
+    return generalCached;
+  }
+
+  return [];
+}
+
 export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
   const client = getSupabaseClient();
   let currentUserId: string | undefined;
@@ -163,6 +196,7 @@ export async function fetchClassSections(): Promise<ClassSectionWithDetails[]> {
           });
 
         // Cache sections under storage and SQLite
+        inMemorySectionsCache = sections;
         AppStorage.setJSON(userCacheKey, sections);
         AppStorage.setJSON(SECTIONS_CACHE_KEY, sections);
         saveCachedSections(sections).catch(() => {});

@@ -16,14 +16,20 @@ import {
   EmptyState,
 } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth';
-import { fetchAttendanceHistory } from '../features/attendance/parentAttendanceService';
+import {
+  fetchAttendanceHistory,
+  getCachedAttendanceHistorySync,
+} from '../features/attendance/parentAttendanceService';
 import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 import type { AttendanceRecord } from '@qr-attendance/types';
 
 export const AttendanceHistoryPage: React.FC = () => {
   const { activeChild } = useAuth();
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedHistory = activeChild ? getCachedAttendanceHistorySync(activeChild.student_id) : null;
+  const [history, setHistory] = useState<AttendanceRecord[]>(cachedHistory || []);
+  const [loading, setLoading] = useState(
+    Boolean(activeChild && (!cachedHistory || cachedHistory.length === 0))
+  );
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
@@ -31,7 +37,12 @@ export const AttendanceHistoryPage: React.FC = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const currentCached = getCachedAttendanceHistorySync(activeChild.student_id);
+    if (currentCached && currentCached.length > 0) {
+      setHistory(currentCached);
+    } else {
+      setLoading(true);
+    }
     fetchAttendanceHistory(activeChild.student_id).then((records) => {
       setHistory(records);
       setLoading(false);

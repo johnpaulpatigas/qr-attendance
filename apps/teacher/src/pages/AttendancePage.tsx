@@ -27,6 +27,7 @@ import type {
 import { QrScanner } from '../features/attendance/QrScanner';
 import {
   fetchClassSections,
+  getCachedSectionsSync,
   getOrCreateAttendanceSession,
   fetchAttendanceSummary,
   fetchSessionRecords,
@@ -97,10 +98,13 @@ export const AttendancePage: React.FC = () => {
   const urlDate = searchParams.get('date');
   const autoScan = searchParams.get('scan') === 'true' || searchParams.get('start') === 'true';
 
+  const initialSections = getCachedSectionsSync();
   const { isOnline, queuedCount } = useNetworkStatus();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState(urlSection);
+  const [sections, setSections] = useState<ClassSectionWithDetails[]>(initialSections);
+  const [selectedClassId, setSelectedClassId] = useState(
+    urlSection || (initialSections.length > 0 ? initialSections[0].id : '')
+  );
   const [sessionType, setSessionType] = useState<SessionType>(
     urlSession === 'morning' || urlSession === 'afternoon' ? urlSession : 'morning'
   );

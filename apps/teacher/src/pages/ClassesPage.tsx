@@ -20,6 +20,7 @@ import { formatGradeSection, cleanSectionName } from '@qr-attendance/validation'
 import { useAuth } from '../features/auth';
 import {
   fetchClassSections,
+  getCachedSectionsSync,
   claimClassSection,
   assignSubjectTeacher,
   removeSubjectTeacher,
@@ -47,9 +48,10 @@ interface TeacherOption {
 
 export const ClassesPage: React.FC = () => {
   const { user, profile } = useAuth();
-  const [classes, setClasses] = useState<ClassSectionWithDetails[]>([]);
+  const initialCached = getCachedSectionsSync();
+  const [classes, setClasses] = useState<ClassSectionWithDetails[]>(initialCached);
   const [teachersList, setTeachersList] = useState<TeacherOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialCached.length === 0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,8 +70,8 @@ export const ClassesPage: React.FC = () => {
   const [assigningSubject, setAssigningSubject] = useState(false);
   const [subjectError, setSubjectError] = useState<string | null>(null);
 
-  const loadClasses = async () => {
-    setLoading(true);
+  const loadClasses = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const data = await fetchClassSections();
       setClasses(data);

@@ -20,10 +20,13 @@ import {
   Badge,
   LoadingState,
 } from '@qr-attendance/ui';
-import { getSupabaseClient } from '@qr-attendance/supabase';
+import { getSupabaseClient, AppStorage } from '@qr-attendance/supabase';
 import { getUtc8DateString, formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth';
-import { fetchClassSections } from '../features/attendance/attendanceSessionService';
+import {
+  fetchClassSections,
+  getCachedSectionsSync,
+} from '../features/attendance/attendanceSessionService';
 import { getQueuedScans } from '../features/attendance/offlineQueueService';
 
 interface DashboardClass {
@@ -44,27 +47,37 @@ interface RecentScan {
 
 export const DashboardPage: React.FC = () => {
   const { user, profile } = useAuth();
-  const [classes, setClasses] = useState<DashboardClass[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
-
-  const [metrics, setMetrics] = useState({
-    totalEnrolled: 0,
+  const initialSections = getCachedSectionsSync();
+  const initialMappedClasses: DashboardClass[] = initialSections.map((s) => ({
+    id: s.id,
+    grade_level: s.grade_level,
+    section_name: s.section_name,
+    room_number: s.room_number || null,
+    student_count: s.student_count || 0,
+  }));
+  const cachedMetrics = AppStorage.getJSON('teacher_cached_dashboard_metrics', {
+    totalEnrolled: initialMappedClasses.reduce((sum, c) => sum + c.student_count, 0),
     present: 0,
     late: 0,
     absent: 0,
-    unrecorded: 0,
+    unrecorded: initialMappedClasses.reduce((sum, c) => sum + c.student_count, 0),
     attendanceRate: 0,
   });
+  const cachedScans = AppStorage.getJSON<RecentScan[]>('teacher_cached_recent_scans', []);
 
-  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [classes, setClasses] = useState<DashboardClass[]>(initialMappedClasses);
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [loading, setLoading] = useState(initialMappedClasses.length === 0);
+
+  const [metrics, setMetrics] = useState(cachedMetrics);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>(cachedScans);
 
   useEffect(() => {
     if (!user) return;
     const client = getSupabaseClient();
 
-    const loadDashboardData = async () => {
-      setLoading(true);
+    const loadDashboardData = async (showLoading = false) => {
+      if (showLoading) setLoading(true);
       try {
         // 1. Fetch Teacher's Assigned Class Sections (Strict Teacher Isolation)
         const mySections = await fetchClassSections();
@@ -150,14 +163,16 @@ export const DashboardPage: React.FC = () => {
         const unrecorded = Math.max(0, totalEnrolled - recordedCount);
         const rate = totalEnrolled > 0 ? Math.round(((present + late) / totalEnrolled) * 100) : 0;
 
-        setMetrics({
+        const newMetrics = {
           totalEnrolled,
           present,
           late,
           absent,
           unrecorded,
           attendanceRate: rate,
-        });
+        };
+        setMetrics(newMetrics);
+        AppStorage.setJSON('teacher_cached_dashboard_metrics', newMetrics);
 
         if (typedAttRecords.length > 0) {
           const scans: RecentScan[] = typedAttRecords.slice(0, 5).map((r) => ({
@@ -170,6 +185,7 @@ export const DashboardPage: React.FC = () => {
             recorded_at: r.recorded_at,
           }));
           setRecentScans(scans);
+          AppStorage.setJSON('teacher_cached_recent_scans', scans);
         } else {
           setRecentScans([]);
         }

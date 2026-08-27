@@ -21,8 +21,11 @@ import {
 } from '@qr-attendance/ui';
 import type { StudentWithSection, ClassSectionWithDetails } from '@qr-attendance/types';
 import { formatGradeSection, cleanSectionName } from '@qr-attendance/validation';
-import { fetchStudents } from '../features/students/studentService';
-import { fetchClassSections } from '../features/attendance/attendanceSessionService';
+import { fetchStudents, getCachedStudentsSync } from '../features/students/studentService';
+import {
+  fetchClassSections,
+  getCachedSectionsSync,
+} from '../features/attendance/attendanceSessionService';
 import { StudentQrModal } from '../features/qr/StudentQrModal';
 import { AddStudentModal } from '../features/students/AddStudentModal';
 import { printBatchStudentQrCards } from '../features/qr/qrUtils';
@@ -36,9 +39,18 @@ export const StudentsPage: React.FC = () => {
     'all';
   const urlGrade = searchParams.get('grade') || 'all';
 
-  const [students, setStudents] = useState<StudentWithSection[]>([]);
-  const [sections, setSections] = useState<ClassSectionWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialSections = getCachedSectionsSync();
+  const initialStudents = getCachedStudentsSync({
+    search: '',
+    gradeLevel: urlGrade !== 'all' ? Number(urlGrade) : undefined,
+    sectionId: urlSection !== 'all' ? urlSection : undefined,
+  });
+
+  const [students, setStudents] = useState<StudentWithSection[]>(initialStudents);
+  const [sections, setSections] = useState<ClassSectionWithDetails[]>(initialSections);
+  const [loading, setLoading] = useState(
+    initialStudents.length === 0 && initialSections.length === 0
+  );
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string>(urlGrade);
   const [sectionFilter, setSectionFilter] = useState<string>(urlSection);
@@ -77,8 +89,8 @@ export const StudentsPage: React.FC = () => {
     }
   }, [sections, searchParams]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     const data = await fetchStudents({
       search,
       gradeLevel: gradeFilter !== 'all' ? Number(gradeFilter) : undefined,

@@ -4,6 +4,8 @@ import { formatGradeSection } from '@qr-attendance/validation';
 import { useAuth } from '../features/auth';
 import {
   fetchStudentStatistics,
+  computeStudentAttendanceMetrics,
+  getCachedAttendanceHistorySync,
   type StudentAttendanceMetrics,
 } from '../features/attendance/parentAttendanceService';
 import { CheckCircle2, Clock, XCircle, Award, BarChart3 } from 'lucide-react';
@@ -11,8 +13,13 @@ import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 
 export const StatisticsPage: React.FC = () => {
   const { activeChild } = useAuth();
-  const [metrics, setMetrics] = useState<StudentAttendanceMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedHistory = activeChild ? getCachedAttendanceHistorySync(activeChild.student_id) : null;
+  const initialMetrics =
+    cachedHistory && cachedHistory.length > 0
+      ? computeStudentAttendanceMetrics(cachedHistory)
+      : null;
+  const [metrics, setMetrics] = useState<StudentAttendanceMetrics | null>(initialMetrics);
+  const [loading, setLoading] = useState(Boolean(activeChild && !initialMetrics));
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
@@ -20,7 +27,12 @@ export const StatisticsPage: React.FC = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const currentHistory = getCachedAttendanceHistorySync(activeChild.student_id);
+    if (currentHistory && currentHistory.length > 0) {
+      setMetrics(computeStudentAttendanceMetrics(currentHistory));
+    } else {
+      setLoading(true);
+    }
     fetchStudentStatistics(activeChild.student_id).then((res) => {
       setMetrics(res);
       setLoading(false);

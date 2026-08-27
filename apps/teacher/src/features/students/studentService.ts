@@ -3,7 +3,7 @@ import type { StudentWithSection } from '@qr-attendance/types';
 import type { CreateStudentInput, UpdateStudentInput } from '@qr-attendance/validation';
 import { cacheClassRoster, getCachedClassRoster } from '../attendance/offlineQueueService';
 import { isNetworkOnline } from '../attendance/networkManager';
-import { fetchClassSections } from '../attendance/attendanceSessionService';
+import { fetchClassSections, getCachedSectionsSync } from '../attendance/attendanceSessionService';
 
 export interface StudentFilters {
   search?: string;
@@ -12,6 +12,69 @@ export interface StudentFilters {
 }
 
 const STUDENTS_CACHE_PREFIX = 'teacher_cached_students_';
+
+const inMemoryStudentsCache = new Map<string, StudentWithSection[]>();
+
+export function getCachedStudentsSync(filters?: StudentFilters): StudentWithSection[] {
+  const secId = filters?.sectionId;
+  const cacheKey = `${STUDENTS_CACHE_PREFIX}${secId || 'all'}`;
+
+  const mySections = getCachedSectionsSync();
+  const teacherSectionIds = mySections.map((s) => s.id);
+  const teacherSectionIdSet = new Set(teacherSectionIds);
+
+  if (teacherSectionIds.length === 0) {
+    return [];
+  }
+
+  let cached = inMemoryStudentsCache.get(cacheKey) || null;
+
+  if (!cached || cached.length === 0) {
+    cached = AppStorage.getJSON<StudentWithSection[] | null>(cacheKey, null);
+    if (cached && cached.length > 0) {
+      inMemoryStudentsCache.set(cacheKey, cached);
+    }
+  }
+
+  // Fallback if 'all' or section query is not directly in cacheKey
+  if (!cached || cached.length === 0) {
+    const allStudentsMap = new Map<string, StudentWithSection>();
+    for (const sectionId of teacherSectionIds) {
+      const list =
+        inMemoryStudentsCache.get(`${STUDENTS_CACHE_PREFIX}${sectionId}`) ||
+        AppStorage.getJSON<StudentWithSection[]>(`${STUDENTS_CACHE_PREFIX}${sectionId}`, []);
+      if (list.length > 0) {
+        list.forEach((s) => {
+          if (teacherSectionIdSet.has(s.section_id)) {
+            allStudentsMap.set(s.id, s);
+          }
+        });
+      }
+    }
+    if (allStudentsMap.size > 0) {
+      cached = Array.from(allStudentsMap.values());
+    }
+  }
+
+  if (cached && cached.length > 0) {
+    let list = cached.filter((st) => teacherSectionIdSet.has(st.section_id));
+    if (filters?.gradeLevel) {
+      list = list.filter((st) => Number(st.grade_level) === Number(filters.gradeLevel));
+    }
+    if (filters?.search) {
+      const s = filters.search.toLowerCase();
+      list = list.filter(
+        (st) =>
+          st.first_name.toLowerCase().includes(s) ||
+          st.last_name.toLowerCase().includes(s) ||
+          st.lrn.includes(s)
+      );
+    }
+    return list;
+  }
+
+  return [];
+}
 
 export async function fetchStudents(filters?: StudentFilters): Promise<StudentWithSection[]> {
   const client = getSupabaseClient();
@@ -100,6 +163,7 @@ export async function fetchStudents(filters?: StudentFilters): Promise<StudentWi
             school_year_name: d.school_years?.name || 'Active Year',
           }));
 
+        inMemoryStudentsCache.set(cacheKey, students);
         AppStorage.setJSON(cacheKey, students);
 
         // Populate offline scanning roster for each class section

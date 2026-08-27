@@ -28,12 +28,38 @@ export interface StudentAttendanceMetrics {
 
 const CACHE_PREFIX = 'deped_parent_cache_';
 
+const inMemoryParentCache = new Map<string, unknown>();
+
 export function getCachedItem<T>(key: string): T | null {
-  return AppStorage.getJSON<T | null>(`${CACHE_PREFIX}${key}`, null);
+  if (inMemoryParentCache.has(key)) {
+    return inMemoryParentCache.get(key) as T;
+  }
+  const item = AppStorage.getJSON<T | null>(`${CACHE_PREFIX}${key}`, null);
+  if (item !== null) {
+    inMemoryParentCache.set(key, item);
+  }
+  return item;
 }
 
 export function setCachedItem<T>(key: string, value: T): void {
+  inMemoryParentCache.set(key, value);
   AppStorage.setJSON(`${CACHE_PREFIX}${key}`, value);
+}
+
+export function getCachedTodayAttendanceSync(
+  studentId: string,
+  dateStr?: string
+): TodayStudentStatus | null {
+  const targetDate = dateStr || getUtc8DateString();
+  return getCachedItem<TodayStudentStatus>(`today_${studentId}_${targetDate}`);
+}
+
+export function getCachedAttendanceHistorySync(studentId: string): AttendanceRecord[] | null {
+  return getCachedItem<AttendanceRecord[]>(`history_${studentId}`);
+}
+
+export function getCachedNotificationsSync(studentId: string): NotificationLog[] | null {
+  return getCachedItem<NotificationLog[]>(`notifs_${studentId}`);
 }
 
 export async function fetchTodayAttendance(

@@ -23,6 +23,7 @@ import { useAuth } from '../features/auth';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   fetchTodayAttendance,
+  getCachedTodayAttendanceSync,
   type TodayStudentStatus,
   type AttendanceRecordWithTeacher,
 } from '../features/attendance/parentAttendanceService';
@@ -74,7 +75,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
       <CardContent className="space-y-3.5 pt-4 text-sm">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-slate-500">
-            <Clock className="h-4 w-4 text-slate-400" /> Time In / Recorded
+            <Clock className="h-4 w-4 text-slate-400" /> Time Logged
           </span>
           <span
             className={`font-semibold ${isRecorded ? 'text-slate-900' : 'font-mono text-slate-400'}`}
@@ -117,8 +118,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
 export const TodayAttendancePage: React.FC = () => {
   const { activeChild } = useAuth();
   const isOnline = useNetworkStatus();
-  const [status, setStatus] = useState<TodayStudentStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedStatus = activeChild ? getCachedTodayAttendanceSync(activeChild.student_id) : null;
+  const [status, setStatus] = useState<TodayStudentStatus | null>(cachedStatus);
+  const [loading, setLoading] = useState(Boolean(activeChild && !cachedStatus));
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   useEffect(() => {
@@ -126,7 +128,12 @@ export const TodayAttendancePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const currentCached = getCachedTodayAttendanceSync(activeChild.student_id);
+    if (currentCached) {
+      setStatus(currentCached);
+    } else {
+      setLoading(true);
+    }
     fetchTodayAttendance(activeChild.student_id).then((res) => {
       setStatus(res);
       setLoading(false);

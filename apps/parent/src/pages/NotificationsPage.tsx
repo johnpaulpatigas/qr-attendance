@@ -11,15 +11,21 @@ import {
   EmptyState,
 } from '@qr-attendance/ui';
 import { useAuth } from '../features/auth';
-import { fetchStudentNotificationLogs } from '../features/attendance/parentAttendanceService';
+import {
+  fetchStudentNotificationLogs,
+  getCachedNotificationsSync,
+} from '../features/attendance/parentAttendanceService';
 import { requestPushPermissionAndRegister } from '../features/notifications/fcmService';
 import { LinkStudentModal } from '../components/layout/LinkStudentModal';
 import type { NotificationLog } from '@qr-attendance/types';
 
 export const NotificationsPage: React.FC = () => {
   const { user, activeChild } = useAuth();
-  const [logs, setLogs] = useState<NotificationLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedLogs = activeChild ? getCachedNotificationsSync(activeChild.student_id) : null;
+  const [logs, setLogs] = useState<NotificationLog[]>(cachedLogs || []);
+  const [loading, setLoading] = useState(
+    Boolean(activeChild && (!cachedLogs || cachedLogs.length === 0))
+  );
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
@@ -28,7 +34,12 @@ export const NotificationsPage: React.FC = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const currentCached = getCachedNotificationsSync(activeChild.student_id);
+    if (currentCached && currentCached.length > 0) {
+      setLogs(currentCached);
+    } else {
+      setLoading(true);
+    }
     fetchStudentNotificationLogs(activeChild.student_id).then((res) => {
       setLogs(res);
       setLoading(false);
