@@ -15,7 +15,7 @@ import {
   saveCachedStudents,
   findCachedStudentByQr,
 } from '@qr-attendance/supabase';
-import { isNetworkOnline } from './networkManager';
+import { isNetworkOnline, onNetworkStatusChange } from './networkManager';
 
 const QUEUE_STORAGE_KEY = 'mnhs_qr_attendance_offline_queue';
 const ROSTER_CACHE_KEY_PREFIX = 'mnhs_qr_roster_cache_';
@@ -490,4 +490,15 @@ export async function syncOfflineQueue(
   }
 
   return summary;
+}
+
+// Automatically trigger offline queue synchronization upon reconnection
+if (typeof window !== 'undefined') {
+  onNetworkStatusChange((online) => {
+    if (online && getQueuedCount() > 0) {
+      syncOfflineQueue().catch((err) => {
+        console.warn('Auto-sync on network reconnect notice:', err);
+      });
+    }
+  });
 }
